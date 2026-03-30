@@ -1,0 +1,378 @@
+import { useState } from "react"
+import {
+  ChevronDownIcon,
+  Loader2Icon,
+  PlusIcon,
+  TrashIcon,
+  XIcon,
+} from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import {
+  Drawer,
+  DrawerContent,
+  DrawerClose,
+} from "@/components/ui/drawer"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+
+export interface SectionEntry {
+  name: string
+  subjects: string[]
+}
+
+export interface ClassFormData {
+  grade: number | ""
+  sections: SectionEntry[]
+  academicYear: string
+}
+
+export interface AddClassDrawerProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSave: (data: ClassFormData) => void
+  availableSubjects: { value: string; label: string }[]
+  existingGrades?: number[]
+  isSaving?: boolean
+}
+
+function getCurrentAcademicYear() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  if (month >= 5) {
+    return `${year}-${year + 1}`
+  }
+  return `${year - 1}-${year}`
+}
+
+const emptyForm: ClassFormData = {
+  grade: "",
+  sections: [{ name: "A", subjects: [] }],
+  academicYear: getCurrentAcademicYear(),
+}
+
+export function AddClassDrawer({
+  open,
+  onOpenChange,
+  onSave,
+  availableSubjects,
+  existingGrades = [],
+  isSaving = false,
+}: AddClassDrawerProps) {
+  const [form, setForm] = useState<ClassFormData>({ ...emptyForm })
+  const [expandedSections, setExpandedSections] = useState<Set<number>>(
+    new Set([0]),
+  )
+
+  const toggleAccordion = (index: number) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+      return next
+    })
+  }
+
+  const handleGradeChange = (value: string) => {
+    const num = parseInt(value, 10)
+    if (!isNaN(num) && num >= 1 && num <= 12) {
+      setForm((prev) => ({ ...prev, grade: num }))
+    } else if (value === "") {
+      setForm((prev) => ({ ...prev, grade: "" }))
+    }
+  }
+
+  const addSection = () => {
+    setForm((prev) => {
+      const lastName = prev.sections[prev.sections.length - 1]?.name
+      const nextChar = String.fromCharCode(
+        (lastName?.charCodeAt(0) ?? 64) + 1,
+      )
+      return {
+        ...prev,
+        sections: [...prev.sections, { name: nextChar, subjects: [] }],
+      }
+    })
+    setExpandedSections((prev) => {
+      const next = new Set(prev)
+      next.add(form.sections.length)
+      return next
+    })
+  }
+
+  const updateSectionName = (index: number, value: string) => {
+    setForm((prev) => {
+      const updated = [...prev.sections]
+      updated[index] = { ...updated[index], name: value.toUpperCase() }
+      return { ...prev, sections: updated }
+    })
+  }
+
+  const removeSection = (index: number) => {
+    if (form.sections.length <= 1) return
+    setForm((prev) => ({
+      ...prev,
+      sections: prev.sections.filter((_, i) => i !== index),
+    }))
+    setExpandedSections((prev) => {
+      const next = new Set<number>()
+      for (const idx of prev) {
+        if (idx < index) next.add(idx)
+        else if (idx > index) next.add(idx - 1)
+      }
+      return next
+    })
+  }
+
+  const toggleSectionSubject = (sectionIndex: number, subjectValue: string) => {
+    setForm((prev) => {
+      const updated = [...prev.sections]
+      const section = updated[sectionIndex]
+      const exists = section.subjects.includes(subjectValue)
+      updated[sectionIndex] = {
+        ...section,
+        subjects: exists
+          ? section.subjects.filter((s) => s !== subjectValue)
+          : [...section.subjects, subjectValue],
+      }
+      return { ...prev, sections: updated }
+    })
+  }
+
+  const isFormValid =
+    form.grade !== "" &&
+    form.sections.length > 0 &&
+    form.sections.every(
+      (s) => s.name.trim() !== "" && s.subjects.length > 0,
+    ) &&
+    form.academicYear.trim() !== ""
+
+  const handleSave = () => {
+    onSave(form)
+    setForm({ ...emptyForm })
+    setExpandedSections(new Set([0]))
+  }
+
+  const handleClose = () => {
+    onOpenChange(false)
+    setForm({ ...emptyForm })
+    setExpandedSections(new Set([0]))
+  }
+
+  return (
+    <Drawer direction="right" open={open} onOpenChange={onOpenChange}>
+      <DrawerContent
+        className="ml-auto h-full rounded-none p-0 before:hidden"
+        style={{ width: 580, maxWidth: 580 }}
+      >
+        {/* Header */}
+        <div className="flex items-start gap-3 bg-background px-6 py-4">
+          <div className="flex flex-1 flex-col">
+            <div className="flex items-center gap-2">
+              <h2 className="flex-1 truncate text-base font-medium text-secondary-foreground">
+                Add Class Room
+              </h2>
+              <DrawerClose asChild>
+                <button
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Close"
+                >
+                  <XIcon className="size-4" />
+                </button>
+              </DrawerClose>
+            </div>
+            <p className="truncate text-sm text-muted-foreground">
+              Set up a new class with grade, sections, and subjects.
+            </p>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex min-h-full flex-col gap-6 bg-background px-6 py-2">
+            {/* Grade */}
+            <div className="flex flex-col gap-2">
+              <Label>Grade</Label>
+              <Select
+                value={form.grade === "" ? undefined : String(form.grade)}
+                onValueChange={handleGradeChange}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select grade (1–12)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => i + 1)
+                    .filter((g) => !existingGrades.includes(g))
+                    .map((g) => (
+                      <SelectItem key={g} value={String(g)}>
+                        Grade {g}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator />
+
+            {/* Sections with per-section subjects */}
+            <div className="flex flex-col gap-3">
+              <Label>Sections & Subjects</Label>
+
+              <div className="flex flex-col gap-2">
+                {form.sections.map((section, index) => {
+                  const isExpanded = expandedSections.has(index)
+                  return (
+                    <div
+                      key={index}
+                      className="overflow-hidden rounded-lg border"
+                    >
+                      {/* Accordion header */}
+                      <div className="flex items-center gap-2 bg-muted/30 px-3 py-2">
+                        <button
+                          type="button"
+                          className="shrink-0"
+                          onClick={() => toggleAccordion(index)}
+                        >
+                          <ChevronDownIcon
+                            className={cn(
+                              "size-4 text-muted-foreground transition-transform",
+                              !isExpanded && "-rotate-90",
+                            )}
+                          />
+                        </button>
+                        <span className="text-sm font-medium">Section</span>
+                        <input
+                          className="w-10 border-b border-transparent bg-transparent text-center text-sm font-medium outline-none focus:border-primary"
+                          value={section.name}
+                          maxLength={2}
+                          placeholder="—"
+                          onChange={(e) =>
+                            updateSectionName(index, e.target.value)
+                          }
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          ({section.subjects.length} subjects)
+                        </span>
+                        <div className="flex-1" />
+                        {form.sections.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => removeSection(index)}
+                          >
+                            <TrashIcon className="size-3.5 text-muted-foreground" />
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Accordion body */}
+                      {isExpanded && (
+                        <div className="flex flex-col gap-3 px-3 py-3">
+                          <div className="flex flex-col gap-1.5">
+                            <Label className="text-xs">Subjects</Label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {availableSubjects.map((subject) => {
+                                const selected = section.subjects.includes(
+                                  subject.value,
+                                )
+                                return (
+                                  <button
+                                    key={subject.value}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleSectionSubject(
+                                        index,
+                                        subject.value,
+                                      )
+                                    }
+                                    className={
+                                      selected
+                                        ? "inline-flex items-center rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors"
+                                        : "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                                    }
+                                  >
+                                    {subject.label}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {section.subjects.length === 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                Select at least one subject
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div>
+                <Button variant="secondary" size="sm" onClick={addSection}>
+                  <PlusIcon className="size-4" />
+                  Add Section
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Academic Year */}
+            <div className="flex flex-col gap-2">
+              <Label>Academic Year</Label>
+              <Input
+                placeholder="e.g. 2026-2027"
+                value={form.academicYear}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    academicYear: e.target.value,
+                  }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Pre-filled with the current school year. Edit if needed.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex flex-col gap-2 bg-background px-6 py-4">
+          <Button
+            size="lg"
+            className="w-full"
+            disabled={!isFormValid || isSaving}
+            onClick={handleSave}
+          >
+            {isSaving && <Loader2Icon className="animate-spin" />}
+            {isSaving ? "Creating..." : "Add Class Room"}
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onClick={handleClose}
+          >
+            Close
+          </Button>
+        </div>
+      </DrawerContent>
+    </Drawer>
+  )
+}
