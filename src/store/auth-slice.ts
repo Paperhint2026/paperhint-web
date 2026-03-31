@@ -7,7 +7,11 @@ export interface User {
   email: string
   role?: string
   school_id?: string
-  avatar?: string
+  profile_url?: string | null
+  designation?: string | null
+  phone_number?: string | null
+  date_of_joining?: number | string | null
+  department_id?: string | null
 }
 
 interface AuthState {
@@ -70,6 +74,12 @@ const authSlice = createSlice({
     clearError(state) {
       state.error = null
     },
+    updateUser(state, action: { payload: Partial<User> }) {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload }
+        localStorage.setItem("user", JSON.stringify(state.user))
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -91,5 +101,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { logout, clearError } = authSlice.actions
+export const { logout, clearError, updateUser } = authSlice.actions
 export default authSlice.reducer

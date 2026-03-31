@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Sidebar,
   SidebarContent,
@@ -64,10 +64,17 @@ export function AppSidebar() {
       <SidebarHeader>
         <div className="flex items-center p-2">
           <Avatar>
-            <AvatarImage src={user?.avatar} alt={user?.full_name} />
-            <AvatarFallback>
-              {user?.full_name ? getInitials(user.full_name) : "PH"}
-            </AvatarFallback>
+            {user?.profile_url ? (
+              <img
+                src={user.profile_url}
+                alt={user.full_name}
+                className="aspect-square size-full rounded-full object-cover"
+              />
+            ) : (
+              <AvatarFallback>
+                {user?.full_name ? getInitials(user.full_name) : "PH"}
+              </AvatarFallback>
+            )}
           </Avatar>
         </div>
       </SidebarHeader>

@@ -3,6 +3,8 @@ import { createBrowserRouter } from "react-router-dom"
 import { AppLayout } from "@/components/layout/app-layout"
 import { ProtectedRoute } from "@/components/layout/protected-route"
 import { LoginPage } from "@/modules/auth/pages/login-page"
+import { ForgotPasswordPage } from "@/modules/auth/pages/forgot-password-page"
+import { ResetPasswordPage } from "@/modules/auth/pages/reset-password-page"
 import { SetPasswordPage } from "@/modules/auth/pages/set-password-page"
 import { HomePage } from "@/modules/home/pages/home-page"
 import { ClassesPage } from "@/modules/classes/pages/classes-page"
@@ -14,6 +16,8 @@ import { HelpPage } from "@/modules/help/pages/help-page"
 
 export const router = createBrowserRouter([
   { path: "login", element: <LoginPage /> },
+  { path: "forgot-password", element: <ForgotPasswordPage /> },
+  { path: "reset-password", element: <ResetPasswordPage /> },
   { path: "set-password", element: <SetPasswordPage /> },
   {
     element: <ProtectedRoute />,
