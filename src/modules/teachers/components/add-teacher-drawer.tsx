@@ -207,6 +207,9 @@ export function AddTeacherDrawer({
     try {
       const formData = new FormData()
       formData.append("image", file)
+      if (teacherId) {
+        formData.append("user_id", teacherId)
+      }
 
       const token = localStorage.getItem("access_token")
       const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
