@@ -45,7 +45,7 @@ export function SettingsPage() {
 
   const [fullName, setFullName] = useState(user?.full_name ?? "")
   const [phone, setPhone] = useState(user?.phone_number ?? "")
-  const [designation, setDesignation] = useState(user?.designation ?? "")
+  const [designation] = useState(user?.designation ?? "")
   const [dateOfJoining, setDateOfJoining] = useState<Date | undefined>(
     user?.date_of_joining ? new Date(user.date_of_joining) : undefined,
   )
