@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import {
   BookOpenIcon,
   BrainCircuitIcon,
@@ -73,10 +74,24 @@ function getFileIcon(url: string) {
 
 export function KnowledgePage() {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [activeTab, setActiveTab] = useState<string>("")
+  const [activeTab, _setActiveTab] = useState<string>("")
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  const setActiveTab = useCallback(
+    (classSubjectId: string, assignmentsList?: Assignment[]) => {
+      _setActiveTab(classSubjectId)
+      const list = assignmentsList ?? assignments
+      const match = list.find((a) => a.class_subject_id === classSubjectId)
+      if (match?.class && match?.subject) {
+        const label = `${match.class.grade}${match.class.section}-${match.subject.subject_name}`.replace(/\s+/g, "-")
+        setSearchParams({ class: label }, { replace: true })
+      }
+    },
+    [assignments, setSearchParams],
+  )
 
   const [materials, setMaterials] = useState<Material[]>([])
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
@@ -122,12 +137,31 @@ export function KnowledgePage() {
       )
       const a = res.teacher.assignments ?? []
       setAssignments(a)
-      if (a.length > 0) setActiveTab(a[0].class_subject_id)
+
+      if (a.length > 0) {
+        const classParam = searchParams.get("class")
+        let restored = false
+        if (classParam) {
+          const match = a.find((asn) => {
+            if (!asn.class || !asn.subject) return false
+            const label = `${asn.class.grade}${asn.class.section}-${asn.subject.subject_name}`.replace(/\s+/g, "-")
+            return label === classParam
+          })
+          if (match) {
+            setActiveTab(match.class_subject_id, a)
+            restored = true
+          }
+        }
+        if (!restored) {
+          setActiveTab(a[0].class_subject_id, a)
+        }
+      }
     } catch (err) {
       console.error("Failed to fetch assignments:", err)
     } finally {
       setIsLoadingAssignments(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   const fetchMaterials = useCallback(async (classSubjectId: string) => {
