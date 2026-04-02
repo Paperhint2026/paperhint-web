@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom"
 import {
+  BookOpenIcon,
   ContactRoundIcon,
   GraduationCapIcon,
   HelpCircleIcon,
@@ -24,10 +25,11 @@ import {
 } from "@/components/ui/sidebar"
 
 const mainNavItems = [
-  { label: "Home", icon: HomeIcon, path: "/" },
-  { label: "Classes", icon: SchoolIcon, path: "/classes" },
-  { label: "Teachers", icon: ContactRoundIcon, path: "/teachers" },
-  { label: "Students", icon: GraduationCapIcon, path: "/students" },
+  { label: "Home", icon: HomeIcon, path: "/", roles: undefined },
+  { label: "Classes", icon: SchoolIcon, path: "/classes", roles: undefined },
+  { label: "Teachers", icon: ContactRoundIcon, path: "/teachers", roles: undefined },
+  { label: "Students", icon: GraduationCapIcon, path: "/students", roles: undefined },
+  { label: "Knowledge Base", icon: BookOpenIcon, path: "/knowledge", roles: ["teacher"] as string[] },
 ]
 
 const bottomNavItems = [
@@ -83,7 +85,9 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
+              {mainNavItems
+                .filter((item) => !item.roles || item.roles.includes(user?.role ?? ""))
+                .map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
                     isActive={isActive(item.path)}

@@ -11,6 +11,7 @@ import { ClassesPage } from "@/modules/classes/pages/classes-page"
 import { TeachersPage } from "@/modules/teachers/pages/teachers-page"
 import { TeacherOverviewPage } from "@/modules/teachers/pages/teacher-overview-page"
 import { StudentsPage } from "@/modules/students/pages/students-page"
+import { KnowledgePage } from "@/modules/knowledge/pages/knowledge-page"
 import { SettingsPage } from "@/modules/settings/pages/settings-page"
 import { HelpPage } from "@/modules/help/pages/help-page"
 
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
           { path: "teachers", element: <TeachersPage /> },
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },
+          { path: "knowledge", element: <KnowledgePage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "help", element: <HelpPage /> },
         ],

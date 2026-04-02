@@ -114,7 +114,7 @@ export function ClassesPage() {
   }
 
   return (
-    <div className="flex size-full flex-col gap-6 p-6">
+    <div className="flex size-full flex-col gap-6 overflow-y-auto p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <div className="flex flex-1 flex-col">

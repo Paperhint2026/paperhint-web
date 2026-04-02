@@ -9,7 +9,7 @@ export function AppLayout() {
     <TooltipProvider>
       <SidebarProvider>
         <AppSidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="flex h-svh flex-1 flex-col overflow-hidden">
           <Outlet />
         </main>
       </SidebarProvider>

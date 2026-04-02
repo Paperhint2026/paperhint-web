@@ -4,7 +4,6 @@ import {
   BadgeCheckIcon,
   CalendarIcon,
   CameraIcon,
-  CheckIcon,
   KeyIcon,
   Loader2Icon,
   MailIcon,
@@ -12,6 +11,8 @@ import {
   ShieldIcon,
   UserIcon,
 } from "lucide-react"
+
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
@@ -53,7 +54,6 @@ export function SettingsPage() {
   const [previewSrc, setPreviewSrc] = useState(user?.profile_url ?? "")
 
   const [isSaving, setIsSaving] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -61,8 +61,6 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isResetting, setIsResetting] = useState(false)
-  const [resetMessage, setResetMessage] = useState("")
-  const [resetError, setResetError] = useState("")
 
   const handlePhotoUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -94,6 +92,7 @@ export function SettingsPage() {
       dispatch(updateUser({ profile_url: data.preview_url }))
     } catch {
       setPreviewSrc(profileUrl)
+      toast.error("Failed to upload photo. Please try again.")
     } finally {
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -103,7 +102,6 @@ export function SettingsPage() {
   const handleSaveProfile = async () => {
     if (!user) return
     setIsSaving(true)
-    setSaveSuccess(false)
     try {
       await apiClient.put(`/api/auth/teacher/${user.id}`, {
         full_name: fullName,
@@ -125,25 +123,23 @@ export function SettingsPage() {
           profile_url: profileUrl,
         }),
       )
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
+      toast.success("Profile updated successfully")
     } catch (err) {
-      console.error("Failed to save profile:", err)
+      toast.error(
+        err instanceof Error ? err.message : "Failed to save profile",
+      )
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleResetPassword = async () => {
-    setResetError("")
-    setResetMessage("")
-
     if (newPassword.length < 6) {
-      setResetError("Password must be at least 6 characters")
+      toast.error("Password must be at least 6 characters")
       return
     }
     if (newPassword !== confirmPassword) {
-      setResetError("Passwords do not match")
+      toast.error("Passwords do not match")
       return
     }
 
@@ -153,12 +149,12 @@ export function SettingsPage() {
         current_password: currentPassword,
         new_password: newPassword,
       })
-      setResetMessage("Password changed successfully")
+      toast.success("Password changed successfully")
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
     } catch (err) {
-      setResetError(
+      toast.error(
         err instanceof Error ? err.message : "Failed to change password",
       )
     } finally {
@@ -345,27 +341,16 @@ export function SettingsPage() {
           </div>
 
           {/* Save button */}
-          <div className="flex items-center gap-3">
+          <div>
             <Button
               disabled={isSaving || !fullName.trim()}
               onClick={handleSaveProfile}
             >
-              {isSaving ? (
+              {isSaving && (
                 <Loader2Icon className="size-4 animate-spin" />
-              ) : saveSuccess ? (
-                <CheckIcon className="size-4" />
-              ) : null}
-              {isSaving
-                ? "Saving..."
-                : saveSuccess
-                  ? "Saved!"
-                  : "Save Changes"}
+              )}
+              {isSaving ? "Saving..." : "Save Changes"}
             </Button>
-            {saveSuccess && (
-              <span className="text-sm text-emerald-600">
-                Profile updated successfully
-              </span>
-            )}
           </div>
         </div>
 
@@ -408,13 +393,6 @@ export function SettingsPage() {
                 placeholder="Confirm new password"
               />
             </div>
-
-            {resetError && (
-              <p className="text-sm text-destructive">{resetError}</p>
-            )}
-            {resetMessage && (
-              <p className="text-sm text-emerald-600">{resetMessage}</p>
-            )}
 
             <div>
               <Button

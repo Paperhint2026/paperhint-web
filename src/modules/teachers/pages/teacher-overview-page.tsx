@@ -136,7 +136,7 @@ export function TeacherOverviewPage() {
 
   if (isLoading) {
     return (
-      <div className="flex size-full items-center justify-center">
+      <div className="flex size-full items-center justify-center overflow-y-auto">
         <Spinner className="size-6" />
       </div>
     )
@@ -144,7 +144,7 @@ export function TeacherOverviewPage() {
 
   if (error || !teacher) {
     return (
-      <div className="flex size-full flex-col items-center justify-center gap-4">
+      <div className="flex size-full flex-col items-center justify-center gap-4 overflow-y-auto">
         <p className="text-sm text-destructive">{error || "Teacher not found"}</p>
         <Button variant="outline" onClick={() => navigate("/teachers")}>
           <ArrowLeftIcon className="size-4" />

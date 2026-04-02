@@ -6,6 +6,7 @@ import { RouterProvider } from "react-router-dom"
 import "./index.css"
 import { store } from "@/store"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
 import { router } from "@/routes"
 
 const hash = window.location.hash
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
     <Provider store={store}>
       <ThemeProvider>
         <RouterProvider router={router} />
+        <Toaster richColors position="top-right" />
       </ThemeProvider>
     </Provider>
   </StrictMode>,
