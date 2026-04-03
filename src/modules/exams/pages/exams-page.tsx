@@ -9,6 +9,7 @@ import {
   PlusIcon,
   SparklesIcon,
   Trash2Icon,
+  UploadIcon,
 } from "lucide-react"
 import dayjs from "dayjs"
 import { toast } from "sonner"
@@ -55,6 +56,7 @@ interface Exam {
   chapters_selected: string[]
   total_marks: number
   question_count: number
+  source: "ai" | "uploaded" | null
   created_at: string
 }
 
@@ -391,7 +393,21 @@ export function ExamsPage() {
                   </div>
                 )}
 
-                <h3 className="pr-16 text-sm font-semibold">{exam.exam_name}</h3>
+                <div className="flex items-center gap-2 pr-16">
+                  <h3 className="text-sm font-semibold">{exam.exam_name}</h3>
+                  {exam.source && (
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold",
+                        exam.source === "ai"
+                          ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                          : "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
+                      )}
+                    >
+                      {exam.source === "ai" ? "AI Generated" : "Uploaded"}
+                    </span>
+                  )}
+                </div>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {(exam.chapters_selected ?? []).slice(0, 3).map((ch) => (
@@ -420,18 +436,29 @@ export function ExamsPage() {
                   </span>
                 </div>
 
-                {/* Generate / View Questions */}
+                {/* Actions */}
                 <div className="mt-4 border-t pt-3">
                   {exam.question_count === 0 ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => navigate(`/exams/${exam.id}/generate?${searchParams.toString()}`)}
-                    >
-                      <SparklesIcon className="mr-1.5 size-3.5" />
-                      Generate Questions
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => navigate(`/exams/${exam.id}/generate?${searchParams.toString()}`)}
+                      >
+                        <SparklesIcon className="mr-1.5 size-3.5" />
+                        AI Generate
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => navigate(`/exams/${exam.id}/upload?${searchParams.toString()}`)}
+                      >
+                        <UploadIcon className="mr-1.5 size-3.5" />
+                        Upload Paper
+                      </Button>
+                    </div>
                   ) : (
                     <Button
                       size="sm"
