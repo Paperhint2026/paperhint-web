@@ -240,17 +240,17 @@ export function QuestionsPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-6 py-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button
             onClick={() => navigate(backUrl)}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <ArrowLeftIcon className="size-4" />
           </button>
-          <div>
-            <h1 className="text-lg font-semibold">{exam.exam_name}</h1>
-            <p className="text-xs text-muted-foreground">
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold sm:text-lg">{exam.exam_name}</h1>
+            <p className="truncate text-xs text-muted-foreground">
               {questions.length} questions · {exam.total_marks} marks
               {exam.chapters_selected?.length > 0 && (
                 <> · {exam.chapters_selected.join(", ")}</>
@@ -262,24 +262,26 @@ export function QuestionsPage() {
           <Button
             variant="outline"
             size="sm"
+            className="flex-1 text-xs sm:flex-none sm:text-sm"
             onClick={() => setShowAnswerKeys(!showAnswerKeys)}
           >
-            {showAnswerKeys ? "Hide Answer Keys" : "Show Answer Keys"}
+            {showAnswerKeys ? "Hide Answers" : "Show Answers"}
           </Button>
           <Button
             size="sm"
+            className="flex-1 text-xs sm:flex-none sm:text-sm"
             onClick={() =>
               navigate(`/exams/${examId}/pdf-builder${classParam ? `?class=${classParam}` : ""}`)
             }
           >
             <FileOutputIcon className="mr-1.5 size-4" />
-            Print / PDF
+            PDF
           </Button>
         </div>
       </div>
 
       {/* Question Paper */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
         <div className="mx-auto max-w-3xl space-y-6">
           {sortedSections.map((section) => {
             const sectionQuestions = sectionGroups[section]

@@ -114,9 +114,9 @@ export function ClassesPage() {
   }
 
   return (
-    <div className="flex size-full flex-col gap-6 overflow-y-auto p-6">
+    <div className="flex size-full flex-col gap-6 overflow-y-auto p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-1 flex-col">
           <h1 className="text-lg font-medium text-secondary-foreground">
             Classes
@@ -126,7 +126,7 @@ export function ClassesPage() {
           </p>
         </div>
         {isAdmin && (
-          <Button size="lg" onClick={() => setDrawerOpen(true)}>
+          <Button size="lg" onClick={() => setDrawerOpen(true)} className="w-full sm:w-auto">
             <PlusIcon />
             Add Class Room
           </Button>

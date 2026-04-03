@@ -686,8 +686,8 @@ export function PdfBuilderPage() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-center justify-between border-b px-5 py-2.5">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5 sm:px-5">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => navigate(backUrl)}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -699,7 +699,7 @@ export function PdfBuilderPage() {
 
         <div className="flex items-center gap-2">
           {mode === "builder" && (
-            <Button variant="outline" size="sm" onClick={renumberQuestions}>
+            <Button variant="outline" size="sm" className="text-xs" onClick={renumberQuestions}>
               Re-number
             </Button>
           )}
@@ -708,25 +708,25 @@ export function PdfBuilderPage() {
             <button
               onClick={() => setMode("builder")}
               className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3",
                 mode === "builder"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <PencilIcon className="mr-1.5 inline-block size-3" />
+              <PencilIcon className="mr-1 inline-block size-3 sm:mr-1.5" />
               Builder
             </button>
             <button
               onClick={() => setMode("preview")}
               className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3",
                 mode === "preview"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <EyeIcon className="mr-1.5 inline-block size-3" />
+              <EyeIcon className="mr-1 inline-block size-3 sm:mr-1.5" />
               Preview
             </button>
           </div>
@@ -737,13 +737,13 @@ export function PdfBuilderPage() {
               fileName="Question-Paper.pdf"
             >
               {({ loading }) => (
-                <Button size="sm" disabled={loading}>
+                <Button size="sm" disabled={loading} className="text-xs">
                   {loading ? (
-                    <Loader2Icon className="mr-1.5 size-4 animate-spin" />
+                    <Loader2Icon className="mr-1 size-3.5 animate-spin" />
                   ) : (
-                    <DownloadIcon className="mr-1.5 size-4" />
+                    <DownloadIcon className="mr-1 size-3.5" />
                   )}
-                  Download PDF
+                  <span className="hidden sm:inline">Download</span> PDF
                 </Button>
               )}
             </PDFDownloadLink>
@@ -755,7 +755,7 @@ export function PdfBuilderPage() {
       {mode === "builder" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Insert toolbar */}
-          <div className="flex w-14 shrink-0 flex-col items-center gap-2 border-r bg-muted/20 py-4">
+          <div className="hidden w-14 shrink-0 flex-col items-center gap-2 border-r bg-muted/20 py-4 sm:flex">
             <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-muted-foreground [writing-mode:vertical-lr]">
               Insert
             </p>
@@ -779,7 +779,7 @@ export function PdfBuilderPage() {
           </div>
 
           {/* Blocks area */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-6">
             <div className="mx-auto max-w-2xl space-y-2">
               <DndContext
                 sensors={sensors}
@@ -920,12 +920,12 @@ export function PdfBuilderPage() {
         </div>
       ) : (
         /* Preview mode */
-        <div className="flex flex-1 items-start justify-center overflow-y-auto bg-zinc-100 p-8 dark:bg-zinc-900">
+        <div className="flex flex-1 items-start justify-center overflow-auto bg-zinc-100 p-4 dark:bg-zinc-900 sm:p-8">
           <BlobProvider document={<PdfDocument blocks={blocks} />}>
             {({ url, loading }) => {
               if (loading) {
                 return (
-                  <div className="flex h-[842px] w-[595px] items-center justify-center rounded-lg bg-white shadow-lg">
+                  <div className="flex h-[80vh] w-full max-w-[595px] items-center justify-center rounded-lg bg-white shadow-lg sm:h-[842px]">
                     <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
                   </div>
                 )
@@ -934,7 +934,7 @@ export function PdfBuilderPage() {
                 return (
                   <iframe
                     src={url}
-                    className="h-[842px] w-[595px] rounded-lg bg-white shadow-lg"
+                    className="h-[80vh] w-full max-w-[595px] rounded-lg bg-white shadow-lg sm:h-[842px]"
                     title="PDF Preview"
                   />
                 )

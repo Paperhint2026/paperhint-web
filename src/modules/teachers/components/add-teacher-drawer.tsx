@@ -294,8 +294,7 @@ export function AddTeacherDrawer({
   return (
     <Drawer direction="right" open={open} onOpenChange={onOpenChange}>
       <DrawerContent
-        className="ml-auto h-full rounded-none p-0 before:hidden"
-        style={{ width: 580, maxWidth: 580 }}
+        className="ml-auto h-full w-full rounded-none p-0 before:hidden sm:max-w-[580px]"
       >
         {/* Header */}
         <div className="flex items-start gap-3 bg-background px-6 py-4">

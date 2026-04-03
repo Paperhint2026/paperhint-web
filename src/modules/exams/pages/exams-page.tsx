@@ -322,9 +322,9 @@ export function ExamsPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
       {/* Class tabs */}
-      <div className="mb-5 flex items-center gap-3 overflow-x-auto pb-1">
+      <div className="mb-5 flex gap-2 overflow-x-auto pb-1 scrollbar-none md:gap-3">
         {assignments.map((a) => (
           <button
             key={a.class_subject_id}
@@ -342,16 +342,16 @@ export function ExamsPage() {
       </div>
 
       {/* Header row */}
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-base font-semibold sm:text-lg">
             Exams – Grade {activeAssignment?.class?.grade}-{activeAssignment?.class?.section} · {activeAssignment?.subject?.subject_name}
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Create and manage question papers for your class
           </p>
         </div>
-        <Button onClick={openCreate} size="sm">
+        <Button onClick={openCreate} size="sm" className="w-full sm:w-auto">
           <PlusIcon className="mr-1.5 size-4" />
           Create Exam
         </Button>
@@ -369,7 +369,7 @@ export function ExamsPage() {
             <p className="text-sm text-muted-foreground">No exams created yet</p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {exams.map((exam) => (
               <div
                 key={exam.id}
@@ -439,7 +439,7 @@ export function ExamsPage() {
                 {/* Actions */}
                 <div className="mt-4 border-t pt-3">
                   {exam.question_count === 0 ? (
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
                       <Button
                         size="sm"
                         variant="outline"
@@ -480,8 +480,7 @@ export function ExamsPage() {
       {/* Create / Edit Exam Drawer */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="right">
         <DrawerContent
-          style={{ width: 580, maxWidth: 580 }}
-          className="ml-auto h-full rounded-none"
+          className="ml-auto h-full w-full rounded-none sm:max-w-[580px]"
         >
           <DrawerHeader className="border-b bg-muted/30">
             <DrawerTitle>{editExam ? "Edit Exam" : "Create Exam"}</DrawerTitle>
@@ -573,7 +572,7 @@ export function ExamsPage() {
                     key={idx}
                     className="flex items-start gap-2 rounded-lg border bg-muted/20 p-3"
                   >
-                    <div className="grid flex-1 grid-cols-4 gap-2">
+                    <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
                       <div>
                         <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
                           Section

@@ -96,7 +96,7 @@ export function GenerateQuestionsPage() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       {/* Top bar */}
-      <div className="border-b px-6 py-4">
+      <div className="border-b px-4 py-3 sm:px-6 sm:py-4">
         <button
           onClick={() => navigate(backUrl)}
           className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -106,7 +106,7 @@ export function GenerateQuestionsPage() {
         </button>
       </div>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-8 p-8">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 p-4 sm:gap-8 sm:p-8">
         {!isGenerating ? (
           <>
             {/* Pre-generation view */}

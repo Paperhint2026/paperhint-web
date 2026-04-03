@@ -402,9 +402,9 @@ export function KnowledgePage() {
           </p>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
           {/* Tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-4">
+          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none">
             {assignments.map((a) => (
               <button
                 key={a.class_subject_id}
@@ -630,16 +630,18 @@ export function KnowledgePage() {
               )}
             >
               <SparklesIcon className="size-4" />
-              Ask PaperHint AI
+              <span className="hidden sm:inline">Ask PaperHint AI</span>
+              <span className="sm:hidden">Ask AI</span>
             </button>
 
-            {/* Chat overlay */}
+            {/* Chat overlay — full-screen on mobile, floating panel on desktop */}
             <div
               className={cn(
-                "fixed bottom-6 right-6 z-30 flex flex-col overflow-hidden rounded-xl border bg-background shadow-2xl transition-all duration-300 ease-in-out origin-bottom-right",
+                "fixed z-30 flex flex-col overflow-hidden bg-background shadow-2xl transition-all duration-300 ease-in-out",
+                "inset-0 rounded-none border-0 md:inset-auto md:bottom-6 md:right-6 md:h-[calc(100vh-120px)] md:w-[600px] md:rounded-xl md:border md:origin-bottom-right",
                 showChat
-                  ? "h-[calc(100vh-120px)] w-[600px] scale-100 opacity-100"
-                  : "pointer-events-none h-0 w-0 scale-50 opacity-0",
+                  ? "scale-100 opacity-100"
+                  : "pointer-events-none h-0 w-0 scale-50 opacity-0 md:h-0 md:w-0",
               )}
             >
               {/* Chat header */}

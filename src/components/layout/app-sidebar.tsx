@@ -23,6 +23,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 const mainNavItems = [
@@ -52,15 +53,33 @@ export function AppSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { isMobile, setOpenMobile } = useSidebar()
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/"
     return location.pathname.startsWith(path)
   }
 
+  const handleNav = (path: string) => {
+    if (isMobile) {
+      setOpenMobile(false)
+      setTimeout(() => navigate(path), 500)
+    } else {
+      navigate(path)
+    }
+  }
+
   const handleLogout = () => {
-    logout()
-    navigate("/login")
+    if (isMobile) {
+      setOpenMobile(false)
+      setTimeout(() => {
+        logout()
+        navigate("/login")
+      }, 500)
+    } else {
+      logout()
+      navigate("/login")
+    }
   }
 
   return (
@@ -94,7 +113,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     isActive={isActive(item.path)}
                     tooltip={item.label}
-                    onClick={() => navigate(item.path)}
+                    onClick={() => handleNav(item.path)}
                   >
                     <item.icon />
                     <span>{item.label}</span>
@@ -113,7 +132,7 @@ export function AppSidebar() {
               <SidebarMenuButton
                 isActive={isActive(item.path)}
                 tooltip={item.label}
-                onClick={() => navigate(item.path)}
+                onClick={() => handleNav(item.path)}
               >
                 <item.icon />
                 <span>{item.label}</span>

@@ -151,23 +151,25 @@ export function StudentsPage() {
     const classLabel = `Grade ${selectedClass.grade} – Section ${selectedClass.section}`
 
     return (
-      <div className="flex size-full flex-col gap-6 overflow-y-auto p-6">
+      <div className="flex size-full flex-col gap-6 overflow-y-auto p-4 md:p-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
-            <ArrowLeftIcon />
-          </Button>
-          <div className="flex flex-1 flex-col">
-            <h1 className="text-lg font-medium text-secondary-foreground">
-              {classLabel}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {students.length} student{students.length !== 1 ? "s" : ""}{" "}
-              enrolled
-            </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={handleBack}>
+              <ArrowLeftIcon />
+            </Button>
+            <div className="flex flex-1 flex-col">
+              <h1 className="text-lg font-medium text-secondary-foreground">
+                {classLabel}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {students.length} student{students.length !== 1 ? "s" : ""}{" "}
+                enrolled
+              </p>
+            </div>
           </div>
           {isAdmin && (
-            <Button size="lg" onClick={() => setDrawerOpen(true)}>
+            <Button size="lg" onClick={() => setDrawerOpen(true)} className="w-full sm:w-auto">
               <PlusIcon />
               Add Students
             </Button>
@@ -220,7 +222,7 @@ export function StudentsPage() {
 
   // Class list view
   return (
-    <div className="flex size-full flex-col gap-6 overflow-y-auto p-6">
+    <div className="flex size-full flex-col gap-6 overflow-y-auto p-4 md:p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <div className="flex flex-1 flex-col">

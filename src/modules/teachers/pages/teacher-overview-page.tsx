@@ -168,7 +168,7 @@ export function TeacherOverviewPage() {
   return (
     <div className="flex size-full flex-col overflow-y-auto">
       {/* Back button */}
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-3 sm:px-6 sm:pt-4">
         <button
           className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           onClick={() => navigate("/teachers")}
@@ -178,7 +178,7 @@ export function TeacherOverviewPage() {
       </div>
 
       {/* Profile Card */}
-      <div className="mx-auto w-full max-w-4xl px-6 pt-3">
+      <div className="mx-auto w-full max-w-4xl px-4 pt-3 sm:px-6">
         <div className="relative overflow-hidden rounded-2xl">
 
           {/* Status tag */}
@@ -202,11 +202,11 @@ export function TeacherOverviewPage() {
           />
 
           {/* Content */}
-          <div className="relative flex items-center gap-6 p-8">
+          <div className="relative flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:items-center sm:gap-6 sm:p-8 sm:text-left">
             {/* Profile photo with department-tinted border */}
             <div className="relative shrink-0">
               <div className={`absolute -inset-1.5 rounded-xl bg-gradient-to-br ${getGradient(teacher.department_id).border}`} />
-              <div className="relative size-28 overflow-hidden rounded-lg">
+              <div className="relative size-24 overflow-hidden rounded-lg sm:size-28">
                 {teacher.profile_url ? (
                   <img
                     src={teacher.profile_url}
@@ -214,22 +214,20 @@ export function TeacherOverviewPage() {
                     className="size-full object-cover"
                   />
                 ) : (
-                  <div className="flex size-full items-center justify-center bg-white/10 text-3xl font-bold text-white/40">
+                  <div className="flex size-full items-center justify-center bg-white/10 text-2xl font-bold text-white/40 sm:text-3xl">
                     {getInitials(teacher.full_name)}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Info - right side */}
+            {/* Info */}
             <div className="flex flex-1 flex-col gap-2">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-white">
-                  {teacher.full_name}
-                </h1>
-              </div>
+              <h1 className="text-xl font-bold text-white sm:text-2xl">
+                {teacher.full_name}
+              </h1>
               {(teacher.designation || teacher.department_name) && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-start">
                   {teacher.designation && (
                     <p className="text-sm font-medium text-white/60">
                       {teacher.designation}
@@ -246,10 +244,10 @@ export function TeacherOverviewPage() {
                   )}
                 </div>
               )}
-              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/50">
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-white/50 sm:justify-start sm:text-sm">
                 <span className="inline-flex items-center gap-1.5">
                   <MailIcon className="size-3.5" />
-                  {teacher.email}
+                  <span className="break-all">{teacher.email}</span>
                 </span>
                 {teacher.phone_number && (
                   <span className="inline-flex items-center gap-1.5">
@@ -271,7 +269,7 @@ export function TeacherOverviewPage() {
       </div>
 
       {/* Stats & Content */}
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         {/* Stat cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <StatCard
