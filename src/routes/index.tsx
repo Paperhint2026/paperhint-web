@@ -12,6 +12,10 @@ import { TeachersPage } from "@/modules/teachers/pages/teachers-page"
 import { TeacherOverviewPage } from "@/modules/teachers/pages/teacher-overview-page"
 import { StudentsPage } from "@/modules/students/pages/students-page"
 import { KnowledgePage } from "@/modules/knowledge/pages/knowledge-page"
+import { ExamsPage } from "@/modules/exams/pages/exams-page"
+import { GenerateQuestionsPage } from "@/modules/exams/pages/generate-questions-page"
+import { QuestionsPage } from "@/modules/exams/pages/questions-page"
+import { PdfBuilderPage } from "@/modules/exams/pages/pdf-builder-page"
 import { SettingsPage } from "@/modules/settings/pages/settings-page"
 import { HelpPage } from "@/modules/help/pages/help-page"
 
@@ -32,6 +36,10 @@ export const router = createBrowserRouter([
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },
           { path: "knowledge", element: <KnowledgePage /> },
+          { path: "exams", element: <ExamsPage /> },
+          { path: "exams/:examId/generate", element: <GenerateQuestionsPage /> },
+          { path: "exams/:examId/questions", element: <QuestionsPage /> },
+          { path: "exams/:examId/pdf-builder", element: <PdfBuilderPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "help", element: <HelpPage /> },
         ],

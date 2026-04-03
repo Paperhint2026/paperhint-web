@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom"
 import {
   BookOpenIcon,
+  ClipboardListIcon,
   ContactRoundIcon,
   GraduationCapIcon,
   HelpCircleIcon,
@@ -30,6 +31,7 @@ const mainNavItems = [
   { label: "Teachers", icon: ContactRoundIcon, path: "/teachers", roles: undefined },
   { label: "Students", icon: GraduationCapIcon, path: "/students", roles: undefined },
   { label: "Knowledge Base", icon: BookOpenIcon, path: "/knowledge", roles: ["teacher"] as string[] },
+  { label: "Exams", icon: ClipboardListIcon, path: "/exams", roles: ["teacher"] as string[] },
 ]
 
 const bottomNavItems = [
