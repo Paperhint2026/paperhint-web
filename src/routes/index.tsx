@@ -17,6 +17,8 @@ import { GenerateQuestionsPage } from "@/modules/exams/pages/generate-questions-
 import { QuestionsPage } from "@/modules/exams/pages/questions-page"
 import { PdfBuilderPage } from "@/modules/exams/pages/pdf-builder-page"
 import { UploadPaperPage } from "@/modules/exams/pages/upload-paper-page"
+import { GradingPage } from "@/modules/grading/pages/grading-page"
+import { GradingReviewPage } from "@/modules/grading/pages/grading-review-page"
 import { SettingsPage } from "@/modules/settings/pages/settings-page"
 import { HelpPage } from "@/modules/help/pages/help-page"
 
@@ -42,6 +44,8 @@ export const router = createBrowserRouter([
           { path: "exams/:examId/upload", element: <UploadPaperPage /> },
           { path: "exams/:examId/questions", element: <QuestionsPage /> },
           { path: "exams/:examId/pdf-builder", element: <PdfBuilderPage /> },
+          { path: "grading", element: <GradingPage /> },
+          { path: "grading/:submissionId/review", element: <GradingReviewPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "help", element: <HelpPage /> },
         ],
