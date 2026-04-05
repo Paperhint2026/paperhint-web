@@ -14,6 +14,7 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  KeyboardSensor,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -42,6 +43,24 @@ interface ScanPagesModalProps {
   studentName: string
   onClose: () => void
   onSubmit: (pdfFile: File) => void
+}
+
+const supportsGetUserMedia =
+  typeof navigator !== "undefined" &&
+  !!navigator.mediaDevices &&
+  typeof navigator.mediaDevices.getUserMedia === "function"
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+  if (canvas.toBlob) {
+    return new Promise((resolve) => canvas.toBlob(resolve, type, quality))
+  }
+  const dataUrl = canvas.toDataURL(type, quality)
+  const parts = dataUrl.split(",")
+  const mime = parts[0].match(/:(.*?);/)?.[1] ?? type
+  const bstr = atob(parts[1])
+  const u8 = new Uint8Array(bstr.length)
+  for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i)
+  return Promise.resolve(new Blob([u8], { type: mime }))
 }
 
 function SortablePageCard({
@@ -91,7 +110,7 @@ function SortablePageCard({
 
       <button
         onClick={onRemove}
-        className="absolute bottom-2 right-2 rounded-md bg-destructive/90 p-1.5 text-destructive-foreground opacity-0 shadow transition-opacity group-hover:opacity-100"
+        className="absolute bottom-2 right-2 rounded-md bg-destructive/90 p-1.5 text-destructive-foreground shadow transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
       >
         <Trash2Icon className="size-3.5" />
       </button>
@@ -105,16 +124,19 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment")
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false)
   const [flashEffect, setFlashEffect] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const nativeCameraRef = useRef<HTMLInputElement>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
   )
 
   const stopCamera = useCallback(() => {
@@ -129,21 +151,47 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
       stopCamera()
       setCameraError(null)
 
+      if (!supportsGetUserMedia) {
+        setCameraError("Camera not supported in this browser. Use Gallery instead.")
+        return
+      }
+
+      const constraints: MediaStreamConstraints = {
+        video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
-          audio: false,
-        })
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
         streamRef.current = stream
         if (videoRef.current) {
           videoRef.current.srcObject = stream
         }
       } catch {
-        setCameraError("Could not access camera. Please check permissions.")
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          })
+          streamRef.current = fallbackStream
+          if (videoRef.current) {
+            videoRef.current.srcObject = fallbackStream
+          }
+        } catch {
+          setCameraError("Could not access camera. Please check permissions or use Gallery.")
+        }
       }
     },
     [stopCamera],
   )
+
+  useEffect(() => {
+    if (!supportsGetUserMedia) return
+    navigator.mediaDevices.enumerateDevices().then((devices) => {
+      const videoInputs = devices.filter((d) => d.kind === "videoinput")
+      setHasMultipleCameras(videoInputs.length > 1)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (cameraActive) {
@@ -162,32 +210,28 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
     }
   }, [open, stopCamera])
 
-  const capturePhoto = useCallback(() => {
+  const capturePhoto = useCallback(async () => {
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas) return
+    if (!video || !canvas || video.videoWidth === 0) return
 
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
-    const ctx = canvas.getContext("2d")!
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
     ctx.drawImage(video, 0, 0)
 
     setFlashEffect(true)
     setTimeout(() => setFlashEffect(false), 200)
 
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return
-        const file = new File([blob], `page-${Date.now()}.jpg`, { type: "image/jpeg" })
-        const preview = URL.createObjectURL(blob)
-        setPages((prev) => [
-          ...prev,
-          { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, file, preview },
-        ])
-      },
-      "image/jpeg",
-      0.92,
-    )
+    const blob = await canvasToBlob(canvas, "image/jpeg", 0.92)
+    if (!blob) return
+    const file = new File([blob], `page-${Date.now()}.jpg`, { type: "image/jpeg" })
+    const preview = URL.createObjectURL(blob)
+    setPages((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, file, preview },
+    ])
   }, [])
 
   const toggleFacing = useCallback(() => {
@@ -198,6 +242,14 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
     stopCamera()
     setCameraActive(false)
   }, [stopCamera])
+
+  const handleCameraClick = useCallback(() => {
+    if (supportsGetUserMedia) {
+      setCameraActive(true)
+    } else {
+      nativeCameraRef.current?.click()
+    }
+  }, [])
 
   const addImages = useCallback((files: FileList | File[]) => {
     const newPages: PageImage[] = Array.from(files)
@@ -282,9 +334,17 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-2xl bg-background shadow-2xl sm:max-w-lg sm:rounded-2xl">
+      {/* eslint-disable-next-line tailwindcss/no-contradicting-classname -- 100vh is the fallback for browsers without dvh support */}
+      <div
+        className={cn(
+          "relative flex w-full flex-col overflow-hidden bg-background shadow-2xl",
+          cameraActive
+            ? "h-[100vh] h-[100dvh] rounded-none"
+            : "max-h-[90vh] max-h-[90dvh] rounded-t-2xl sm:max-w-lg sm:rounded-2xl",
+        )}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
+        <div className="flex shrink-0 items-center justify-between border-b px-4 py-3 sm:px-5">
           <div>
             <h2 className="text-sm font-semibold sm:text-base">
               {cameraActive ? "Capture Pages" : "Scan Answer Pages"}
@@ -298,7 +358,7 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
 
         {/* Camera view */}
         {cameraActive ? (
-          <div className="relative flex flex-1 flex-col bg-black">
+          <div className="relative flex min-h-0 flex-1 flex-col bg-black">
             {cameraError ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
                 <CameraIcon className="size-10 text-muted-foreground/40" />
@@ -309,19 +369,17 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
               </div>
             ) : (
               <>
-                <div className="relative flex-1 overflow-hidden">
+                <div className="relative min-h-0 flex-1 overflow-hidden">
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
-                    className="size-full object-cover"
+                    className="absolute inset-0 size-full object-cover"
                   />
-                  {/* Flash overlay */}
                   {flashEffect && (
-                    <div className="absolute inset-0 animate-pulse bg-white/70" />
+                    <div className="absolute inset-0 bg-white/70 transition-opacity duration-150" />
                   )}
-                  {/* Page counter badge */}
                   {pages.length > 0 && (
                     <div className="absolute left-3 top-3 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow">
                       {pages.length} page{pages.length > 1 ? "s" : ""} captured
@@ -329,14 +387,20 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
                   )}
                 </div>
 
-                {/* Camera controls */}
-                <div className="flex items-center justify-center gap-6 bg-black/90 px-4 py-4">
-                  <button
-                    onClick={toggleFacing}
-                    className="flex size-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-                  >
-                    <SwitchCameraIcon className="size-5" />
-                  </button>
+                <div
+                  className="flex shrink-0 items-center justify-center gap-6 bg-black/90 px-4 py-4"
+                  style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+                >
+                  {hasMultipleCameras ? (
+                    <button
+                      onClick={toggleFacing}
+                      className="flex size-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 active:bg-white/30"
+                    >
+                      <SwitchCameraIcon className="size-5" />
+                    </button>
+                  ) : (
+                    <div className="size-11" />
+                  )}
 
                   <button
                     onClick={capturePhoto}
@@ -347,20 +411,19 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
 
                   <button
                     onClick={exitCamera}
-                    className="flex size-11 items-center justify-center rounded-full bg-emerald-600 text-white transition-colors hover:bg-emerald-500"
+                    className="flex size-11 items-center justify-center rounded-full bg-emerald-600 text-white transition-colors hover:bg-emerald-500 active:bg-emerald-700"
                   >
                     <CheckIcon className="size-5" />
                   </button>
                 </div>
               </>
             )}
-            {/* Hidden canvas for capture */}
             <canvas ref={canvasRef} className="hidden" />
           </div>
         ) : (
           <>
             {/* Pages grid */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               {pages.length === 0 ? (
                 <div className="flex flex-col items-center gap-4 py-10 text-center">
                   <div className="flex size-16 items-center justify-center rounded-2xl bg-muted">
@@ -401,13 +464,16 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
             </div>
 
             {/* Footer actions */}
-            <div className="flex flex-col gap-3 border-t bg-muted/30 px-4 py-3 sm:px-5">
+            <div
+              className="flex shrink-0 flex-col gap-3 border-t bg-muted/30 px-4 py-3 sm:px-5"
+              style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+            >
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => setCameraActive(true)}
+                  onClick={handleCameraClick}
                 >
                   <CameraIcon className="mr-1.5 size-4" />
                   Camera
@@ -441,10 +507,22 @@ export function ScanPagesModal({ open, studentName, onClose, onSubmit }: ScanPag
               )}
             </div>
 
+            {/* Native camera fallback for browsers without getUserMedia */}
+            <input
+              ref={nativeCameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) addImages(e.target.files)
+                e.target.value = ""
+              }}
+            />
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               multiple
               className="hidden"
               onChange={(e) => {
