@@ -22,6 +22,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dayjs": "1.11.20",
+    "jspdf": "4.2.1",
     "katex": "0.16.44",
     "lucide-react": "^1.0.1",
     "marked": "15.0.12",

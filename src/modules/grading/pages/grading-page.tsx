@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import {
   AlertTriangleIcon,
+  CameraIcon,
   CheckCircle2Icon,
   ClipboardCheckIcon,
   EyeIcon,
@@ -34,6 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { ScanPagesModal } from "../components/scan-pages-modal"
 
 function compressForUpload(file: File): Promise<File> {
   return new Promise((resolve) => {
@@ -133,6 +135,10 @@ export function GradingPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{
     submissionId: string
+    studentName: string
+  } | null>(null)
+  const [scanModal, setScanModal] = useState<{
+    studentId: string
     studentName: string
   } | null>(null)
 
@@ -367,6 +373,45 @@ export function GradingPage() {
     }
   }
 
+  const handleScanUpload = async (pdfFile: File) => {
+    if (!scanModal || !selectedExamId) return
+    const studentId = scanModal.studentId
+    setScanModal(null)
+
+    setUploadingSet((prev) => new Set(prev).add(studentId))
+    try {
+      const formData = new FormData()
+      formData.append("file", pdfFile)
+      formData.append("exam_id", selectedExamId)
+      formData.append("student_id", studentId)
+
+      const token = localStorage.getItem("access_token")
+      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
+
+      const res = await fetch(`${BASE_URL}/api/grading/upload-answer-sheet`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Upload failed")
+      }
+
+      toast.success("Answer sheet uploaded! AI grading in progress...")
+      fetchStudentsAndSubmissions(activeTab, selectedExamId)
+    } catch (err: unknown) {
+      toast.error((err as Error).message || "Failed to upload answer sheet")
+    } finally {
+      setUploadingSet((prev) => {
+        const next = new Set(prev)
+        next.delete(studentId)
+        return next
+      })
+    }
+  }
+
   const selectedExam = exams.find((e) => e.id === selectedExamId)
   const isLoadingList = isLoadingStudents || isLoadingSubmissions
 
@@ -417,6 +462,14 @@ export function GradingPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Scan pages modal */}
+      <ScanPagesModal
+        open={!!scanModal}
+        studentName={scanModal?.studentName ?? ""}
+        onClose={() => setScanModal(null)}
+        onSubmit={handleScanUpload}
+      />
 
       {/* Class tabs */}
       <div className="mb-5 flex gap-2 overflow-x-auto pb-1 scrollbar-none md:gap-3">
@@ -599,21 +652,45 @@ export function GradingPage() {
                             <RefreshCwIcon className="mr-1 size-3.5" />
                             Re-upload
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs"
+                            onClick={() =>
+                              setScanModal({ studentId: student.id, studentName: student.full_name })
+                            }
+                          >
+                            <CameraIcon className="mr-1 size-3.5" />
+                            Scan
+                          </Button>
                         </>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={isUploading}
-                          onClick={() => handleUploadClick(student.id)}
-                        >
-                          {isUploading ? (
-                            <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
-                          ) : (
-                            <UploadIcon className="mr-1.5 size-3.5" />
-                          )}
-                          {isUploading ? "Uploading..." : "Upload Answer Sheet"}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isUploading}
+                            onClick={() => handleUploadClick(student.id)}
+                          >
+                            {isUploading ? (
+                              <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+                            ) : (
+                              <UploadIcon className="mr-1.5 size-3.5" />
+                            )}
+                            {isUploading ? "Uploading..." : "Upload File"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isUploading}
+                            onClick={() =>
+                              setScanModal({ studentId: student.id, studentName: student.full_name })
+                            }
+                          >
+                            <CameraIcon className="mr-1.5 size-3.5" />
+                            Scan Pages
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
