@@ -178,30 +178,28 @@ export function AddClassDrawer({
         className="ml-auto h-full w-full rounded-none p-0 before:hidden sm:max-w-[580px]"
       >
         {/* Header */}
-        <div className="flex items-start gap-3 bg-background px-6 py-4">
-          <div className="flex flex-1 flex-col">
-            <div className="flex items-center gap-2">
-              <h2 className="flex-1 truncate text-base font-medium text-secondary-foreground">
-                Add Class Room
-              </h2>
-              <DrawerClose asChild>
-                <button
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label="Close"
-                >
-                  <XIcon className="size-4" />
-                </button>
-              </DrawerClose>
-            </div>
+        <div className="flex items-center gap-3 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-base font-medium text-secondary-foreground">
+              Add Class Room
+            </h2>
             <p className="truncate text-sm text-muted-foreground">
               Set up a new class with grade, sections, and subjects.
             </p>
           </div>
+          <DrawerClose asChild>
+            <button
+              className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Close"
+            >
+              <XIcon className="size-5" />
+            </button>
+          </DrawerClose>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto">
-          <div className="flex min-h-full flex-col gap-6 bg-background px-6 py-2">
+          <div className="flex min-h-full flex-col gap-6 bg-background px-4 py-2 sm:px-6">
             {/* Grade */}
             <div className="flex flex-col gap-2">
               <Label>Grade</Label>
@@ -352,7 +350,7 @@ export function AddClassDrawer({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col gap-2 bg-background px-6 py-4">
+        <div className="flex flex-col gap-2 border-t bg-background px-4 py-3 sm:px-6 sm:py-4">
           <Button
             size="lg"
             className="w-full"

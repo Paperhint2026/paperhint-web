@@ -25,7 +25,16 @@ export function LoginPage() {
       await login({ email, password })
       navigate("/", { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed")
+      const msg = err instanceof Error ? err.message : ""
+      if (/invalid.*credential/i.test(msg) || /request failed.*40[01]/i.test(msg)) {
+        setError("Invalid email or password. Please try again.")
+      } else if (/email.*not.*confirmed/i.test(msg)) {
+        setError("Your email is not confirmed. Please check your inbox.")
+      } else if (/too many/i.test(msg) || /rate/i.test(msg)) {
+        setError("Too many attempts. Please wait a moment and try again.")
+      } else {
+        setError(msg || "Something went wrong. Please try again.")
+      }
     }
   }
 

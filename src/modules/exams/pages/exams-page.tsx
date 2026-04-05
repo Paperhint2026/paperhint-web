@@ -10,6 +10,7 @@ import {
   SparklesIcon,
   Trash2Icon,
   UploadIcon,
+  XIcon,
 } from "lucide-react"
 import dayjs from "dayjs"
 import { toast } from "sonner"
@@ -22,9 +23,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
   DrawerFooter,
 } from "@/components/ui/drawer"
 import {
@@ -480,13 +480,25 @@ export function ExamsPage() {
       {/* Create / Edit Exam Drawer */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="right">
         <DrawerContent
-          className="ml-auto h-full w-full rounded-none sm:max-w-[580px]"
+          className="ml-auto h-full w-full rounded-none p-0 before:hidden sm:max-w-[580px]"
         >
-          <DrawerHeader className="border-b bg-muted/30">
-            <DrawerTitle>{editExam ? "Edit Exam" : "Create Exam"}</DrawerTitle>
-          </DrawerHeader>
+          <div className="flex items-center gap-3 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-base font-medium text-secondary-foreground">
+                {editExam ? "Edit Exam" : "Create Exam"}
+              </h2>
+            </div>
+            <DrawerClose asChild>
+              <button
+                className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+              >
+                <XIcon className="size-5" />
+              </button>
+            </DrawerClose>
+          </div>
 
-          <div className="flex-1 space-y-5 overflow-y-auto p-6">
+          <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:p-6">
             {/* Exam Name */}
             <div className="space-y-1.5">
               <Label>Exam Name</Label>

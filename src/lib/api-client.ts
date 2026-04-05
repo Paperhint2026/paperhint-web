@@ -36,7 +36,7 @@ async function request<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
-    throw new Error(error.message || `Request failed: ${response.status}`)
+    throw new Error(error.message || error.error || `Request failed: ${response.status}`)
   }
 
   return response.json() as Promise<T>
