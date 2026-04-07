@@ -10,6 +10,7 @@ import {
   Loader2Icon,
   MessageSquareIcon,
   PaperclipIcon,
+  RefreshCwIcon,
   SendIcon,
   SparklesIcon,
   UploadIcon,
@@ -43,6 +44,7 @@ interface Material {
   title: string
   file_url: string
   tags?: string[] | null
+  processed?: boolean
   uploaded_at: string
 }
 
@@ -96,12 +98,15 @@ export function KnowledgePage() {
   const [materials, setMaterials] = useState<Material[]>([])
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
 
-  const [title, setTitle] = useState("")
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<{ file: File; title: string }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [isUploading, setIsUploading] = useState(false)
   const [processingStep, setProcessingStep] = useState(-1)
+  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set())
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+
+  const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB
 
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -196,22 +201,56 @@ export function KnowledgePage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    const newEntries: { file: File; title: string }[] = []
+    const skipped: string[] = []
+
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_SIZE) {
+        skipped.push(file.name)
+        continue
+      }
+      const title = file.name.replace(/\.[^/.]+$/, "")
+      newEntries.push({ file, title })
+    }
+
+    if (skipped.length > 0) {
+      toast.error(`Skipped ${skipped.length} file(s) exceeding 50MB: ${skipped.join(", ")}`)
+    }
+
+    setSelectedFiles((prev) => [...prev, ...newEntries])
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const updateFileTitle = (idx: number, title: string) => {
+    setSelectedFiles((prev) => prev.map((f, i) => (i === idx ? { ...f, title } : f)))
+  }
+
+  const removeFile = (idx: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== idx))
+  }
+
   const handleUploadAndProcess = async () => {
-    if (!selectedFile || !title.trim() || !activeTab) return
+    if (selectedFiles.length === 0 || !activeTab) return
+    if (selectedFiles.some((f) => !f.title.trim())) {
+      return toast.error("All files need a title")
+    }
 
     setIsUploading(true)
     setProcessingStep(0)
 
     try {
       const formData = new FormData()
-      formData.append("file", selectedFile)
       formData.append("class_subject_id", activeTab)
-      formData.append("title", title.trim())
+      formData.append("titles", JSON.stringify(selectedFiles.map((f) => f.title.trim())))
+      selectedFiles.forEach((f) => formData.append("files", f.file))
 
       const token = localStorage.getItem("access_token")
       const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
 
-      setProcessingStep(0)
       const uploadRes = await fetch(`${BASE_URL}/api/knowledge/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -221,42 +260,113 @@ export function KnowledgePage() {
       if (!uploadRes.ok) throw new Error("Upload failed")
 
       const uploadData = (await uploadRes.json()) as {
-        material: Material
+        results: ({ material: Material } | { title: string; error: string })[]
       }
 
-      setMaterials((prev) => [uploadData.material, ...prev])
+      const uploaded: Material[] = []
+      for (const r of uploadData.results) {
+        if ("material" in r) uploaded.push(r.material)
+        else toast.error(`Failed: ${r.title} — ${r.error}`)
+      }
 
-      setProcessingStep(1)
-      await new Promise((r) => setTimeout(r, 800))
+      const uploadedIds = new Set(uploaded.map((m) => m.id))
+      setMaterials((prev) => [...uploaded, ...prev])
+      setProcessingIds((prev) => new Set([...prev, ...uploadedIds]))
+      setSelectedFiles([])
       setProcessingStep(2)
 
-      const processRes = await apiClient.post<{ material: Material }>(
-        "/api/knowledge/process-material",
-        { material_id: uploadData.material.id },
-      )
-
-      setProcessingStep(3)
-      await new Promise((r) => setTimeout(r, 600))
-
-      setMaterials((prev) =>
-        prev.map((m) =>
-          m.id === processRes.material.id ? processRes.material : m,
+      const processResults = await Promise.allSettled(
+        uploaded.map((mat) =>
+          apiClient.post<{ material: Material }>(
+            "/api/knowledge/process-material",
+            { material_id: mat.id },
+          ),
         ),
       )
 
-      setTitle("")
-      setSelectedFile(null)
-      if (fileInputRef.current) fileInputRef.current.value = ""
+      let successCount = 0
+      for (let i = 0; i < processResults.length; i++) {
+        const result = processResults[i]
+        if (result.status === "fulfilled") {
+          successCount++
+          setMaterials((prev) =>
+            prev.map((m) => (m.id === result.value.material.id ? result.value.material : m)),
+          )
+        } else {
+          toast.error(`Processing failed for "${uploaded[i].title}"`)
+        }
+      }
 
-      toast.success("Material uploaded and analyzed successfully")
+      setProcessingIds((prev) => {
+        const next = new Set(prev)
+        uploadedIds.forEach((id) => next.delete(id))
+        return next
+      })
+      setProcessingStep(3)
+      await new Promise((r) => setTimeout(r, 400))
+
+      toast.success(`${successCount} material(s) uploaded and analyzed`)
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Upload failed. Please try again."
+      const message = err instanceof Error ? err.message : "Upload failed. Please try again."
       toast.error(message)
     } finally {
       setIsUploading(false)
       setProcessingStep(-1)
     }
+  }
+
+  const retryProcessing = async (materialId: string) => {
+    setRetryingIds((prev) => new Set(prev).add(materialId))
+    try {
+      const res = await apiClient.post<{ material: Material }>(
+        "/api/knowledge/process-material",
+        { material_id: materialId },
+      )
+      setMaterials((prev) =>
+        prev.map((m) => (m.id === res.material.id ? res.material : m)),
+      )
+      toast.success("Material analyzed successfully")
+    } catch {
+      toast.error("Processing failed. Please try again.")
+    } finally {
+      setRetryingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(materialId)
+        return next
+      })
+    }
+  }
+
+  const retryAllFailed = async () => {
+    const failed = materials.filter((m) => !m.processed && !processingIds.has(m.id))
+    if (failed.length === 0) return
+
+    const ids = failed.map((m) => m.id)
+    setRetryingIds(new Set(ids))
+
+    const results = await Promise.allSettled(
+      failed.map((m) =>
+        apiClient.post<{ material: Material }>(
+          "/api/knowledge/process-material",
+          { material_id: m.id },
+        ),
+      ),
+    )
+
+    let success = 0
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === "fulfilled") {
+        success++
+        const val = (results[i] as PromiseFulfilledResult<{ material: Material }>).value
+        setMaterials((prev) =>
+          prev.map((m) => (m.id === val.material.id ? val.material : m)),
+        )
+      }
+    }
+
+    setRetryingIds(new Set())
+    if (success === failed.length) toast.success(`All ${success} material(s) analyzed`)
+    else toast.error(`${success}/${failed.length} succeeded. Retry remaining ones.`)
   }
 
   const handleAsk = async () => {
@@ -430,60 +540,64 @@ export function KnowledgePage() {
               <div className="rounded-xl bg-muted/30 p-4">
                 <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <UploadIcon className="size-3.5" />
-                  Upload Material
+                  Upload Materials
                 </h3>
                 <div className="flex flex-col gap-3">
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Material title..."
+                  <Button
+                    variant="outline"
+                    size="sm"
                     disabled={isUploading}
-                    className="h-9 text-sm"
+                    className="w-full justify-center gap-1.5 text-xs"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <UploadIcon className="size-3.5" />
+                    {selectedFiles.length === 0 ? "Choose Files" : "Add More Files"}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    multiple
+                    onChange={handleFilesSelected}
                   />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isUploading}
-                      className="flex-1 justify-start text-xs"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {selectedFile ? (
-                        <FileTextIcon className="size-3.5" />
-                      ) : (
-                        <UploadIcon className="size-3.5" />
-                      )}
-                      {selectedFile
-                        ? selectedFile.name.length > 18
-                          ? selectedFile.name.slice(0, 18) + "..."
-                          : selectedFile.name
-                        : "Choose File"}
-                    </Button>
-                    {selectedFile && !isUploading && (
-                      <button
-                        onClick={() => {
-                          setSelectedFile(null)
-                          if (fileInputRef.current)
-                            fileInputRef.current.value = ""
-                        }}
-                        className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-                      >
-                        <XIcon className="size-3.5" />
-                      </button>
-                    )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="application/pdf,image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(e) =>
-                        setSelectedFile(e.target.files?.[0] ?? null)
-                      }
-                    />
-                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    PDF, JPEG, PNG, WebP — max 50MB per file
+                  </p>
+
+                  {selectedFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {selectedFiles.map((entry, idx) => (
+                        <div key={idx} className="flex items-center gap-2 rounded-lg border bg-background p-2">
+                          <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              value={entry.title}
+                              onChange={(e) => updateFileTitle(idx, e.target.value)}
+                              disabled={isUploading}
+                              className="h-7 text-xs"
+                              placeholder="Title..."
+                            />
+                            <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                              {entry.file.name} ({(entry.file.size / 1024 / 1024).toFixed(1)} MB)
+                            </p>
+                          </div>
+                          {!isUploading && (
+                            <button
+                              onClick={() => removeFile(idx)}
+                              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <XIcon className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <Button
                     size="sm"
-                    disabled={isUploading || !selectedFile || !title.trim()}
+                    disabled={isUploading || selectedFiles.length === 0}
                     onClick={handleUploadAndProcess}
                     className="w-full"
                   >
@@ -492,7 +606,9 @@ export function KnowledgePage() {
                     ) : (
                       <UploadIcon className="size-3.5" />
                     )}
-                    {isUploading ? "Processing..." : "Upload & Analyze"}
+                    {isUploading
+                      ? "Processing..."
+                      : `Upload & Analyze (${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""})`}
                   </Button>
                 </div>
 
@@ -559,10 +675,30 @@ export function KnowledgePage() {
                     </p>
                   </div>
                 ) : (
+                  <>
+                  {(() => {
+                    const failedCount = materials.filter((m) => !m.processed && !processingIds.has(m.id) && !retryingIds.has(m.id)).length
+                    return failedCount > 0 && !isUploading ? (
+                      <div className="mb-2 flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs"
+                          disabled={retryingIds.size > 0}
+                          onClick={retryAllFailed}
+                        >
+                          <RefreshCwIcon className={cn("size-3", retryingIds.size > 0 && "animate-spin")} />
+                          Retry All Failed ({failedCount})
+                        </Button>
+                      </div>
+                    ) : null
+                  })()}
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {materials.map((m) => {
                       const Icon = getFileIcon(m.file_url)
-                      const isProcessed = !!m.tags && m.tags.length > 0
+                      const isProcessed = !!m.processed
+                      const isActivelyProcessing = processingIds.has(m.id) || retryingIds.has(m.id)
+                      const isFailed = !isProcessed && !isActivelyProcessing
                       return (
                         <div
                           key={m.id}
@@ -583,21 +719,25 @@ export function KnowledgePage() {
                                 })}
                               </p>
                             </div>
-                            <span
-                              className={cn(
-                                "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-                                isProcessed
-                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                                  : "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-                              )}
-                            >
-                              {isProcessed ? (
+                            {isProcessed ? (
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                                 <SparklesIcon className="size-2.5" />
-                              ) : (
+                                Ready
+                              </span>
+                            ) : isActivelyProcessing ? (
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">
                                 <Loader2Icon className="size-2.5 animate-spin" />
-                              )}
-                              {isProcessed ? "Ready" : "..."}
-                            </span>
+                                Analyzing
+                              </span>
+                            ) : isFailed ? (
+                              <button
+                                onClick={() => retryProcessing(m.id)}
+                                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 transition-colors hover:bg-amber-500/25 dark:text-amber-400"
+                              >
+                                <RefreshCwIcon className="size-2.5" />
+                                Retry
+                              </button>
+                            ) : null}
                           </div>
                           {m.tags && m.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
@@ -615,6 +755,7 @@ export function KnowledgePage() {
                       )
                     })}
                   </div>
+                  </>
                 )}
               </div>
             </div>

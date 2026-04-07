@@ -37,6 +37,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { BlueprintModal, type Blueprint, type BlueprintSection } from "../components/blueprint-modal"
 
 interface Assignment {
   class_subject_id: string
@@ -58,13 +66,6 @@ interface Exam {
   question_count: number
   source: "ai" | "uploaded" | null
   created_at: string
-}
-
-interface BlueprintSection {
-  section: string
-  type: string
-  num_questions: number
-  marks_per_question: number
 }
 
 const DEFAULT_BLUEPRINT: BlueprintSection[] = [
@@ -97,6 +98,13 @@ export function ExamsPage() {
   const [chapterInput, setChapterInput] = useState("")
   const [blueprint, setBlueprint] = useState<BlueprintSection[]>(DEFAULT_BLUEPRINT)
   const [totalMarks, setTotalMarks] = useState(0)
+
+  // Saved blueprints
+  const [savedBlueprints, setSavedBlueprints] = useState<Blueprint[]>([])
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState("")
+  const [blueprintModalOpen, setBlueprintModalOpen] = useState(false)
+  const [blueprintEdited, setBlueprintEdited] = useState(false)
+  const [showBlueprintSections, setShowBlueprintSections] = useState(false)
 
   // Chapter suggestions from materials tags
   const [chapterSuggestions, setChapterSuggestions] = useState<string[]>([])
@@ -185,9 +193,19 @@ export function ExamsPage() {
     }
   }, [])
 
+  const fetchBlueprints = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ blueprints: Blueprint[] }>("/api/blueprints")
+      setSavedBlueprints(res.blueprints ?? [])
+    } catch {
+      setSavedBlueprints([])
+    }
+  }, [])
+
   useEffect(() => {
     fetchAssignments()
-  }, [fetchAssignments])
+    fetchBlueprints()
+  }, [fetchAssignments, fetchBlueprints])
 
   useEffect(() => {
     if (activeTab) {
@@ -201,6 +219,9 @@ export function ExamsPage() {
     setChapters([])
     setChapterInput("")
     setBlueprint(DEFAULT_BLUEPRINT)
+    setSelectedBlueprintId("")
+    setBlueprintEdited(false)
+    setShowBlueprintSections(false)
     setEditExam(null)
   }
 
@@ -214,12 +235,15 @@ export function ExamsPage() {
     setExamName(exam.exam_name)
     setChapters(exam.chapters_selected ?? [])
     setBlueprint(exam.blueprint ?? DEFAULT_BLUEPRINT)
+    setShowBlueprintSections(exam.blueprint && exam.blueprint.length > 0)
+    setBlueprintEdited(false)
     setDrawerOpen(true)
   }
 
   const handleSave = async () => {
     if (!examName.trim()) return toast.error("Exam name is required")
     if (chapters.length === 0) return toast.error("Select at least one chapter")
+    if (!showBlueprintSections || blueprint.length === 0) return toast.error("Select or create a blueprint")
 
     setIsSaving(true)
     try {
@@ -283,6 +307,7 @@ export function ExamsPage() {
     setBlueprint((prev) =>
       prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
     )
+    setBlueprintEdited(true)
   }
 
   const addBlueprintSection = () => {
@@ -290,10 +315,48 @@ export function ExamsPage() {
       ...prev,
       { section: String.fromCharCode(65 + prev.length), type: "", num_questions: 1, marks_per_question: 1 },
     ])
+    setBlueprintEdited(true)
   }
 
   const removeBlueprintSection = (idx: number) => {
     setBlueprint((prev) => prev.filter((_, i) => i !== idx))
+    setBlueprintEdited(true)
+  }
+
+  const handleBlueprintSelect = (value: string) => {
+    const found = savedBlueprints.find((bp) => bp.id === value)
+    if (found) {
+      setSelectedBlueprintId(found.id)
+      setBlueprint(found.sections.map((s) => ({ ...s })))
+      setShowBlueprintSections(true)
+      setBlueprintEdited(false)
+    }
+  }
+
+  const handleBlueprintCreated = (bp: Blueprint) => {
+    setBlueprintModalOpen(false)
+    setSavedBlueprints((prev) => [bp, ...prev])
+    setSelectedBlueprintId(bp.id)
+    setBlueprint(bp.sections.map((s) => ({ ...s })))
+    setShowBlueprintSections(true)
+    setBlueprintEdited(false)
+  }
+
+  const handleSaveEditedAsBlueprint = async () => {
+    const sourceName = savedBlueprints.find((bp) => bp.id === selectedBlueprintId)?.name
+    const newName = sourceName ? `${sourceName} (edited)` : "Untitled Blueprint"
+    try {
+      const res = await apiClient.post<{ blueprint: Blueprint }>("/api/blueprints", {
+        name: newName,
+        sections: blueprint,
+      })
+      toast.success("Saved as new blueprint")
+      setSavedBlueprints((prev) => [res.blueprint, ...prev])
+      setSelectedBlueprintId(res.blueprint.id)
+      setBlueprintEdited(false)
+    } catch (err: unknown) {
+      toast.error((err as Error).message || "Failed to save blueprint")
+    }
   }
 
   const filteredSuggestions = chapterSuggestions.filter(
@@ -568,85 +631,140 @@ export function ExamsPage() {
 
             {/* Blueprint */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Blueprint</Label>
-                <button
-                  onClick={addBlueprintSection}
-                  className="text-xs font-medium text-primary hover:underline"
+              <Label>Blueprint</Label>
+
+              {savedBlueprints.length === 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-center gap-1.5 text-xs"
+                  onClick={() => setBlueprintModalOpen(true)}
                 >
-                  + Add Section
-                </button>
-              </div>
-
-              <div className="space-y-2.5">
-                {blueprint.map((sec, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-2 rounded-lg border bg-muted/20 p-3"
+                  <PlusIcon className="size-3.5" />
+                  Create Blueprint
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={selectedBlueprintId || undefined}
+                    onValueChange={handleBlueprintSelect}
                   >
-                    <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
-                      <div>
-                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
-                          Section
-                        </label>
-                        <Input
-                          value={sec.section}
-                          onChange={(e) => updateBlueprint(idx, "section", e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
-                          Type
-                        </label>
-                        <Input
-                          value={sec.type}
-                          onChange={(e) => updateBlueprint(idx, "type", e.target.value)}
-                          className="h-8 text-xs"
-                          placeholder="e.g., MCQ"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
-                          Questions
-                        </label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={sec.num_questions}
-                          onChange={(e) => updateBlueprint(idx, "num_questions", Number(e.target.value))}
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
-                          Marks each
-                        </label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={sec.marks_per_question}
-                          onChange={(e) => updateBlueprint(idx, "marks_per_question", Number(e.target.value))}
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                    </div>
-                    {blueprint.length > 1 && (
-                      <button
-                        onClick={() => removeBlueprintSection(idx)}
-                        className="mt-5 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2Icon className="size-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    <SelectTrigger className="h-9 flex-1 text-xs">
+                      <SelectValue placeholder="Select a blueprint" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedBlueprints.map((bp) => (
+                        <SelectItem key={bp.id} value={bp.id}>
+                          {bp.name} ({bp.total_marks} marks)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 text-xs text-primary"
+                    onClick={() => setBlueprintModalOpen(true)}
+                  >
+                    <PlusIcon className="mr-1 size-3" />
+                    New
+                  </Button>
+                </div>
+              )}
 
-              <div className="flex items-center justify-between rounded-lg bg-primary/5 px-4 py-2.5">
-                <span className="text-sm font-medium">Total Marks</span>
-                <span className="text-lg font-bold text-primary">{totalMarks}</span>
-              </div>
+              {/* Section editor — shown after a blueprint is selected or editing an exam */}
+              {showBlueprintSections && (
+                <>
+                  <div className="flex items-center justify-end">
+                    <button
+                      onClick={addBlueprintSection}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      + Add Section
+                    </button>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {blueprint.map((sec, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-start gap-2 rounded-lg border bg-muted/20 p-3"
+                      >
+                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+                          <div>
+                            <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
+                              Section
+                            </label>
+                            <Input
+                              value={sec.section}
+                              onChange={(e) => updateBlueprint(idx, "section", e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
+                              Type
+                            </label>
+                            <Input
+                              value={sec.type}
+                              onChange={(e) => updateBlueprint(idx, "type", e.target.value)}
+                              className="h-8 text-xs"
+                              placeholder="e.g., MCQ"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
+                              Questions
+                            </label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={sec.num_questions}
+                              onChange={(e) => updateBlueprint(idx, "num_questions", Number(e.target.value))}
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
+                              Marks each
+                            </label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={sec.marks_per_question}
+                              onChange={(e) => updateBlueprint(idx, "marks_per_question", Number(e.target.value))}
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                        {blueprint.length > 1 && (
+                          <button
+                            onClick={() => removeBlueprintSection(idx)}
+                            className="mt-5 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2Icon className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg bg-primary/5 px-4 py-2.5">
+                    <span className="text-sm font-medium">Total Marks</span>
+                    <span className="text-lg font-bold text-primary">{totalMarks}</span>
+                  </div>
+
+                  {blueprintEdited && selectedBlueprintId && (
+                    <button
+                      onClick={handleSaveEditedAsBlueprint}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Save changes as new blueprint
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -685,6 +803,13 @@ export function ExamsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Blueprint creation modal */}
+      <BlueprintModal
+        open={blueprintModalOpen}
+        onClose={() => setBlueprintModalOpen(false)}
+        onSaved={handleBlueprintCreated}
+      />
     </div>
   )
 }
