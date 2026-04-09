@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   CalendarIcon,
-  ClipboardListIcon,
   EditIcon,
   FileTextIcon,
   Loader2Icon,
@@ -17,7 +16,6 @@ import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
-import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -46,16 +44,6 @@ import {
 } from "@/components/ui/select"
 import { BlueprintModal, type Blueprint, type BlueprintSection } from "../components/blueprint-modal"
 
-interface Assignment {
-  class_subject_id: string
-  class: { id: string; grade: number; section: string } | null
-  subject: { id: string; subject_name: string } | null
-}
-
-interface TeacherOverview {
-  assignments: Assignment[]
-}
-
 interface Exam {
   id: string
   class_subject_id: string
@@ -77,13 +65,8 @@ const DEFAULT_BLUEPRINT: BlueprintSection[] = [
 ]
 
 export function ExamsPage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [activeTab, _setActiveTab] = useState("")
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+  const { classSubjectId } = useParams<{ classSubjectId: string }>()
 
   const [exams, setExams] = useState<Exam[]>([])
   const [isLoadingExams, setIsLoadingExams] = useState(false)
@@ -114,57 +97,10 @@ export function ExamsPage() {
   const [deleteExam, setDeleteExam] = useState<Exam | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const setActiveTab = useCallback(
-    (classSubjectId: string, list?: Assignment[]) => {
-      _setActiveTab(classSubjectId)
-      const items = list ?? assignments
-      const match = items.find((a) => a.class_subject_id === classSubjectId)
-      if (match?.class && match?.subject) {
-        const label = `${match.class.grade}${match.class.section}-${match.subject.subject_name}`.replace(/\s+/g, "-")
-        setSearchParams({ class: label }, { replace: true })
-      }
-    },
-    [assignments, setSearchParams],
-  )
-
   useEffect(() => {
     const calcMarks = blueprint.reduce((sum, s) => sum + s.num_questions * s.marks_per_question, 0)
     setTotalMarks(calcMarks)
   }, [blueprint])
-
-  const fetchAssignments = useCallback(async () => {
-    if (!user) return
-    setIsLoadingAssignments(true)
-    try {
-      const res = await apiClient.get<{ teacher: TeacherOverview }>(
-        `/api/auth/teacher/${user.id}/overview`,
-      )
-      const a = res.teacher.assignments ?? []
-      setAssignments(a)
-
-      if (a.length > 0) {
-        const classParam = searchParams.get("class")
-        let restored = false
-        if (classParam) {
-          const match = a.find((asn) => {
-            if (!asn.class || !asn.subject) return false
-            const label = `${asn.class.grade}${asn.class.section}-${asn.subject.subject_name}`.replace(/\s+/g, "-")
-            return label === classParam
-          })
-          if (match) {
-            setActiveTab(match.class_subject_id, a)
-            restored = true
-          }
-        }
-        if (!restored) setActiveTab(a[0].class_subject_id, a)
-      }
-    } catch (err) {
-      console.error("Failed to fetch assignments:", err)
-    } finally {
-      setIsLoadingAssignments(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
 
   const fetchExams = useCallback(async (classSubjectId: string) => {
     setIsLoadingExams(true)
@@ -203,16 +139,15 @@ export function ExamsPage() {
   }, [])
 
   useEffect(() => {
-    fetchAssignments()
     fetchBlueprints()
-  }, [fetchAssignments, fetchBlueprints])
+  }, [fetchBlueprints])
 
   useEffect(() => {
-    if (activeTab) {
-      fetchExams(activeTab)
-      fetchChapterSuggestions(activeTab)
+    if (classSubjectId) {
+      fetchExams(classSubjectId)
+      fetchChapterSuggestions(classSubjectId)
     }
-  }, [activeTab, fetchExams, fetchChapterSuggestions])
+  }, [classSubjectId, fetchExams, fetchChapterSuggestions])
 
   const resetForm = () => {
     setExamName("")
@@ -257,7 +192,7 @@ export function ExamsPage() {
         toast.success("Exam updated successfully")
       } else {
         await apiClient.post("/api/exams/create", {
-          class_subject_id: activeTab,
+          class_subject_id: classSubjectId,
           exam_name: examName.trim(),
           chapters_selected: chapters,
           blueprint,
@@ -267,7 +202,7 @@ export function ExamsPage() {
       }
       setDrawerOpen(false)
       resetForm()
-      fetchExams(activeTab)
+      if (classSubjectId) fetchExams(classSubjectId)
     } catch (err: unknown) {
       toast.error((err as Error).message || "Failed to save exam")
     } finally {
@@ -282,7 +217,7 @@ export function ExamsPage() {
       await apiClient.delete(`/api/exams/${deleteExam.id}`)
       toast.success("Exam deleted successfully")
       setDeleteExam(null)
-      fetchExams(activeTab)
+      if (classSubjectId) fetchExams(classSubjectId)
     } catch (err: unknown) {
       toast.error((err as Error).message || "Failed to delete exam")
     } finally {
@@ -365,51 +300,21 @@ export function ExamsPage() {
       !chapters.includes(s),
   )
 
-  const activeAssignment = assignments.find((a) => a.class_subject_id === activeTab)
-
-  if (isLoadingAssignments) {
-    return (
-      <div className="flex h-full items-center justify-center overflow-y-auto">
-        <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (assignments.length === 0) {
+  if (!classSubjectId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto">
-        <ClipboardListIcon className="size-16 text-muted-foreground/30" />
-        <p className="text-muted-foreground">No class assignments found</p>
+        <FileTextIcon className="size-16 text-muted-foreground/30" />
+        <p className="text-muted-foreground">Select a class from the sidebar</p>
       </div>
     )
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
-      {/* Class tabs */}
-      <div className="mb-5 flex gap-2 overflow-x-auto pb-1 scrollbar-none md:gap-3">
-        {assignments.map((a) => (
-          <button
-            key={a.class_subject_id}
-            onClick={() => setActiveTab(a.class_subject_id)}
-            className={cn(
-              "shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-              activeTab === a.class_subject_id
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-            )}
-          >
-            Grade {a.class?.grade} – {a.class?.section} · {a.subject?.subject_name}
-          </button>
-        ))}
-      </div>
-
       {/* Header row */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold sm:text-lg">
-            Exams – Grade {activeAssignment?.class?.grade}-{activeAssignment?.class?.section} · {activeAssignment?.subject?.subject_name}
-          </h2>
+          <h2 className="text-base font-semibold sm:text-lg">Exams</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Create and manage question papers for your class
           </p>
@@ -507,7 +412,7 @@ export function ExamsPage() {
                         size="sm"
                         variant="outline"
                         className="flex-1"
-                        onClick={() => navigate(`/exams/${exam.id}/generate?${searchParams.toString()}`)}
+                        onClick={() => navigate(`/class/${classSubjectId}/exams/${exam.id}/generate`)}
                       >
                         <SparklesIcon className="mr-1.5 size-3.5" />
                         AI Generate
@@ -516,7 +421,7 @@ export function ExamsPage() {
                         size="sm"
                         variant="outline"
                         className="flex-1"
-                        onClick={() => navigate(`/exams/${exam.id}/upload?${searchParams.toString()}`)}
+                        onClick={() => navigate(`/class/${classSubjectId}/exams/${exam.id}/upload`)}
                       >
                         <UploadIcon className="mr-1.5 size-3.5" />
                         Upload Paper
@@ -527,7 +432,7 @@ export function ExamsPage() {
                       size="sm"
                       variant="outline"
                       className="w-full"
-                      onClick={() => navigate(`/exams/${exam.id}/questions?${searchParams.toString()}`)}
+                      onClick={() => navigate(`/class/${classSubjectId}/exams/${exam.id}/questions`)}
                     >
                       <FileTextIcon className="mr-1.5 size-3.5" />
                       View Question Paper

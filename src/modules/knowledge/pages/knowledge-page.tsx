@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useSearchParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import {
   BookOpenIcon,
   BrainCircuitIcon,
@@ -41,12 +41,6 @@ import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-interface Assignment {
-  class_subject_id: string
-  class: { id: string; grade: number; section: string } | null
-  subject: { id: string; subject_name: string } | null
-}
-
 interface Material {
   id: string
   class_subject_id: string
@@ -56,10 +50,6 @@ interface Material {
   tags?: string[] | null
   processed?: boolean
   uploaded_at: string
-}
-
-interface TeacherOverview {
-  assignments: Assignment[]
 }
 
 interface ChatMessage {
@@ -94,24 +84,7 @@ function fileIdsScopeKey(ids: string[]) {
 
 export function KnowledgePage() {
   const { user } = useAuth()
-  const [searchParams, setSearchParams] = useSearchParams()
-
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [activeTab, _setActiveTab] = useState<string>("")
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  const setActiveTab = useCallback(
-    (classSubjectId: string, assignmentsList?: Assignment[]) => {
-      _setActiveTab(classSubjectId)
-      const list = assignmentsList ?? assignments
-      const match = list.find((a) => a.class_subject_id === classSubjectId)
-      if (match?.class && match?.subject) {
-        const label = `${match.class.grade}${match.class.section}-${match.subject.subject_name}`.replace(/\s+/g, "-")
-        setSearchParams({ class: label }, { replace: true })
-      }
-    },
-    [assignments, setSearchParams],
-  )
+  const { classSubjectId } = useParams<{ classSubjectId: string }>()
 
   const [materials, setMaterials] = useState<Material[]>([])
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
@@ -140,7 +113,7 @@ export function KnowledgePage() {
   const lastAskTagsRef = useRef<string[]>([])
   const lastAskFileIdsRef = useRef<string[]>([])
 
-  const [showChat, setShowChat] = useState(true)
+  const [showChat, setShowChat] = useState(false)
 
   const [topicDropdownOpen, setTopicDropdownOpen] = useState(false)
   const [fileDropdownOpen, setFileDropdownOpen] = useState(false)
@@ -154,42 +127,6 @@ export function KnowledgePage() {
   const analyzedMaterials = materials.filter(
     (m) => m.tags && m.tags.length > 0,
   )
-
-  const fetchAssignments = useCallback(async () => {
-    if (!user) return
-    setIsLoadingAssignments(true)
-    try {
-      const res = await apiClient.get<{ teacher: TeacherOverview }>(
-        `/api/auth/teacher/${user.id}/overview`,
-      )
-      const a = res.teacher.assignments ?? []
-      setAssignments(a)
-
-      if (a.length > 0) {
-        const classParam = searchParams.get("class")
-        let restored = false
-        if (classParam) {
-          const match = a.find((asn) => {
-            if (!asn.class || !asn.subject) return false
-            const label = `${asn.class.grade}${asn.class.section}-${asn.subject.subject_name}`.replace(/\s+/g, "-")
-            return label === classParam
-          })
-          if (match) {
-            setActiveTab(match.class_subject_id, a)
-            restored = true
-          }
-        }
-        if (!restored) {
-          setActiveTab(a[0].class_subject_id, a)
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch assignments:", err)
-    } finally {
-      setIsLoadingAssignments(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
 
   const fetchMaterials = useCallback(async (classSubjectId: string) => {
     setIsLoadingMaterials(true)
@@ -207,19 +144,15 @@ export function KnowledgePage() {
   }, [])
 
   useEffect(() => {
-    fetchAssignments()
-  }, [fetchAssignments])
-
-  useEffect(() => {
-    if (activeTab) {
-      fetchMaterials(activeTab)
+    if (classSubjectId) {
+      fetchMaterials(classSubjectId)
       setMessages([])
       setSelectedTags([])
       setAttachedFiles([])
       lastAskTagsRef.current = []
       lastAskFileIdsRef.current = []
     }
-  }, [activeTab, fetchMaterials])
+  }, [classSubjectId, fetchMaterials])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -258,7 +191,7 @@ export function KnowledgePage() {
   }
 
   const handleUploadAndProcess = async () => {
-    if (selectedFiles.length === 0 || !activeTab) return
+    if (selectedFiles.length === 0 || !classSubjectId) return
     if (selectedFiles.some((f) => !f.title.trim())) {
       return toast.error("All files need a title")
     }
@@ -268,7 +201,7 @@ export function KnowledgePage() {
 
     try {
       const formData = new FormData()
-      formData.append("class_subject_id", activeTab)
+      formData.append("class_subject_id", classSubjectId)
       formData.append("titles", JSON.stringify(selectedFiles.map((f) => f.title.trim())))
       selectedFiles.forEach((f) => formData.append("files", f.file))
 
@@ -482,7 +415,7 @@ export function KnowledgePage() {
         sources: { id: string; title: string; tags: string[] }[]
       }>("/api/knowledge/ask", {
         query: chatInput.trim(),
-        class_subject_id: activeTab,
+        class_subject_id: classSubjectId ?? "",
         tags: currentTags.length > 0 ? currentTags : undefined,
         material_ids,
         ...(conversation_history.length > 0
@@ -551,42 +484,20 @@ export function KnowledgePage() {
 
   if (!user) return null
 
+  if (!classSubjectId) {
+    return (
+      <div className="flex size-full flex-col items-center justify-center gap-3 p-8">
+        <BookOpenIcon className="size-12 text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">
+          Select a class from the sidebar
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex size-full flex-col overflow-hidden">
-      {isLoadingAssignments ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : assignments.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8">
-          <BookOpenIcon className="size-12 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">
-            No class-subject assignments found. Contact your admin to get
-            assigned.
-          </p>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
-          {/* Tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none">
-            {assignments.map((a) => (
-              <button
-                key={a.class_subject_id}
-                onClick={() => setActiveTab(a.class_subject_id)}
-                className={cn(
-                  "shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                  activeTab === a.class_subject_id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-                )}
-              >
-                Grade {a.class?.grade} – {a.class?.section} ·{" "}
-                {a.subject?.subject_name}
-              </button>
-            ))}
-          </div>
-
-          {/* Content — NotebookLM-style split layout */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
             {/* ── Sources panel (left) ── */}
             <div className="flex w-full flex-col md:w-auto md:flex-[2] md:border-r">
@@ -1289,7 +1200,6 @@ export function KnowledgePage() {
             </div>
           </div>
         </div>
-      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CheckCircle2Icon,
@@ -55,11 +55,9 @@ interface SubmissionData {
 }
 
 export function GradingReviewPage() {
-  const { submissionId } = useParams<{ submissionId: string }>()
+  const { classSubjectId, submissionId } = useParams<{ classSubjectId: string; submissionId: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const backParams = searchParams.toString()
-  const backUrl = backParams ? `/grading?${backParams}` : "/grading"
+  const backUrl = `/class/${classSubjectId}/grading`
 
   const [submission, setSubmission] = useState<SubmissionData | null>(null)
   const [marks, setMarks] = useState<QuestionMark[]>([])

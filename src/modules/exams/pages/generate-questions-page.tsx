@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   BrainCircuitIcon,
@@ -35,11 +35,9 @@ const GENERATION_STEPS = [
 ]
 
 export function GenerateQuestionsPage() {
-  const { examId } = useParams<{ examId: string }>()
+  const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const classParam = searchParams.get("class")
-  const backUrl = classParam ? `/exams?class=${classParam}` : "/exams"
+  const backUrl = `/class/${classSubjectId}/exams`
 
   const [prompt, setPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -83,7 +81,7 @@ export function GenerateQuestionsPage() {
       toast.success(`${(res.questions ?? []).length} questions generated successfully!`)
 
       setTimeout(() => {
-        navigate(`/exams/${examId}/questions${classParam ? `?class=${classParam}` : ""}`)
+        navigate(`/class/${classSubjectId}/exams/${examId}/questions`)
       }, 2000)
     } catch (err: unknown) {
       clearInterval(stepInterval)

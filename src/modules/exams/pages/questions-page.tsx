@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CheckIcon,
@@ -56,11 +56,9 @@ interface Exam {
 }
 
 export function QuestionsPage() {
-  const { examId } = useParams<{ examId: string }>()
+  const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const classParam = searchParams.get("class")
-  const backUrl = classParam ? `/exams?class=${classParam}` : "/exams"
+  const backUrl = `/class/${classSubjectId}/exams`
 
   const [exam, setExam] = useState<Exam | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -271,7 +269,7 @@ export function QuestionsPage() {
             size="sm"
             className="flex-1 text-xs sm:flex-none sm:text-sm"
             onClick={() =>
-              navigate(`/exams/${examId}/pdf-builder${classParam ? `?class=${classParam}` : ""}`)
+              navigate(`/class/${classSubjectId}/exams/${examId}/pdf-builder`)
             }
           >
             <FileOutputIcon className="mr-1.5 size-4" />

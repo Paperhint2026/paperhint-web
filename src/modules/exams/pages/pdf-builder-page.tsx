@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   ChevronDownIcon,
@@ -516,13 +516,9 @@ function PdfDocument({ blocks }: { blocks: Block[] }) {
 // ─── Main Component ───────────────────────────────────
 
 export function PdfBuilderPage() {
-  const { examId } = useParams<{ examId: string }>()
+  const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const classParam = searchParams.get("class")
-  const backUrl = classParam
-    ? `/exams/${examId}/questions?class=${classParam}`
-    : `/exams/${examId}/questions`
+  const backUrl = `/class/${classSubjectId}/exams/${examId}/questions`
 
   const school = useAppSelector((state) => state.school.school)
 

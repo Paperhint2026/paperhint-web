@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   AlertTriangleIcon,
   CameraIcon,
@@ -14,7 +14,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
@@ -81,12 +80,6 @@ function compressForUpload(file: File): Promise<File> {
   })
 }
 
-interface Assignment {
-  class_subject_id: string
-  class: { id: string; grade: number; section: string } | null
-  subject: { id: string; subject_name: string } | null
-}
-
 interface Exam {
   id: string
   exam_name: string
@@ -115,11 +108,7 @@ interface Submission {
 export function GradingPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [activeTab, _setActiveTab] = useState("")
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+  const { classSubjectId } = useParams<{ classSubjectId: string }>()
 
   const [exams, setExams] = useState<Exam[]>([])
   const [isLoadingExams, setIsLoadingExams] = useState(false)
@@ -142,93 +131,17 @@ export function GradingPage() {
     studentName: string
   } | null>(null)
 
-  const initialParamsRef = useRef({
-    class: searchParams.get("class"),
-    exam: searchParams.get("exam"),
-  })
-
-  const setActiveTab = useCallback(
-    (classSubjectId: string, list?: Assignment[], isRestore = false) => {
-      _setActiveTab(classSubjectId)
-      const items = list ?? assignments
-      const match = items.find((a) => a.class_subject_id === classSubjectId)
-      if (match?.class && match?.subject) {
-        const label = `${match.class.grade}${match.class.section}-${match.subject.subject_name}`.replace(/\s+/g, "-")
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev)
-          next.set("class", label)
-          if (!isRestore) next.delete("exam")
-          return next
-        }, { replace: true })
-      }
-    },
-    [assignments, setSearchParams],
-  )
-
-  const updateExamParam = useCallback(
-    (examId: string) => {
-      setSelectedExamId(examId)
-      if (examId) {
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev)
-          next.set("exam", examId)
-          return next
-        }, { replace: true })
-      }
-    },
-    [setSearchParams],
-  )
-
-  const fetchAssignments = useCallback(async () => {
-    if (!user) return
-    setIsLoadingAssignments(true)
-    try {
-      const res = await apiClient.get<{ teacher: { assignments: Assignment[] } }>(
-        `/api/auth/teacher/${user.id}/overview`,
-      )
-      const a = res.teacher.assignments ?? []
-      setAssignments(a)
-      if (a.length > 0) {
-        const classParam = initialParamsRef.current.class
-        let restored = false
-        if (classParam) {
-          const match = a.find((asn) => {
-            if (!asn.class || !asn.subject) return false
-            const label = `${asn.class.grade}${asn.class.section}-${asn.subject.subject_name}`.replace(/\s+/g, "-")
-            return label === classParam
-          })
-          if (match) {
-            setActiveTab(match.class_subject_id, a, true)
-            restored = true
-          }
-        }
-        if (!restored) setActiveTab(a[0].class_subject_id, a)
-      }
-    } catch (err) {
-      console.error("Failed to fetch assignments:", err)
-    } finally {
-      setIsLoadingAssignments(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
-
-  const fetchExams = useCallback(async (classSubjectId: string) => {
+  const fetchExams = useCallback(async (csId: string) => {
     setIsLoadingExams(true)
     setSelectedExamId("")
     setStudents([])
     setSubmissions([])
     try {
       const res = await apiClient.get<{ exams: Exam[] }>(
-        `/api/exams/class-subject/${classSubjectId}`,
+        `/api/exams/class-subject/${csId}`,
       )
       const onlyWithQuestions = (res.exams ?? []).filter((e) => e.question_count > 0)
       setExams(onlyWithQuestions)
-
-      const savedExam = initialParamsRef.current.exam
-      if (savedExam && onlyWithQuestions.some((e) => e.id === savedExam)) {
-        setSelectedExamId(savedExam)
-        initialParamsRef.current.exam = null
-      }
     } catch {
       setExams([])
     } finally {
@@ -236,15 +149,12 @@ export function GradingPage() {
     }
   }, [])
 
-  const fetchStudentsAndSubmissions = useCallback(async (classSubjectId: string, examId: string) => {
-    const assignment = assignments.find((a) => a.class_subject_id === classSubjectId)
-    if (!assignment?.class) return
-
+  const fetchStudentsAndSubmissions = useCallback(async (csId: string, examId: string) => {
     setIsLoadingStudents(true)
     setIsLoadingSubmissions(true)
     try {
       const [studentsRes, submissionsRes] = await Promise.all([
-        apiClient.get<{ students: Student[] }>(`/api/students/class/${assignment.class.id}`),
+        apiClient.get<{ students: Student[] }>(`/api/students/class-subject/${csId}`),
         apiClient.get<{ submissions: Submission[] }>(`/api/grading/submissions/${examId}`),
       ])
       setStudents(studentsRes.students ?? [])
@@ -255,21 +165,17 @@ export function GradingPage() {
       setIsLoadingStudents(false)
       setIsLoadingSubmissions(false)
     }
-  }, [assignments])
+  }, [])
 
   useEffect(() => {
-    fetchAssignments()
-  }, [fetchAssignments])
+    if (classSubjectId) fetchExams(classSubjectId)
+  }, [classSubjectId, fetchExams])
 
   useEffect(() => {
-    if (activeTab) fetchExams(activeTab)
-  }, [activeTab, fetchExams])
-
-  useEffect(() => {
-    if (activeTab && selectedExamId) {
-      fetchStudentsAndSubmissions(activeTab, selectedExamId)
+    if (classSubjectId && selectedExamId) {
+      fetchStudentsAndSubmissions(classSubjectId, selectedExamId)
     }
-  }, [activeTab, selectedExamId, fetchStudentsAndSubmissions])
+  }, [classSubjectId, selectedExamId, fetchStudentsAndSubmissions])
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -280,7 +186,7 @@ export function GradingPage() {
       (s) => s.status === "uploaded" || s.status === "processing",
     )
 
-    if (hasPending && activeTab && selectedExamId) {
+    if (hasPending && classSubjectId && selectedExamId) {
       pollRef.current = setInterval(async () => {
         try {
           const res = await apiClient.get<{ submissions: Submission[] }>(
@@ -307,7 +213,7 @@ export function GradingPage() {
         pollRef.current = null
       }
     }
-  }, [submissions, activeTab, selectedExamId])
+  }, [submissions, classSubjectId, selectedExamId])
 
   const getSubmissionForStudent = (studentId: string) =>
     submissions.find((s) => s.student_id === studentId)
@@ -344,7 +250,7 @@ export function GradingPage() {
         }
 
         toast.success("Answer sheet uploaded! AI grading in progress...")
-        fetchStudentsAndSubmissions(activeTab, selectedExamId)
+        fetchStudentsAndSubmissions(classSubjectId ?? "", selectedExamId)
       } catch (err: unknown) {
         toast.error((err as Error).message || "Failed to upload answer sheet")
       } finally {
@@ -364,7 +270,7 @@ export function GradingPage() {
     try {
       await apiClient.delete(`/api/grading/submission/${deleteConfirm.submissionId}`)
       toast.success("Answer sheet removed")
-      fetchStudentsAndSubmissions(activeTab, selectedExamId)
+      fetchStudentsAndSubmissions(classSubjectId ?? "", selectedExamId)
     } catch (err: unknown) {
       toast.error((err as Error).message || "Failed to delete submission")
     } finally {
@@ -400,7 +306,7 @@ export function GradingPage() {
       }
 
       toast.success("Answer sheet uploaded! AI grading in progress...")
-      fetchStudentsAndSubmissions(activeTab, selectedExamId)
+      fetchStudentsAndSubmissions(classSubjectId ?? "", selectedExamId)
     } catch (err: unknown) {
       toast.error((err as Error).message || "Failed to upload answer sheet")
     } finally {
@@ -420,19 +326,11 @@ export function GradingPage() {
 
   if (!user) return null
 
-  if (isLoadingAssignments) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (assignments.length === 0) {
+  if (!classSubjectId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <ClipboardCheckIcon className="size-16 text-muted-foreground/30" />
-        <p className="text-muted-foreground">No class assignments found</p>
+        <p className="text-muted-foreground">Select a class from the sidebar</p>
       </div>
     )
   }
@@ -471,30 +369,12 @@ export function GradingPage() {
         onSubmit={handleScanUpload}
       />
 
-      {/* Class tabs */}
-      <div className="mb-5 flex gap-2 overflow-x-auto pb-1 scrollbar-none md:gap-3">
-        {assignments.map((a) => (
-          <button
-            key={a.class_subject_id}
-            onClick={() => setActiveTab(a.class_subject_id)}
-            className={cn(
-              "shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-              activeTab === a.class_subject_id
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-            )}
-          >
-            Grade {a.class?.grade} – {a.class?.section} · {a.subject?.subject_name}
-          </button>
-        ))}
-      </div>
-
       {/* Exam selector + summary */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Select
             value={selectedExamId}
-            onValueChange={updateExamParam}
+            onValueChange={setSelectedExamId}
             disabled={isLoadingExams || exams.length === 0}
           >
             <SelectTrigger className="w-64">
@@ -591,7 +471,7 @@ export function GradingPage() {
                             className="text-xs"
                             onClick={() =>
                               navigate(
-                                `/grading/${submission.id}/review?${searchParams.toString()}`,
+                                `/class/${classSubjectId}/grading/${submission.id}/review`,
                               )
                             }
                           >
