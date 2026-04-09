@@ -7,6 +7,7 @@ import {
   FileIcon,
   FileTextIcon,
   HashIcon,
+  InfoIcon,
   ImageIcon,
   Loader2Icon,
   MessageSquareIcon,
@@ -29,6 +30,12 @@ import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
@@ -831,15 +838,6 @@ export function KnowledgePage() {
                 </div>
               </div>
 
-              {/* Hint bar */}
-              <div className="flex items-center gap-3 border-b px-5 py-1.5">
-                <span className="text-[10px] text-muted-foreground">
-                  Type <kbd className="rounded border bg-muted px-1 py-0.5 font-mono text-[10px]">/</kbd> for tags
-                  {" · "}
-                  <kbd className="rounded border bg-muted px-1 py-0.5 font-mono text-[10px]">@</kbd> to attach files
-                </span>
-              </div>
-
               {/* Chat messages */}
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 {messages.length === 0 ? (
@@ -1250,6 +1248,24 @@ export function KnowledgePage() {
                         </div>
                       </PopoverContent>
                     </Popover>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center text-muted-foreground transition-colors hover:text-foreground"
+                            aria-label="Prompt help"
+                          >
+                            <InfoIcon className="size-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" sideOffset={8}>
+                          Choose topics and sources to focus your answer
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
                     {/* Send button */}
                     <button
