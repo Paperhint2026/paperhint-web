@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ArrowUpIcon,
   DatabaseIcon,
+  HelpCircleIcon,
   Loader2Icon,
   MessageSquarePlusIcon,
   PanelLeftOpenIcon,
@@ -32,7 +33,7 @@ interface Message {
   id: string
   role: "user" | "assistant"
   content: string
-  query_type?: "sql" | "rag" | "general" | null
+  query_type?: "sql" | "rag" | "general" | "clarify" | null
   metadata?: Record<string, unknown>
   created_at: string
 }
@@ -553,6 +554,12 @@ export function CopilotPanel({
                             <span>Knowledge search</span>
                           </div>
                         )}
+                        {msg.query_type === "clarify" && (
+                          <div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <HelpCircleIcon className="size-3 text-amber-500" />
+                            <span>Needs clarification</span>
+                          </div>
+                        )}
                         <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-muted prose-pre:text-foreground">
                           {isLatest ? (
                             <TypewriterText text={msg.content} />
@@ -578,11 +585,16 @@ export function CopilotPanel({
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  const el = e.target
+                  el.style.height = "auto"
+                  el.style.height = `${Math.min(el.scrollHeight, 72)}px`
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder="Message Hint AI…"
                 rows={1}
-                className="max-h-36 min-h-[48px] flex-1 resize-none bg-transparent px-4 py-3.5 text-sm outline-none placeholder:text-muted-foreground/50"
+                className="max-h-[72px] min-h-[36px] flex-1 resize-none overflow-y-auto bg-transparent px-4 py-3 text-sm leading-6 outline-none placeholder:text-muted-foreground/50"
               />
               <button
                 onClick={handleSend}
