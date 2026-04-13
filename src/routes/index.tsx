@@ -8,6 +8,7 @@ import { ResetPasswordPage } from "@/modules/auth/pages/reset-password-page"
 import { SetPasswordPage } from "@/modules/auth/pages/set-password-page"
 import { HomePage } from "@/modules/home/pages/home-page"
 import { ClassesPage } from "@/modules/classes/pages/classes-page"
+import { ClassOverviewPage } from "@/modules/classes/pages/class-overview-page"
 import { TeachersPage } from "@/modules/teachers/pages/teachers-page"
 import { TeacherOverviewPage } from "@/modules/teachers/pages/teacher-overview-page"
 import { StudentsPage } from "@/modules/students/pages/students-page"
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: "classes", element: <ClassesPage /> },
+          { path: "classes/:grade/overview", element: <ClassOverviewPage /> },
           { path: "teachers", element: <TeachersPage /> },
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },

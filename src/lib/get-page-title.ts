@@ -2,6 +2,8 @@
 export function getPageTitleFromPath(pathname: string): string {
   const path = pathname || "/"
   if (path === "/" || path === "") return "Home"
+  if (path.includes("/classes/") && path.includes("/overview"))
+    return "Class overview"
   if (path.startsWith("/classes")) return "Classes"
   if (path.includes("/teachers/") && path.includes("/overview"))
     return "Teacher overview"

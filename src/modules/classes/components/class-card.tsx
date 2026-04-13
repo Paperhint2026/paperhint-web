@@ -9,10 +9,17 @@ export interface ClassRecord {
   created_at?: string
 }
 
+export interface SubjectInfo {
+  id: string
+  subject_name: string
+}
+
 export interface GroupedGrade {
   grade: string
   academicYear: string
   sections: ClassRecord[]
+  subjects?: SubjectInfo[]
+  studentCount?: number
 }
 
 interface ClassCardProps {
@@ -21,35 +28,51 @@ interface ClassCardProps {
 }
 
 export function ClassCard({ data, onClick }: ClassCardProps) {
+  const subjects = data.subjects ?? []
+
   return (
     <div
-      className="flex cursor-pointer flex-col gap-4 rounded-lg border bg-background p-5 transition-colors hover:bg-muted/30"
+      className="flex cursor-pointer flex-col gap-5 rounded-xl border bg-background p-6 transition-colors hover:bg-muted/30"
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
-        <FolderIcon className="size-4 text-muted-foreground" />
-        <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+        <FolderIcon className="size-5 text-muted-foreground/60" />
+        <span className="rounded-full border border-border px-3 py-1 text-xs font-medium text-secondary-foreground">
           Current Batch
         </span>
       </div>
 
       <div>
-        <p className="text-base font-medium text-secondary-foreground">
+        <p className="text-xl font-semibold text-secondary-foreground">
           Grade {data.grade}
         </p>
-        <p className="text-xs text-muted-foreground">{data.academicYear}</p>
+        <p className="text-sm text-muted-foreground">{data.academicYear}</p>
       </div>
 
-      <div className="flex items-center gap-0 divide-x text-xs">
-        <div className="pr-3">
-          <p className="font-medium">{data.sections.length}</p>
-          <p className="text-muted-foreground">Sections</p>
-        </div>
-        <div className="pl-3">
-          <p className="font-medium">
-            {data.sections.map((s) => s.section).join(", ")}
+      {subjects.length > 0 && (
+        <p className="truncate text-xs text-muted-foreground">
+          {subjects.map((s) => s.subject_name).join("  ·  ")}
+        </p>
+      )}
+
+      <div className="flex items-center divide-x text-sm">
+        <div className="flex flex-col gap-0.5 pr-6">
+          <p className="text-lg font-semibold text-secondary-foreground">
+            {subjects.length}
           </p>
-          <p className="text-muted-foreground">Section Names</p>
+          <p className="text-xs text-muted-foreground">Subjects</p>
+        </div>
+        <div className="flex flex-col gap-0.5 px-6">
+          <p className="text-lg font-semibold text-secondary-foreground">
+            {data.sections.length}
+          </p>
+          <p className="text-xs text-muted-foreground">Sections</p>
+        </div>
+        <div className="flex flex-col gap-0.5 pl-6">
+          <p className="text-lg font-semibold text-secondary-foreground">
+            {data.studentCount ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground">Students</p>
         </div>
       </div>
     </div>

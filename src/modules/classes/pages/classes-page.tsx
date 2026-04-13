@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { PlusIcon, SchoolIcon } from "lucide-react"
 
 import { apiClient } from "@/lib/api-client"
@@ -17,18 +18,29 @@ import {
   type ClassFormData,
 } from "@/modules/classes/components/add-class-drawer"
 
+interface SubjectInfo {
+  id: string
+  subject_name: string
+}
+
 interface GroupedClassesResponse {
   classes: Record<string, ClassRecord[]>
+  gradeSubjects?: Record<string, SubjectInfo[]>
+  studentCounts?: Record<string, number>
 }
 
 function toGroupedGrades(
   grouped: Record<string, ClassRecord[]>,
+  gradeSubjects?: Record<string, SubjectInfo[]>,
+  studentCounts?: Record<string, number>,
 ): GroupedGrade[] {
   return Object.entries(grouped)
     .map(([grade, records]) => ({
       grade,
       academicYear: records[0]?.academic_year ?? "",
       sections: records,
+      subjects: gradeSubjects?.[grade] ?? [],
+      studentCount: studentCounts?.[grade] ?? 0,
     }))
     .sort((a, b) => Number(a.grade) - Number(b.grade))
 }
@@ -36,6 +48,7 @@ function toGroupedGrades(
 export function ClassesPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
+  const navigate = useNavigate()
 
   const dispatch = useAppDispatch()
   const { subjects: subjectRecords } = useAppSelector(
@@ -60,7 +73,7 @@ export function ClassesPage() {
       const res = await apiClient.get<GroupedClassesResponse>(
         "/api/classes/grouped",
       )
-      setGrades(toGroupedGrades(res.classes ?? {}))
+      setGrades(toGroupedGrades(res.classes ?? {}, res.gradeSubjects, res.studentCounts))
     } catch (err) {
       if (err instanceof Error && err.message !== "Unauthorized") {
         setError(err.message)
@@ -154,7 +167,11 @@ export function ClassesPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {grades.map((grade) => (
-            <ClassCard key={grade.grade} data={grade} />
+            <ClassCard
+              key={grade.grade}
+              data={grade}
+              onClick={() => navigate(`/classes/${grade.grade}/overview`)}
+            />
           ))}
         </div>
       )}
