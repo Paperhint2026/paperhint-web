@@ -328,7 +328,7 @@ export function GradingPage() {
 
   if (!classSubjectId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4">
+      <div className="flex min-h-full w-full flex-col items-center justify-center gap-4">
         <ClipboardCheckIcon className="size-16 text-muted-foreground/30" />
         <p className="text-muted-foreground">Select a class from the sidebar</p>
       </div>
@@ -336,7 +336,7 @@ export function GradingPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 md:p-6">
       {/* Delete confirmation dialog */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
         <AlertDialogContent>

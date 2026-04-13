@@ -10,7 +10,6 @@ import {
   SearchIcon,
   SparklesIcon,
   Trash2Icon,
-  XIcon,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -150,13 +149,7 @@ const SUGGESTIONS = [
 /*  Main panel                                                         */
 /* ------------------------------------------------------------------ */
 
-export function CopilotPanel({
-  open,
-  onClose,
-}: {
-  open: boolean
-  onClose: () => void
-}) {
+export function CopilotPanel() {
   const [chats, setChats] = useState<Chat[]>([])
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -179,11 +172,6 @@ export function CopilotPanel({
   }, [messages, stage, scrollToBottom])
 
   useEffect(() => {
-    if (!open) {
-      initRef.current = false
-      return
-    }
-
     setSidebarOpen(!isMobile())
 
     const init = async () => {
@@ -209,7 +197,8 @@ export function CopilotPanel({
     }
 
     init()
-  }, [open, activeChatId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* ---- API helpers ---- */
 
@@ -360,14 +349,12 @@ export function CopilotPanel({
 
   /* ---- Render ---- */
 
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex bg-background">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
       {/* ── Mobile backdrop ── */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 md:hidden"
+          className="absolute inset-0 z-10 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -376,7 +363,7 @@ export function CopilotPanel({
       <div
         className={cn(
           "flex shrink-0 flex-col border-r bg-background transition-all duration-300",
-          "fixed inset-y-0 left-0 z-50 w-72",
+          "absolute inset-y-0 left-0 z-20 w-72",
           "md:relative md:inset-auto md:z-auto md:bg-muted/30",
           sidebarOpen
             ? "translate-x-0 md:w-64"
@@ -395,8 +382,7 @@ export function CopilotPanel({
             onClick={() => setSidebarOpen(false)}
             className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted"
           >
-            <XIcon className="size-4 md:hidden" />
-            <PanelLeftOpenIcon className="hidden size-4 md:block" />
+            <PanelLeftOpenIcon className="size-4" />
           </button>
         </div>
 
@@ -474,13 +460,6 @@ export function CopilotPanel({
             <span className="text-sm font-semibold">Hint AI</span>
           </div>
 
-          {/* Right: close */}
-          <button
-            onClick={onClose}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted"
-          >
-            <XIcon className="size-4" />
-          </button>
         </div>
 
         {/* Messages */}

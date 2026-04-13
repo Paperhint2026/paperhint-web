@@ -1,185 +1,142 @@
-import { useLocation, useNavigate, useParams } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import {
   ContactRoundIcon,
   GraduationCapIcon,
-  HelpCircleIcon,
   HomeIcon,
-  LogOutIcon,
   SchoolIcon,
-  SettingsIcon,
+  SparklesIcon,
 } from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
 import { useTeacherAssignments, classLabel } from "@/hooks/use-teacher-assignments"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { NavMain } from "@/components/nav-main"
+import { NavUser } from "@/components/nav-user"
+import { NavWorkspaces } from "@/components/nav-workspaces"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
+  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-
-const adminNavItems = [
-  { label: "Home", icon: HomeIcon, path: "/" },
-  { label: "Classes", icon: SchoolIcon, path: "/classes" },
-  { label: "Teachers", icon: ContactRoundIcon, path: "/teachers" },
-  { label: "Students", icon: GraduationCapIcon, path: "/students" },
-]
-
-const bottomNavItems = [
-  { label: "Settings", icon: SettingsIcon, path: "/settings" },
-  { label: "Help", icon: HelpCircleIcon, path: "/help" },
-]
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
-}
 
 export function AppSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
-  const params = useParams()
   const { user, logout } = useAuth()
   const { isMobile, setOpenMobile } = useSidebar()
   const { assignments } = useTeacherAssignments()
   const isTeacher = user?.role === "teacher"
 
-  const activeClassSubjectId = params.classSubjectId || ""
+  const closeMobileThen = (fn: () => void) => {
+    if (isMobile) {
+      setOpenMobile(false)
+      setTimeout(fn, 300)
+    } else {
+      fn()
+    }
+  }
 
-  const isActive = (path: string) => {
+  const handleNav = (path: string) => {
+    closeMobileThen(() => navigate(path))
+  }
+
+  const handleLogout = () => {
+    closeMobileThen(() => {
+      logout()
+      navigate("/login")
+    })
+  }
+
+  const isActivePath = (path: string) => {
     if (path === "/") return location.pathname === "/"
     return location.pathname.startsWith(path)
   }
 
-  const handleNav = (path: string) => {
-    if (isMobile) {
-      setOpenMobile(false)
-      setTimeout(() => navigate(path), 300)
-    } else {
-      navigate(path)
-    }
-  }
+  const mainItems = [
+    {
+      title: "Ask Hint AI",
+      icon: <SparklesIcon />,
+      isActive: isActivePath("/ask"),
+      onClick: () => handleNav("/ask"),
+    },
+    {
+      title: "Home",
+      icon: <HomeIcon />,
+      isActive: location.pathname === "/",
+      onClick: () => handleNav("/"),
+    },
+    {
+      title: "Classes",
+      icon: <SchoolIcon />,
+      isActive: isActivePath("/classes"),
+      onClick: () => handleNav("/classes"),
+    },
+    {
+      title: "Teachers",
+      icon: <ContactRoundIcon />,
+      isActive: isActivePath("/teachers"),
+      onClick: () => handleNav("/teachers"),
+    },
+    {
+      title: "Students",
+      icon: <GraduationCapIcon />,
+      isActive: isActivePath("/students"),
+      onClick: () => handleNav("/students"),
+    },
+  ]
 
-  const handleLogout = () => {
-    if (isMobile) {
-      setOpenMobile(false)
-      setTimeout(() => {
-        logout()
-        navigate("/login")
-      }, 300)
-    } else {
-      logout()
-      navigate("/login")
-    }
-  }
+  const workspaces =
+    isTeacher && assignments.length > 0
+      ? [
+          {
+            name: "Your classes",
+            pages: assignments.map((a) => ({
+              name: classLabel(a),
+              icon: <SchoolIcon className="size-3.5" />,
+              isActive: location.pathname.startsWith(`/class/${a.class_subject_id}`),
+              onClick: () =>
+                handleNav(`/class/${a.class_subject_id}/knowledge`),
+            })),
+          },
+        ]
+      : []
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-3 p-2">
-          <Avatar>
-            {user?.profile_url ? (
-              <img
-                src={user.profile_url}
-                alt={user.full_name}
-                className="aspect-square size-full rounded-full object-cover"
-              />
-            ) : (
-              <AvatarFallback>
-                {user?.full_name ? getInitials(user.full_name) : "PH"}
-              </AvatarFallback>
-            )}
-          </Avatar>
-          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-medium">{user?.full_name}</p>
-            <p className="truncate text-xs text-muted-foreground capitalize">{user?.role}</p>
-          </div>
-        </div>
-      </SidebarHeader>
-
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminNavItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton
-                    isActive={isActive(item.path)}
-                    tooltip={item.label}
-                    onClick={() => handleNav(item.path)}
-                  >
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {isTeacher && assignments.length > 0 && (
-          <>
-            <SidebarSeparator />
-            <SidebarGroup>
-              <SidebarGroupLabel>Class Room</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {assignments.map((a) => (
-                    <SidebarMenuItem key={a.class_subject_id}>
-                      <SidebarMenuButton
-                        isActive={activeClassSubjectId === a.class_subject_id}
-                        tooltip={classLabel(a)}
-                        onClick={() =>
-                          handleNav(`/class/${a.class_subject_id}/knowledge`)
-                        }
-                      >
-                        <SchoolIcon />
-                        <span className="truncate">{classLabel(a)}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        )}
-      </SidebarContent>
-
-      <SidebarFooter>
         <SidebarMenu>
-          {bottomNavItems.map((item) => (
-            <SidebarMenuItem key={item.path}>
-              <SidebarMenuButton
-                isActive={isActive(item.path)}
-                tooltip={item.label}
-                onClick={() => handleNav(item.path)}
-              >
-                <item.icon />
-                <span>{item.label}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Logout" onClick={handleLogout}>
-              <LogOutIcon />
-              <span>Logout</span>
+            <SidebarMenuButton size="lg" className="pointer-events-none px-[6px]">
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <SparklesIcon className="size-4" />
+              </div>
+              <span className="truncate font-semibold">PaperHint</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <NavMain items={mainItems} />
+        {workspaces.length > 0 ? <NavWorkspaces workspaces={workspaces} /> : null}
+      </SidebarContent>
+      <SidebarFooter>
+        {user ? (
+          <NavUser
+            user={{
+              name: user.full_name,
+              email: user.email,
+              avatar: user.profile_url,
+            }}
+            onLogout={handleLogout}
+          />
+        ) : null}
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   )
 }

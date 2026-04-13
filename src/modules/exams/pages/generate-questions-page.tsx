@@ -92,7 +92,7 @@ export function GenerateQuestionsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
+    <div className="flex min-h-full w-full flex-col">
       {/* Top bar */}
       <div className="border-b px-4 py-3 sm:px-6 sm:py-4">
         <button

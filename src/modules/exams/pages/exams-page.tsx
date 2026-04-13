@@ -302,7 +302,7 @@ export function ExamsPage() {
 
   if (!classSubjectId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto">
+      <div className="flex min-h-full w-full flex-col items-center justify-center gap-4">
         <FileTextIcon className="size-16 text-muted-foreground/30" />
         <p className="text-muted-foreground">Select a class from the sidebar</p>
       </div>
@@ -310,7 +310,7 @@ export function ExamsPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 md:p-6">
       {/* Header row */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>

@@ -486,7 +486,7 @@ export function KnowledgePage() {
 
   if (!classSubjectId) {
     return (
-      <div className="flex size-full flex-col items-center justify-center gap-3 p-8">
+      <div className="flex min-h-full w-full flex-col items-center justify-center gap-3 p-8">
         <BookOpenIcon className="size-12 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground">
           Select a class from the sidebar
@@ -496,7 +496,7 @@ export function KnowledgePage() {
   }
 
   return (
-    <div className="flex size-full flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
             {/* ── Sources panel (left) ── */}

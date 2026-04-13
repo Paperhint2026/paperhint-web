@@ -165,18 +165,8 @@ export function SettingsPage() {
   if (!user) return null
 
   return (
-    <div className="flex size-full flex-col overflow-y-auto">
+    <div className="flex min-h-full w-full flex-col">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
-        {/* Page header */}
-        <div>
-          <h1 className="text-xl font-semibold text-secondary-foreground">
-            Settings
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your account and preferences
-          </p>
-        </div>
-
         {/* Profile Card */}
         <div className="flex flex-col gap-6 rounded-xl border bg-background p-6">
           <div className="flex items-center gap-2">

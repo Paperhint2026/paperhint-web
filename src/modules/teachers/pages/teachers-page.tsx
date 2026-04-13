@@ -249,18 +249,9 @@ export function TeachersPage() {
   }
 
   return (
-    <div className="flex size-full flex-col gap-6 overflow-y-auto p-4 md:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex flex-1 flex-col">
-          <h1 className="text-lg font-medium text-secondary-foreground">
-            Manage Teachers
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Keep track of who teaches what, and where
-          </p>
-        </div>
-        {isAdmin && (
+    <div className="flex min-h-full w-full flex-col gap-6 p-4 md:p-6">
+      {isAdmin ? (
+        <div className="flex justify-end">
           <Button
             size="lg"
             disabled={!isFormDataReady}
@@ -274,8 +265,8 @@ export function TeachersPage() {
             <PlusIcon />
             Add Teacher
           </Button>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       {/* Body */}
       {isLoading ? (

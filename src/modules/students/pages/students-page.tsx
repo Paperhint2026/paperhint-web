@@ -151,7 +151,7 @@ export function StudentsPage() {
     const classLabel = `Grade ${selectedClass.grade} – Section ${selectedClass.section}`
 
     return (
-      <div className="flex size-full flex-col gap-6 overflow-y-auto p-4 md:p-6">
+      <div className="flex min-h-full w-full flex-col gap-6 p-4 md:p-6">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
@@ -162,10 +162,6 @@ export function StudentsPage() {
               <h1 className="text-lg font-medium text-secondary-foreground">
                 {classLabel}
               </h1>
-              <p className="text-sm text-muted-foreground">
-                {students.length} student{students.length !== 1 ? "s" : ""}{" "}
-                enrolled
-              </p>
             </div>
           </div>
           {isAdmin && (
@@ -222,19 +218,7 @@ export function StudentsPage() {
 
   // Class list view
   return (
-    <div className="flex size-full flex-col gap-6 overflow-y-auto p-4 md:p-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className="flex flex-1 flex-col">
-          <h1 className="text-lg font-medium text-secondary-foreground">
-            Students
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Select a class to view and manage students
-          </p>
-        </div>
-      </div>
-
+    <div className="flex min-h-full w-full flex-col gap-6 p-4 md:p-6">
       {/* Body */}
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">

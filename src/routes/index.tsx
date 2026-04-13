@@ -21,6 +21,7 @@ import { GradingPage } from "@/modules/grading/pages/grading-page"
 import { GradingReviewPage } from "@/modules/grading/pages/grading-review-page"
 import { SettingsPage } from "@/modules/settings/pages/settings-page"
 import { HelpPage } from "@/modules/help/pages/help-page"
+import { CopilotPage } from "@/modules/copilot/pages/copilot-page"
 
 export const router = createBrowserRouter([
   { path: "login", element: <LoginPage /> },
@@ -49,6 +50,7 @@ export const router = createBrowserRouter([
           { path: "class/:classSubjectId/grading", element: <GradingPage /> },
           { path: "class/:classSubjectId/grading/:submissionId/review", element: <GradingReviewPage /> },
 
+          { path: "ask", element: <CopilotPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "help", element: <HelpPage /> },
         ],

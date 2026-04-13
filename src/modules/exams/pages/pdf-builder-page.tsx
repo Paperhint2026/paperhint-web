@@ -673,7 +673,7 @@ export function PdfBuilderPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex min-h-full w-full items-center justify-center">
         <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
       </div>
     )
