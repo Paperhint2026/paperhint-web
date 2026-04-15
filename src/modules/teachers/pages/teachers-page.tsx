@@ -216,10 +216,28 @@ export function TeachersPage() {
         date_of_joining: data.dateOfJoining
           ? dayjs(data.dateOfJoining).valueOf()
           : undefined,
-        profile_url: data.profileUrl || undefined,
         phone_number: data.phone || undefined,
       })
         teacherId = res.teacher.id
+
+        if (data.pendingProfileFile) {
+          try {
+            const formData = new FormData()
+            formData.append("image", data.pendingProfileFile)
+            formData.append("user_id", teacherId)
+
+            const token = localStorage.getItem("access_token")
+            const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
+
+            await fetch(`${BASE_URL}/api/auth/upload-profile`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData,
+            })
+          } catch (err) {
+            console.error("Failed to upload profile image for new teacher:", err)
+          }
+        }
       }
 
       const newAssignments = data.classSubjects.filter(
