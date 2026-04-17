@@ -100,7 +100,7 @@ export function AppSidebar() {
               icon: <SchoolIcon className="size-3.5" />,
               isActive: location.pathname.startsWith(`/class/${a.class_subject_id}`),
               onClick: () =>
-                handleNav(`/class/${a.class_subject_id}/knowledge`),
+                handleNav(`/class/${a.class_subject_id}/exams`),
             })),
           },
         ]

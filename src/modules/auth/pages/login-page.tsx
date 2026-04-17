@@ -1,11 +1,15 @@
 import { useState, type FormEvent } from "react"
 import { Link, Navigate, useNavigate } from "react-router-dom"
-import { Loader2Icon } from "lucide-react"
+import { GalleryVerticalEndIcon, Loader2Icon } from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 
 export function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth()
@@ -39,62 +43,77 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-muted p-4">
-      <div className="w-full max-w-sm rounded-2xl border bg-background p-8 shadow-lg">
-        <div className="mb-8 flex flex-col items-center gap-2">
-          <div className="flex size-12 items-center justify-center rounded-full bg-primary text-xl font-bold text-primary-foreground">
-            P
-          </div>
-          <h1 className="text-xl font-semibold">Welcome to PaperHint</h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to your account
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                to="/forgot-password"
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Forgot password?
-              </Link>
+    <div className="grid min-h-svh lg:grid-cols-2">
+      <div className="flex flex-col gap-4 p-6 md:p-10">
+        <div className="flex justify-center gap-2 md:justify-start">
+          <Link to="/" className="flex items-center gap-2 font-medium">
+            <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <GalleryVerticalEndIcon className="size-4" />
             </div>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
+            PaperHint
+          </Link>
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-xs">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+              <FieldGroup>
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <h1 className="text-2xl font-bold">Login to your account</h1>
+                  <p className="text-balance text-sm text-muted-foreground">
+                    Enter your email below to login to your account
+                  </p>
+                </div>
+                <Field>
+                  <FieldLabel htmlFor="email">Email</FieldLabel>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </Field>
+                <Field>
+                  <div className="flex items-center">
+                    <FieldLabel htmlFor="password">Password</FieldLabel>
+                    <Link
+                      to="/forgot-password"
+                      className="ml-auto text-sm underline-offset-4 hover:underline"
+                    >
+                      Forgot your password?
+                    </Link>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </Field>
+                {error && (
+                  <p className="text-sm text-destructive">{error}</p>
+                )}
+                <Field>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading && <Loader2Icon className="animate-spin" />}
+                    Login
+                  </Button>
+                </Field>
+              </FieldGroup>
+            </form>
           </div>
-
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-
-          <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
-            {isLoading && <Loader2Icon className="animate-spin" />}
-            Sign In
-          </Button>
-        </form>
+        </div>
+      </div>
+      <div className="relative hidden bg-muted lg:block">
+        <img
+          src="/login-cover.jpg"
+          alt="PaperHint"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
       </div>
     </div>
   )

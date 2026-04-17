@@ -1,8 +1,16 @@
 import dayjs from "dayjs"
-import { BriefcaseIcon, CalendarIcon, MailIcon, BadgeCheckIcon, PencilIcon } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { BriefcaseIcon, CalendarIcon, CheckIcon, GraduationCapIcon, MoreHorizontalIcon, PencilIcon, Trash2Icon, UserRoundIcon } from "lucide-react"
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export type TeacherStatus = "invited" | "active" | "inactive"
 
@@ -19,40 +27,24 @@ export interface Teacher {
   school_id?: string
 }
 
-const STATUS_STYLES: Record<TeacherStatus, string> = {
-  invited: "bg-amber-500 text-white",
-  active: "bg-emerald-500 text-white",
-  inactive: "bg-slate-500 text-white",
+const STATUS_LABEL: Record<TeacherStatus, string> = {
+  invited: "Invited",
+  active: "Active",
+  inactive: "Inactive",
+}
+
+const STATUS_CLASSES: Record<TeacherStatus, string> = {
+  invited: "bg-amber-50 text-amber-700 border-amber-500 dark:bg-amber-950 dark:text-amber-400",
+  active: "bg-green-200 text-green-900 border-green-700 dark:bg-green-950 dark:text-green-400",
+  inactive: "bg-slate-100 text-slate-600 border-slate-400 dark:bg-slate-800 dark:text-slate-400",
 }
 
 interface TeacherCardProps {
   teacher: Teacher
   departmentName?: string
+  onView?: (teacherId: string) => void
   onEdit?: (teacherId: string) => void
-}
-
-const GRADIENTS = [
-  "from-indigo-900 to-slate-900",
-  "from-sky-900 to-slate-900",
-  "from-emerald-900 to-slate-900",
-  "from-teal-900 to-slate-900",
-  "from-blue-900 to-slate-900",
-  "from-cyan-900 to-slate-900",
-  "from-violet-900 to-slate-900",
-  "from-slate-800 to-slate-900",
-]
-
-function hashStringToIndex(str: string, max: number): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return Math.abs(hash) % max
-}
-
-function getGradient(departmentId?: string | null): string {
-  if (!departmentId) return GRADIENTS[0]
-  return GRADIENTS[hashStringToIndex(departmentId, GRADIENTS.length)]
+  onDelete?: (teacherId: string) => void
 }
 
 function getInitials(name: string) {
@@ -64,90 +56,119 @@ function getInitials(name: string) {
     .slice(0, 2)
 }
 
-export function TeacherCard({ teacher, departmentName, onEdit }: TeacherCardProps) {
-  const gradient = getGradient(teacher.department_id)
-  const navigate = useNavigate()
-
+export function TeacherCard({ teacher, departmentName, onView, onEdit, onDelete }: TeacherCardProps) {
+  const showMore = Boolean(onEdit || onDelete)
   return (
     <div
-      className="group cursor-pointer overflow-hidden rounded-lg border bg-background transition-colors hover:bg-muted/30"
-      onClick={() => navigate(`/teachers/${teacher.id}/overview`)}
+      role="button"
+      tabIndex={0}
+      onClick={() => onView?.(teacher.id)}
+      onKeyDown={(e) => e.key === "Enter" && onView?.(teacher.id)}
+      className="group relative flex cursor-pointer flex-col gap-5 overflow-hidden rounded-lg border border-border bg-sidebar p-5 transition-colors hover:bg-sidebar-accent"
     >
-      {/* Gradient banner with dot pattern */}
-      <div className={`relative h-20 bg-gradient-to-r ${gradient}`}>
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)",
-            backgroundSize: "8px 8px",
-          }}
-        />
-        <div className="absolute right-3 top-3 flex items-center gap-2">
-          {onEdit && (
-            <button
-              className="flex size-7 items-center justify-center rounded-md bg-white/10 text-white/70 opacity-0 backdrop-blur-sm transition-opacity hover:bg-white/20 hover:text-white group-hover:opacity-100"
-              onClick={(e) => {
-                e.stopPropagation()
-                onEdit(teacher.id)
-              }}
-            >
-              <PencilIcon className="size-3.5" />
-            </button>
-          )}
-          {teacher.status && (
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize ${STATUS_STYLES[teacher.status]}`}
-            >
-              {teacher.status === "inactive" ? "In-Active" : teacher.status}
-            </span>
-          )}
-        </div>
+      {/* Top-right slot: badge always visible, edit button expands in on hover */}
+      <div className="absolute right-4 top-4 flex items-center">
+        {/* Badge — always visible */}
+        {teacher.status && (
+          <Badge className={`transition-all duration-200 ${STATUS_CLASSES[teacher.status]}`}>
+            {teacher.status === "active" && <CheckIcon />}
+            {STATUS_LABEL[teacher.status]}
+          </Badge>
+        )}
+
+        {/* More button — zero width by default, expands on hover or when menu open */}
+        {showMore && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="w-0 overflow-hidden transition-all duration-200 group-hover:ml-1.5 group-hover:w-6 has-[[data-state=open]]:ml-1.5 has-[[data-state=open]]:w-6"
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="More options"
+                >
+                  <MoreHorizontalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                {onEdit && (
+                  <DropdownMenuItem onSelect={() => onEdit(teacher.id)}>
+                    <PencilIcon className="size-3.5" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {onEdit && onDelete && <DropdownMenuSeparator />}
+                {onDelete && (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={(e) => {
+                      e.preventDefault()
+                      onDelete(teacher.id)
+                    }}
+                  >
+                    <Trash2Icon className="size-3.5" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
 
-      {/* Content */}
-      <div className="-mt-6 flex items-start gap-4 px-4 pb-4">
-        <Avatar size="lg" className="ring-2 ring-background">
+      {/* Profile section */}
+      <div className="flex flex-col gap-3">
+        <Avatar>
           {teacher.profile_url ? (
-            <img
-              src={teacher.profile_url}
-              alt={teacher.full_name}
-              className="aspect-square size-full rounded-full object-cover"
-            />
+            <AvatarImage src={teacher.profile_url} alt={teacher.full_name} />
           ) : (
             <AvatarFallback>{getInitials(teacher.full_name)}</AvatarFallback>
           )}
         </Avatar>
 
-        <div className="flex flex-1 flex-col gap-1 overflow-hidden pt-7">
-          <p className="truncate text-sm font-medium text-secondary-foreground">
+        <div className="flex flex-col gap-0">
+          <p className="truncate text-base font-medium text-secondary-foreground">
             {teacher.full_name}
           </p>
-          <p className="inline-flex items-center gap-1 truncate text-xs text-muted-foreground">
-            <MailIcon className="size-3 shrink-0 text-foreground" />
-            {teacher.email}
+          <p className="truncate text-xs text-muted-foreground">
+            {teacher.designation ?? teacher.email}
           </p>
+        </div>
+      </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
-            {departmentName && (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <BriefcaseIcon className="size-3 shrink-0 text-foreground" />
-                {departmentName}
+      {/* Details section */}
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+        <div className="flex items-center gap-1.5">
+          {departmentName ? (
+            <>
+              <BriefcaseIcon className="size-3 shrink-0 text-muted-foreground" />
+              <span className="truncate text-xs text-foreground">{departmentName}</span>
+            </>
+          ) : (
+            <>
+              <UserRoundIcon className="size-3 shrink-0 text-muted-foreground" />
+              <span className="truncate text-xs text-muted-foreground">No department</span>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {teacher.date_of_joining ? (
+            <>
+              <CalendarIcon className="size-3 shrink-0 text-muted-foreground" />
+              <span className="truncate text-xs text-foreground">
+                Joined {dayjs(teacher.date_of_joining).format("MMM YYYY")}
               </span>
-            )}
-            {teacher.designation && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                <BadgeCheckIcon className="size-3 shrink-0 text-foreground" />
-                {teacher.designation}
-              </span>
-            )}
-            {teacher.date_of_joining && (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <CalendarIcon className="size-3 shrink-0 text-foreground" />
-                {dayjs(teacher.date_of_joining).format("MMM DD, YYYY")}
-              </span>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              <GraduationCapIcon className="size-3 shrink-0 text-muted-foreground" />
+              <span className="truncate text-xs text-muted-foreground">No join date</span>
+            </>
+          )}
         </div>
       </div>
     </div>

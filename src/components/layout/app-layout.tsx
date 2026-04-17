@@ -1,18 +1,16 @@
-import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom"
-import {
-  BookOpenIcon,
-  ClipboardCheckIcon,
-  ClipboardListIcon,
-} from "lucide-react"
+import { Link, Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { LayoutDashboardIcon, NewspaperIcon } from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
 import { getPageTitleFromPath } from "@/lib/get-page-title"
-import { cn } from "@/lib/utils"
+import { useTeacherAssignments, classLabel } from "@/hooks/use-teacher-assignments"
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
+  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import {
   SidebarInset,
@@ -21,31 +19,55 @@ import {
 } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { AppSidebar } from "@/components/layout/app-sidebar"
+import { HeaderActionsProvider, useHeaderActions } from "@/components/layout/header-actions-context"
 
-const moduleSegments = [
-  { label: "Knowledge base", icon: BookOpenIcon, segment: "knowledge" },
-  { label: "Question papers", icon: ClipboardListIcon, segment: "exams" },
-  { label: "Grading", icon: ClipboardCheckIcon, segment: "grading" },
-]
-
-export function AppLayout() {
+function AppLayoutInner() {
   const location = useLocation()
-  const { classSubjectId } = useParams()
+  const { classSubjectId, grade } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
-  const rawTitle = getPageTitleFromPath(location.pathname)
-  const title =
-    location.pathname === "/" && user?.full_name
-      ? `Welcome, ${user.full_name.split(" ")[0]}`
-      : rawTitle
+  const { assignments } = useTeacherAssignments()
+  const { headerActions } = useHeaderActions()
 
-  const activeSegment = (() => {
-    const path = location.pathname
-    if (path.includes("/knowledge")) return "knowledge"
-    if (path.includes("/grading")) return "grading"
-    if (path.includes("/exams")) return "exams"
-    return ""
+  const pageTab = (searchParams.get("tab") ?? "overview") as "overview" | "exams"
+  const handleTabChange = (value: string) => {
+    if (!value) return
+    const params = new URLSearchParams(searchParams)
+    params.set("tab", value)
+    navigate({ search: params.toString() }, { replace: true })
+  }
+  const rawTitle = getPageTitleFromPath(location.pathname)
+
+  const classTitle = (() => {
+    if (!classSubjectId) return null
+    const assignment = assignments.find((a) => a.class_subject_id === classSubjectId)
+    return assignment ? classLabel(assignment) : null
+  })()
+
+  // Build breadcrumb segments: { label, href? }
+  // href present = clickable link; absent = current page (non-clickable)
+  const segments: { label: string; href?: string }[] = (() => {
+    if (location.pathname === "/" && user?.full_name) {
+      return [{ label: `Welcome, ${user.full_name.split(" ")[0]}` }]
+    }
+    if (classTitle) {
+      // /class/:classSubjectId/* → Classes › Class Name
+      return [
+        { label: "Classes", href: "/classes" },
+        { label: classTitle },
+      ]
+    }
+    if (grade) {
+      // /classes/:grade/overview → Classes › Grade X
+      return [
+        { label: "Classes", href: "/classes" },
+        { label: `Grade ${grade}` },
+      ]
+    }
+    return [{ label: rawTitle }]
   })()
 
   return (
@@ -53,14 +75,7 @@ export function AppLayout() {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
-          <header
-            className={cn(
-              "grid h-14 shrink-0 items-center border-b px-3 sm:px-4",
-              classSubjectId
-                ? "grid-cols-[minmax(0,1fr)_auto] gap-x-3"
-                : "grid-cols-1",
-            )}
-          >
+          <header className="flex h-14 shrink-0 items-center justify-between border-b px-3 sm:px-4">
             <div className="flex min-h-0 min-w-0 items-center gap-2 self-stretch">
               <SidebarTrigger className="shrink-0" />
               <Separator
@@ -68,41 +83,63 @@ export function AppLayout() {
                 className="mx-1 w-px shrink-0 self-stretch"
               />
               <Breadcrumb className="min-w-0">
-                <BreadcrumbList className="flex-nowrap gap-2 sm:gap-2">
-                  <BreadcrumbItem>
-                    <BreadcrumbPage className="line-clamp-1 text-sm font-medium text-foreground">
-                      {title}
-                    </BreadcrumbPage>
-                  </BreadcrumbItem>
+                <BreadcrumbList className="flex-nowrap gap-1.5 sm:gap-1.5">
+                  {segments.map((seg, i) => {
+                    const isLast = i === segments.length - 1
+                    return (
+                      <BreadcrumbItem key={seg.label}>
+                        {!isLast && seg.href ? (
+                          <>
+                            <BreadcrumbLink asChild>
+                              <Link
+                                to={seg.href}
+                                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                {seg.label}
+                              </Link>
+                            </BreadcrumbLink>
+                            <BreadcrumbSeparator />
+                          </>
+                        ) : (
+                          <BreadcrumbPage className="line-clamp-1 text-sm font-medium text-foreground">
+                            {seg.label}
+                          </BreadcrumbPage>
+                        )}
+                      </BreadcrumbItem>
+                    )
+                  })}
                 </BreadcrumbList>
               </Breadcrumb>
+
+              {/* Overview / Exams toggle — placed right after the grade name */}
+              {grade && (
+                <ToggleGroup
+                  type="single"
+                  size="sm"
+                  variant="outline"
+                  spacing={2}
+                  value={pageTab}
+                  onValueChange={handleTabChange}
+                  className="ml-2"
+                >
+                  <ToggleGroupItem value="overview" aria-label="Overview">
+                    <LayoutDashboardIcon className="size-3.5" />
+                    Overview
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="exams" aria-label="Exams">
+                    <NewspaperIcon className="size-3.5" />
+                    Exams
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              )}
             </div>
 
-            {classSubjectId ? (
-              <div className="flex min-h-0 min-w-0 items-center justify-center justify-self-center">
-                <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted/60 p-1">
-                  {moduleSegments.map((mod) => (
-                    <button
-                      key={mod.segment}
-                      type="button"
-                      onClick={() =>
-                        navigate(`/class/${classSubjectId}/${mod.segment}`)
-                      }
-                      className={cn(
-                        "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all sm:px-3",
-                        activeSegment === mod.segment
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <mod.icon className="size-3.5" />
-                      {mod.label}
-                    </button>
-                  ))}
-                </div>
+            {/* Page-level CTA slot — populated by each page via useHeaderActions() */}
+            {headerActions && (
+              <div className="ml-auto flex items-center pl-2">
+                {headerActions}
               </div>
-            ) : null}
-
+            )}
           </header>
 
           <div className="relative min-h-0 flex-1">
@@ -113,5 +150,13 @@ export function AppLayout() {
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
+  )
+}
+
+export function AppLayout() {
+  return (
+    <HeaderActionsProvider>
+      <AppLayoutInner />
+    </HeaderActionsProvider>
   )
 }

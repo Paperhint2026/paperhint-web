@@ -1,15 +1,35 @@
-import { useCallback, useEffect, useState } from "react"
-import { ContactRoundIcon, PlusIcon } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { ContactRoundIcon, Loader2Icon, PlusIcon, SearchIcon, SlidersHorizontalIcon, Trash2Icon } from "lucide-react"
+import { useHeaderActions } from "@/components/layout/header-actions-context"
 import dayjs from "dayjs"
 
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Spinner } from "@/components/ui/spinner"
+import {
+  FilterChip,
+  MultiSelectField,
+  toggleArrayValue,
+} from "@/components/shared/filter-controls"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   TeacherCard,
   type Teacher,
 } from "@/modules/teachers/components/teacher-card"
+import { TeacherDetailDrawer } from "@/modules/teachers/components/teacher-detail-drawer"
 import {
   AddTeacherDrawer,
   type ClassSubjectOption,
@@ -45,6 +65,7 @@ interface ClassByIdResponse {
 export function TeachersPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
+  const { setHeaderActions } = useHeaderActions()
 
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -59,6 +80,59 @@ export function TeachersPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [editData, setEditData] = useState<TeacherFormData | null>(null)
   const [editTeacherId, setEditTeacherId] = useState<string | null>(null)
+
+  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null)
+
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const [search, setSearch] = useState("")
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([])
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [selectedDesignations, setSelectedDesignations] = useState<string[]>([])
+
+  const STATUS_OPTIONS = ["active", "invited", "inactive"]
+  const STATUS_LABEL: Record<string, string> = {
+    active: "Active",
+    invited: "Invited",
+    inactive: "Inactive",
+  }
+
+  const designationOptions = useMemo(() => {
+    const set = new Set<string>()
+    teachers.forEach((t) => {
+      if (t.designation) set.add(t.designation)
+    })
+    return [...set].sort().map((d) => ({ value: d, label: d }))
+  }, [teachers])
+
+  const filteredTeachers = useMemo(() => {
+    let list = teachers
+    if (selectedDepartments.length > 0) {
+      list = list.filter(
+        (t) => t.department_id && selectedDepartments.includes(t.department_id),
+      )
+    }
+    if (selectedStatuses.length > 0) {
+      list = list.filter((t) => t.status && selectedStatuses.includes(t.status))
+    }
+    if (selectedDesignations.length > 0) {
+      list = list.filter(
+        (t) => t.designation && selectedDesignations.includes(t.designation),
+      )
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(
+        (t) =>
+          t.full_name.toLowerCase().includes(q) ||
+          t.email.toLowerCase().includes(q) ||
+          t.designation?.toLowerCase().includes(q),
+      )
+    }
+    return list
+  }, [teachers, selectedDepartments, selectedStatuses, selectedDesignations, search])
 
   const departmentMap = new Map(departments.map((d) => [d.id, d.name]))
 
@@ -114,6 +188,26 @@ export function TeachersPage() {
     fetchTeachers()
     fetchFormData()
   }, [fetchTeachers, fetchFormData])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    setHeaderActions(
+      <Button
+        size="lg"
+        disabled={!isFormDataReady}
+        className="rounded-full"
+        onClick={() => {
+          setEditData(null)
+          setEditTeacherId(null)
+          setDrawerOpen(true)
+        }}
+      >
+        <PlusIcon className="size-3.5" />
+        <span className="hidden sm:inline">Add Teacher</span>
+      </Button>
+    )
+    return () => setHeaderActions(null)
+  }, [isAdmin, isFormDataReady, setHeaderActions])
 
   const fetchSubjectsForClass = async (
     classId: string,
@@ -187,6 +281,20 @@ export function TeachersPage() {
     })
   }
 
+  const handleConfirmDelete = async () => {
+    if (!teacherToDelete) return
+    setIsDeleting(true)
+    try {
+      await apiClient.delete(`/api/auth/teacher/${teacherToDelete.id}`)
+      setTeacherToDelete(null)
+      await fetchTeachers()
+    } catch (err) {
+      console.error("Failed to delete teacher:", err)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const handleSaveTeacher = async (data: TeacherFormData) => {
     setIsSaving(true)
     try {
@@ -248,25 +356,163 @@ export function TeachersPage() {
     }
   }
 
+  const activeCount =
+    selectedDepartments.length +
+    selectedStatuses.length +
+    selectedDesignations.length
+
+  const clearAllFilters = () => {
+    setSelectedDepartments([])
+    setSelectedStatuses([])
+    setSelectedDesignations([])
+  }
+
+  const renderStatusPill = (value: string) => {
+    const selected = selectedStatuses.includes(value)
+    return (
+      <button
+        key={value}
+        type="button"
+        onClick={() => toggleArrayValue(setSelectedStatuses, value)}
+        className={
+          "rounded-full border px-2.5 py-1 text-xs transition-colors " +
+          (selected
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-background text-secondary-foreground hover:bg-muted")
+        }
+      >
+        {STATUS_LABEL[value]}
+      </button>
+    )
+  }
+
+  const hasAnyFilter = activeCount > 0 || search.trim().length > 0
+
   return (
-    <div className="flex min-h-full w-full flex-col gap-6 p-4 md:p-6">
-      {isAdmin ? (
-        <div className="flex justify-end">
-          <Button
-            size="lg"
-            disabled={!isFormDataReady}
-            className="w-full sm:w-auto"
-            onClick={() => {
-              setEditData(null)
-              setEditTeacherId(null)
-              setDrawerOpen(true)
-            }}
-          >
-            <PlusIcon />
-            Add Teacher
-          </Button>
+    <div className="flex min-h-full w-full flex-col gap-4 p-4 md:p-6">
+      {/* Filters — search + popover + active-filter chips */}
+      {!isLoading && !error && teachers.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1 sm:max-w-72">
+              <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search teachers..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 rounded-full pl-9"
+              />
+            </div>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 rounded-full">
+                  <SlidersHorizontalIcon className="size-3.5" />
+                  Filters
+                  {activeCount > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="ml-1 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
+                    >
+                      {activeCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <p className="text-sm font-medium">Filters</p>
+                  {activeCount > 0 && (
+                    <button
+                      onClick={clearAllFilters}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="flex max-h-[60vh] flex-col gap-4 overflow-auto p-4">
+                  <MultiSelectField
+                    label="Department"
+                    placeholder={
+                      departmentOptions.length === 0
+                        ? "No departments available"
+                        : "All Departments"
+                    }
+                    options={departmentOptions}
+                    selected={selectedDepartments}
+                    onToggle={(v) => toggleArrayValue(setSelectedDepartments, v)}
+                    onClear={() => setSelectedDepartments([])}
+                    searchable={departmentOptions.length > 8}
+                  />
+                  <MultiSelectField
+                    label="Designation"
+                    placeholder={
+                      designationOptions.length === 0
+                        ? "No designations available"
+                        : "All Designations"
+                    }
+                    options={designationOptions}
+                    selected={selectedDesignations}
+                    onToggle={(v) => toggleArrayValue(setSelectedDesignations, v)}
+                    onClear={() => setSelectedDesignations([])}
+                    searchable={designationOptions.length > 8}
+                  />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      {selectedStatuses.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStatuses([])}
+                          className="text-[10px] text-muted-foreground hover:text-foreground"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {STATUS_OPTIONS.map((s) => renderStatusPill(s))}
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {activeCount > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {selectedDepartments.map((d) => (
+                <FilterChip
+                  key={`dept-${d}`}
+                  label={departmentMap.get(d) ?? d}
+                  onRemove={() => toggleArrayValue(setSelectedDepartments, d)}
+                />
+              ))}
+              {selectedDesignations.map((d) => (
+                <FilterChip
+                  key={`desig-${d}`}
+                  label={d}
+                  onRemove={() => toggleArrayValue(setSelectedDesignations, d)}
+                />
+              ))}
+              {selectedStatuses.map((s) => (
+                <FilterChip
+                  key={`status-${s}`}
+                  label={STATUS_LABEL[s] ?? s}
+                  onRemove={() => toggleArrayValue(setSelectedStatuses, s)}
+                />
+              ))}
+              <button
+                onClick={clearAllFilters}
+                className="ml-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
         </div>
-      ) : null}
+      )}
 
       {/* Body */}
       {isLoading ? (
@@ -296,9 +542,35 @@ export function TeachersPage() {
             </p>
           </div>
         </div>
+      ) : filteredTeachers.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg bg-sidebar p-5">
+          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
+            <ContactRoundIcon className="size-6 text-muted-foreground" />
+          </div>
+          <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
+            <p className="text-base font-medium text-secondary-foreground">
+              No teachers match your filters
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Try removing a filter or clearing the search.
+            </p>
+          </div>
+          {hasAnyFilter && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearch("")
+                clearAllFilters()
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {teachers.map((teacher) => (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredTeachers.map((teacher) => (
             <TeacherCard
               key={teacher.id}
               teacher={teacher}
@@ -307,7 +579,16 @@ export function TeachersPage() {
                   ? departmentMap.get(teacher.department_id)
                   : undefined
               }
+              onView={(id) => { setSelectedTeacherId(id); setDetailDrawerOpen(true) }}
               onEdit={isAdmin ? handleEditTeacher : undefined}
+              onDelete={
+                isAdmin
+                  ? (id) => {
+                      const t = teachers.find((x) => x.id === id) ?? null
+                      setTeacherToDelete(t)
+                    }
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -333,6 +614,62 @@ export function TeachersPage() {
           editData={editData}
         />
       )}
+
+      <AlertDialog
+        open={!!teacherToDelete}
+        onOpenChange={(open) => !open && setTeacherToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete teacher?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{" "}
+              <span className="font-medium text-foreground">
+                {teacherToDelete?.full_name}
+              </span>{" "}
+              and their assignments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmDelete()
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                <>
+                  <Trash2Icon className="size-3.5" />
+                  Delete
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <TeacherDetailDrawer
+        teacherId={selectedTeacherId}
+        open={detailDrawerOpen}
+        onOpenChange={setDetailDrawerOpen}
+        canManage={isAdmin}
+        onEdit={(id) => {
+          setDetailDrawerOpen(false)
+          handleEditTeacher(id)
+        }}
+        onDeleted={() => {
+          setSelectedTeacherId(null)
+          fetchTeachers()
+        }}
+      />
     </div>
   )
 }
