@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useNavigate, useParams } from "react-router-dom"
 import {
-  AlertTriangleIcon,
   ArrowLeftIcon,
   CameraIcon,
   CalendarIcon,

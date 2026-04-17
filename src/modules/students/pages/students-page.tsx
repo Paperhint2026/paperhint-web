@@ -90,7 +90,7 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[sum % AVATAR_COLORS.length]
 }
 
-interface StudentWithClass extends Student {
+interface StudentWithClass extends Omit<Student, "grade" | "section" | "academic_year"> {
   grade: number
   section: string
   academic_year: string
