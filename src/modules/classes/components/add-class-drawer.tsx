@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   ChevronDownIcon,
   Loader2Icon,
@@ -10,10 +11,14 @@ import {
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
-  Drawer,
-  DrawerContent,
-  DrawerClose,
-} from "@/components/ui/drawer"
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -69,6 +74,7 @@ export function AddClassDrawer({
   existingGrades = [],
   isSaving = false,
 }: AddClassDrawerProps) {
+  const isMobile = useIsMobile()
   const [form, setForm] = useState<ClassFormData>({ ...emptyForm })
   const [expandedSections, setExpandedSections] = useState<Set<number>>(
     new Set([0]),
@@ -173,36 +179,36 @@ export function AddClassDrawer({
   }
 
   return (
-    <Drawer direction="right" open={open} onOpenChange={onOpenChange}>
-      <DrawerContent
-        className="ml-auto h-full w-full rounded-none p-0 before:hidden sm:max-w-[580px]"
-      >
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side={isMobile ? "bottom" : "right"} size={isMobile ? "full" : "xl"} showCloseButton={false} className="flex h-full w-full flex-col p-0">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-medium text-secondary-foreground">
-              Add Class Room
-            </h2>
-            <p className="truncate text-sm text-muted-foreground">
-              Set up a new class with grade, sections, and subjects.
-            </p>
+        <SheetHeader className="border-b bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <SheetTitle className="text-base font-medium text-secondary-foreground">
+                Add Class Room
+              </SheetTitle>
+              <SheetDescription>
+                Set up a new class with grade, sections, and subjects.
+              </SheetDescription>
+            </div>
+            <SheetClose asChild>
+              <button
+                className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+              >
+                <XIcon className="size-5" />
+              </button>
+            </SheetClose>
           </div>
-          <DrawerClose asChild>
-            <button
-              className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Close"
-            >
-              <XIcon className="size-5" />
-            </button>
-          </DrawerClose>
-        </div>
+        </SheetHeader>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex min-h-full flex-col gap-6 bg-background px-4 py-2 sm:px-6">
+        <div className="no-scrollbar flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
             {/* Grade */}
-            <div className="flex flex-col gap-2">
-              <Label>Grade</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Grade</Label>
               <Select
                 value={form.grade === "" ? undefined : String(form.grade)}
                 onValueChange={handleGradeChange}
@@ -226,7 +232,7 @@ export function AddClassDrawer({
 
             {/* Sections with per-section subjects */}
             <div className="flex flex-col gap-3">
-              <Label>Sections & Subjects</Label>
+              <Label className="text-sm">Sections & Subjects</Label>
 
               <div className="flex flex-col gap-2">
                 {form.sections.map((section, index) => {
@@ -330,8 +336,8 @@ export function AddClassDrawer({
             <Separator />
 
             {/* Academic Year */}
-            <div className="flex flex-col gap-2">
-              <Label>Academic Year</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Academic Year</Label>
               <Input
                 placeholder="e.g. 2026-2027"
                 value={form.academicYear}
@@ -350,7 +356,7 @@ export function AddClassDrawer({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col gap-2 border-t bg-background px-4 py-3 sm:px-6 sm:py-4">
+        <SheetFooter className="flex-col border-t bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
           <Button
             size="lg"
             className="w-full"
@@ -368,8 +374,8 @@ export function AddClassDrawer({
           >
             Close
           </Button>
-        </div>
-      </DrawerContent>
-    </Drawer>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

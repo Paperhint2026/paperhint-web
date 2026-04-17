@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { PlusIcon, SchoolIcon } from "lucide-react"
+import { useHeaderActions } from "@/components/layout/header-actions-context"
 
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
@@ -49,6 +50,7 @@ export function ClassesPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
   const navigate = useNavigate()
+  const { setHeaderActions } = useHeaderActions()
 
   const dispatch = useAppDispatch()
   const { subjects: subjectRecords } = useAppSelector(
@@ -87,6 +89,17 @@ export function ClassesPage() {
     fetchClasses()
     dispatch(fetchSubjects())
   }, [fetchClasses, dispatch])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    setHeaderActions(
+      <Button size="lg" className="rounded-full" onClick={() => setDrawerOpen(true)}>
+        <PlusIcon className="size-3.5" />
+        <span className="hidden sm:inline">Add Class Room</span>
+      </Button>
+    )
+    return () => setHeaderActions(null)
+  }, [isAdmin, setHeaderActions])
 
   const handleSaveClass = async (data: ClassFormData) => {
     setIsSaving(true)
@@ -128,15 +141,6 @@ export function ClassesPage() {
 
   return (
     <div className="flex min-h-full w-full flex-col gap-6 p-4 md:p-6">
-      {isAdmin ? (
-        <div className="flex justify-end">
-          <Button size="lg" onClick={() => setDrawerOpen(true)} className="w-full sm:w-auto">
-            <PlusIcon />
-            Add Class Room
-          </Button>
-        </div>
-      ) : null}
-
       {/* Body */}
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">

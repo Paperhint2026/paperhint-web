@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from "react"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
-  BookCopyIcon,
   CalendarIcon,
   CameraIcon,
-  FileEditIcon,
-  InfoIcon,
   Loader2Icon,
   LinkIcon,
   MailIcon,
+  PencilIcon,
   PhoneIcon,
   PlusIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react"
-import dayjs from "dayjs"
+import { format } from "date-fns"
 
 import { cn } from "@/lib/utils"
 import {
@@ -27,10 +27,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
-  Drawer,
-  DrawerContent,
-  DrawerClose,
-} from "@/components/ui/drawer"
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -102,22 +106,6 @@ const emptyForm: TeacherFormData = {
   existingAssignments: [],
 }
 
-function SectionHeader({
-  icon: Icon,
-  title,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  title: string
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <Icon className="size-4 text-accent-foreground" />
-      <span className="text-sm font-medium text-accent-foreground">
-        {title}
-      </span>
-    </div>
-  )
-}
 
 export function AddTeacherDrawer({
   open,
@@ -132,10 +120,12 @@ export function AddTeacherDrawer({
   editData = null,
 }: AddTeacherDrawerProps) {
   const isEditMode = !!editData
+  const isMobile = useIsMobile()
   const [form, setForm] = useState<TeacherFormData>({ ...emptyForm })
   const [previewSrc, setPreviewSrc] = useState("")
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const bodyScrollRef = useRef<HTMLDivElement>(null)
   const [subjectsByClass, setSubjectsByClass] = useState<
     Record<string, ClassSubjectOption[]>
   >({})
@@ -268,6 +258,13 @@ export function AddTeacherDrawer({
     })
   }
 
+  const removeClassSubjectRow = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      classSubjects: prev.classSubjects.filter((_, i) => i !== index),
+    }))
+  }
+
   const addClassSubjectRow = () => {
     setForm((prev) => ({
       ...prev,
@@ -276,6 +273,12 @@ export function AddTeacherDrawer({
         { classId: "", classSubjectId: "" },
       ],
     }))
+    requestAnimationFrame(() => {
+      const el = bodyScrollRef.current
+      if (el) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+      }
+    })
   }
 
   const isFormValid =
@@ -298,96 +301,105 @@ export function AddTeacherDrawer({
   }
 
   return (
-    <Drawer direction="right" open={open} onOpenChange={onOpenChange}>
-      <DrawerContent
-        className="ml-auto h-full w-full rounded-none p-0 before:hidden sm:max-w-[580px]"
-      >
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side={isMobile ? "bottom" : "right"} size={isMobile ? "full" : "xl"} showCloseButton={false} className="flex h-full w-full flex-col p-0">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-medium text-secondary-foreground">
-              {isEditMode ? "Edit Teacher" : "Add New Teacher"}
-            </h2>
-            <p className="truncate text-sm text-muted-foreground">
-              {isEditMode
-                ? "Update the teacher's details."
-                : "Fill in the details to add a new teacher."}
-            </p>
+        <SheetHeader className="border-b bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <SheetTitle className="text-base font-medium text-secondary-foreground">
+                {isEditMode ? "Edit Teacher" : "Add New Teacher"}
+              </SheetTitle>
+              <SheetDescription>
+                {isEditMode
+                  ? "Update the teacher's details."
+                  : "Fill in the details to add a new teacher."}
+              </SheetDescription>
+            </div>
+            <SheetClose asChild>
+              <button
+                className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+              >
+                <XIcon className="size-5" />
+              </button>
+            </SheetClose>
           </div>
-          <DrawerClose asChild>
-            <button
-              className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Close"
-            >
-              <XIcon className="size-5" />
-            </button>
-          </DrawerClose>
-        </div>
+        </SheetHeader>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex min-h-full flex-col gap-6 bg-background px-4 py-2 sm:px-6">
+        <div ref={bodyScrollRef} className="no-scrollbar flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
             {/* Basic Info */}
-            <SectionHeader icon={InfoIcon} title="Basic Info" />
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Basic Info</p>
 
-            {/* Profile Picture */}
-            <div className="flex flex-col gap-2">
-              <Label>Profile Picture</Label>
-              <div className="flex items-center gap-4">
-                <div
-                  className="relative flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-muted-foreground/50"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {previewSrc ? (
-                    <img
-                      src={previewSrc}
-                      alt="Preview"
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <CameraIcon className="size-5 text-muted-foreground" />
-                  )}
-                  {isUploading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                      <Loader2Icon className="size-4 animate-spin" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isUploading}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    {isUploading ? "Uploading..." : "Upload Photo"}
-                  </Button>
-                  <p className="text-[11px] text-muted-foreground">
-                    Recommended: 200 × 200px. JPG, PNG or WebP.
-                  </p>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={handleFileChange}
+            {/* Avatar + Full Name */}
+            <div className="flex items-end gap-4">
+              <div
+                className="group/avatar relative flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-muted-foreground/50"
+                onClick={() => !previewSrc && fileInputRef.current?.click()}
+              >
+                {previewSrc ? (
+                  <img
+                    src={previewSrc}
+                    alt="Preview"
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <CameraIcon className="size-5 text-muted-foreground" />
+                )}
+                {previewSrc && !isUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center gap-1 bg-background/60 opacity-0 transition-opacity group-hover/avatar:opacity-100 [@media(hover:none)]:opacity-100">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        fileInputRef.current?.click()
+                      }}
+                      className="flex size-6 items-center justify-center rounded-full bg-background text-foreground shadow hover:bg-muted"
+                      aria-label="Change photo"
+                    >
+                      <PencilIcon className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPreviewSrc("")
+                        updateField("profileUrl", "")
+                      }}
+                      className="flex size-6 items-center justify-center rounded-full bg-background text-destructive shadow hover:bg-destructive hover:text-destructive-foreground"
+                      aria-label="Remove photo"
+                    >
+                      <Trash2Icon className="size-3" />
+                    </button>
+                  </div>
+                )}
+                {isUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                    <Loader2Icon className="size-4 animate-spin" />
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label className="text-sm">Teacher&apos;s Full Name <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="e.g. Sarah Johnson"
+                  value={form.fullName}
+                  onChange={(e) => updateField("fullName", e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label>Teacher&apos;s Full Name *</Label>
-              <Input
-                placeholder="e.g. Sarah Johnson"
-                value={form.fullName}
-                onChange={(e) => updateField("fullName", e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Work Email Address *</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Work Email Address <span className="text-destructive">*</span></Label>
               <div className="relative">
                 <MailIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -406,8 +418,8 @@ export function AddTeacherDrawer({
               )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label>Phone Number</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Phone Number</Label>
               <div className="relative">
                 <PhoneIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -423,10 +435,10 @@ export function AddTeacherDrawer({
             <Separator />
 
             {/* Professional Details */}
-            <SectionHeader icon={FileEditIcon} title="Professional Details" />
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Professional Details</p>
 
-            <div className="flex flex-col gap-2">
-              <Label>Department *</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Department <span className="text-destructive">*</span></Label>
               <Select
                 value={form.departmentId}
                 onValueChange={(v) => updateField("departmentId", v)}
@@ -445,54 +457,35 @@ export function AddTeacherDrawer({
             </div>
 
             <div className="flex gap-3">
-              <div className="flex flex-1 flex-col gap-2">
-                <Label>Designation</Label>
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label className="text-sm">Designation</Label>
                 <Input
                   placeholder="e.g. Senior Teacher, Asst. Professor"
                   value={form.designation}
                   onChange={(e) => updateField("designation", e.target.value)}
                 />
               </div>
-              <div className="flex flex-1 flex-col gap-2">
-                <Label>Date of Joining</Label>
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label className="text-sm">Date of Joining</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !form.dateOfJoining && "text-muted-foreground",
-                      )}
+                      data-empty={!form.dateOfJoining}
+                      className="w-full justify-start text-left font-normal data-[empty=true]:text-muted-foreground"
                     >
                       <CalendarIcon className="size-4" />
                       {form.dateOfJoining
-                        ? dayjs(form.dateOfJoining).format("MM/DD/YYYY")
-                        : "MM/DD/YYYY"}
+                        ? format(form.dateOfJoining, "PPP")
+                        : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <div className="p-3 border-b">
-                      <Input
-                        type="date"
-                        value={
-                          form.dateOfJoining
-                            ? dayjs(form.dateOfJoining).format("YYYY-MM-DD")
-                            : ""
-                        }
-                        onChange={(e) => {
-                          const d = e.target.value
-                            ? new Date(e.target.value + "T00:00:00")
-                            : undefined
-                          updateField("dateOfJoining", d)
-                        }}
-                        className="h-8 text-sm"
-                      />
-                    </div>
                     <Calendar
                       mode="single"
                       selected={form.dateOfJoining}
                       onSelect={(d) => updateField("dateOfJoining", d)}
-                      initialFocus
+                      captionLayout="dropdown"
                     />
                   </PopoverContent>
                 </Popover>
@@ -502,7 +495,7 @@ export function AddTeacherDrawer({
             <Separator />
 
             {/* Classes & Subjects */}
-            <SectionHeader icon={BookCopyIcon} title="Classes & Subjects" />
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Classes & Subjects</p>
             <p className="text-xs text-muted-foreground">
               {isEditMode
                 ? "Manage class-subject assignments for this teacher."
@@ -596,10 +589,11 @@ export function AddTeacherDrawer({
                   ? loadingSubjects[entry.classId] ?? false
                   : false
 
+                const isFirst = index === 0
                 return (
-                  <div key={index} className="flex gap-3">
+                  <div key={index} className="flex items-end gap-2">
                     <div className="flex flex-1 flex-col gap-2">
-                      <Label className="text-xs">Class</Label>
+                      {isFirst && <Label className="text-xs">Class</Label>}
                       <Select
                         value={entry.classId}
                         onValueChange={(v) => handleClassChange(index, v)}
@@ -617,7 +611,7 @@ export function AddTeacherDrawer({
                       </Select>
                     </div>
                     <div className="flex flex-1 flex-col gap-2">
-                      <Label className="text-xs">Subject</Label>
+                      {isFirst && <Label className="text-xs">Subject</Label>}
                       {isLoadingSubs ? (
                         <div className="h-9 animate-pulse rounded-4xl bg-muted" />
                       ) : (
@@ -650,12 +644,23 @@ export function AddTeacherDrawer({
                         </Select>
                       )}
                     </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                      onClick={() => removeClassSubjectRow(index)}
+                      disabled={form.classSubjects.length === 1}
+                      aria-label="Remove row"
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
                   </div>
                 )
               })}
               <div>
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   onClick={addClassSubjectRow}
                 >
@@ -668,7 +673,7 @@ export function AddTeacherDrawer({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col gap-2 border-t bg-background px-4 py-3 sm:px-6 sm:py-4">
+        <SheetFooter className="flex-col border-t bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
           <Button
             size="lg"
             className="w-full"
@@ -692,8 +697,8 @@ export function AddTeacherDrawer({
           >
             Close
           </Button>
-        </div>
-      </DrawerContent>
-    </Drawer>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

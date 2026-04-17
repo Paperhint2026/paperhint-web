@@ -15,8 +15,21 @@ export interface Student {
   id: string
   class_id: string
   full_name: string
+  date_of_birth?: string | null
+  gender?: string | null
+  blood_group?: string | null
+  admission_number?: string | null
+  academic_year?: string | null
+  grade?: string | null
+  section?: string | null
   roll_number: number
-  register_number: string
+  register_number?: string | null
+  street?: string | null
+  city?: string | null
+  contact_number?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_relationship?: string | null
+  emergency_contact_phone?: string | null
   created_at?: string
 }
 
