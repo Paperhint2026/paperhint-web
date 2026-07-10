@@ -5,6 +5,7 @@ import {
   HomeIcon,
   SchoolIcon,
   SparklesIcon,
+  TagIcon,
 } from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
@@ -87,6 +88,12 @@ export function AppSidebar() {
       icon: <GraduationCapIcon />,
       isActive: isActivePath("/students"),
       onClick: () => handleNav("/students"),
+    },
+    {
+      title: "Labels",
+      icon: <TagIcon />,
+      isActive: isActivePath("/teacher/labels"),
+      onClick: () => handleNav("/teacher/labels"),
     },
   ]
 

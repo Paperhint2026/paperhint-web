@@ -23,6 +23,7 @@ import { GradingReviewPage } from "@/modules/grading/pages/grading-review-page"
 import { SettingsPage } from "@/modules/settings/pages/settings-page"
 import { HelpPage } from "@/modules/help/pages/help-page"
 import { CopilotPage } from "@/modules/copilot/pages/copilot-page"
+import { LabelsPage } from "@/modules/labels/pages/labels-page"
 
 export const router = createBrowserRouter([
   { path: "login", element: <LoginPage /> },
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
           { path: "teachers", element: <TeachersPage /> },
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },
+          { path: "teacher/labels", element: <LabelsPage /> },
 
           // Class-scoped modules
           { path: "class/:classSubjectId/knowledge", element: <KnowledgePage /> },
