@@ -4,12 +4,14 @@ import { useDispatch, useSelector } from "react-redux"
 import authReducer from "@/store/auth-slice"
 import schoolReducer from "@/store/school-slice"
 import subjectsReducer from "@/store/subjects-slice"
+import studentNotesReducer from "@/store/studentNotes-slice"
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     school: schoolReducer,
     subjects: subjectsReducer,
+    studentNotes: studentNotesReducer,
   },
 })
 
