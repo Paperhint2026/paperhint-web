@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   EditIcon,
+  LockIcon,
   FileOutputIcon,
   Loader2Icon,
   PlusIcon,
@@ -21,6 +22,7 @@ import remarkMath from "remark-math"
 import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -53,10 +55,15 @@ interface Exam {
   total_marks: number
   blueprint: { section: string; type: string; num_questions: number; marks_per_question: number }[]
   chapters_selected: string[]
+  // Server-computed: true once ANY student submission for this exam has
+  // reached the graded status. See exams.controller.js -> isExamLockedForEditing.
+  locked_for_editing?: boolean
 }
 
 export function QuestionsPage() {
   const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const editQueryId = searchParams.get("edit")
   const navigate = useNavigate()
   const backUrl = `/class/${classSubjectId}/exams`
 
@@ -76,6 +83,10 @@ export function QuestionsPage() {
 
   // Delete state
   const [deleteQuestion, setDeleteQuestion] = useState<Question | null>(null)
+  // Convenience — every place that touches question mutations reads this.
+  // Falls to false pre-fetch so buttons render normally while loading, and
+  // the server would 409 anyway if someone squeezed a request in before
+  // the fetch completed.
   const [isDeletingQuestion, setIsDeletingQuestion] = useState(false)
 
   // Add question state
@@ -130,6 +141,37 @@ export function QuestionsPage() {
       return next
     })
   }
+
+  // Handle ?edit=<question_id> deep-link from the exam preview page. Fires
+  // once questions have loaded so scrollIntoView can find the row.
+  useEffect(() => {
+    if (!editQueryId || questions.length === 0) return
+    const target = questions.find((q) => q.id === editQueryId)
+    if (!target) return
+
+    setEditingQuestion(target.id)
+    setEditText(target.question_text)
+    setEditMarks(target.marks)
+    setEditAnswerKey(target.answer_key || "")
+    setEditOptions(target.options || [])
+
+    // Defer the scroll to the next frame so the row is in the DOM after the
+    // state above renders. Focus onto the row's element by id, not by ref —
+    // avoids adding refs to every card.
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`question-${target.id}`)
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" })
+    })
+
+    // Remove the param so this only fires once. Using replace so the user's
+    // back button doesn't re-trigger the auto-open.
+    const next = new URLSearchParams(searchParams)
+    next.delete("edit")
+    setSearchParams(next, { replace: true })
+    // Intentionally not listing setSearchParams/searchParams — the effect
+    // should only re-check when the deep-link id or questions change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editQueryId, questions])
 
   const startEdit = (q: Question) => {
     setEditingQuestion(q.id)
@@ -281,6 +323,20 @@ export function QuestionsPage() {
       {/* Question Paper */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
         <div className="mx-auto max-w-3xl space-y-6">
+          {exam?.locked_for_editing && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-950/30">
+              <LockIcon className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
+              <div className="text-sm">
+                <p className="font-medium text-amber-900 dark:text-amber-200">
+                  Editing locked
+                </p>
+                <p className="mt-0.5 text-xs leading-relaxed text-amber-800/90 dark:text-amber-300/90">
+                  Grading has started for this exam, so questions can no longer be added, edited, or removed. Editing a question after marks are awarded would silently invalidate them. To reopen editing, delete the graded submissions from the grading page.
+                </p>
+              </div>
+            </div>
+          )}
+
           {sortedSections.map((section) => {
             const sectionQuestions = sectionGroups[section]
             const bp = getBlueprintForSection(section)
@@ -318,10 +374,45 @@ export function QuestionsPage() {
                     {sectionQuestions
                       .sort((a, b) => a.question_order - b.question_order)
                       .map((q) => (
-                        <div key={q.id} className="group relative px-5 py-4">
+                        <div
+                          key={q.id}
+                          id={`question-${q.id}`}
+                          className={cn(
+                            "group relative px-5 py-4 transition-colors",
+                            // Highlight the whole row while it is being
+                            // edited — a soft accent tint + a real ring so
+                            // the teacher can't lose the active question
+                            // when they scroll around the page.
+                            // Background-only highlight while editing — no ring, no
+                            // rounded corners. The tint fills the row edge-to-edge so it
+                            // reads as part of the section's flush layout.
+                            editingQuestion === q.id && "bg-primary/[0.06]"
+                          )}
+                        >
                           {editingQuestion === q.id ? (
                             /* Edit mode */
                             <div className="space-y-3">
+                              {/* Sticky header so the teacher always sees which
+                                  question this form belongs to, even when the
+                                  question text is long enough to scroll. */}
+                              <div className="flex flex-wrap items-center gap-2 border-b pb-2 text-sm">
+                                <span className="font-semibold">
+                                  Editing Q{q.question_number}
+                                </span>
+                                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                  {q.marks} {q.marks === 1 ? "mark" : "marks"}
+                                </span>
+                                {q.type && (
+                                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                                    {q.type}
+                                  </span>
+                                )}
+                                {q.section && (
+                                  <span className="ml-auto text-[11px] text-muted-foreground">
+                                    Section {q.section}
+                                  </span>
+                                )}
+                              </div>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-muted-foreground">
                                   Question Text
@@ -450,21 +541,26 @@ export function QuestionsPage() {
                                   )}
                                 </div>
 
-                                {/* Action buttons */}
-                                <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                  <button
-                                    onClick={() => startEdit(q)}
-                                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                  >
-                                    <EditIcon className="size-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => setDeleteQuestion(q)}
-                                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                  >
-                                    <Trash2Icon className="size-3.5" />
-                                  </button>
-                                </div>
+                                {/* Action buttons — hidden once the exam is
+                                    locked for editing (a submission has been
+                                    graded). Server also 409s these routes
+                                    with code: "exam_locked_for_editing". */}
+                                {!exam?.locked_for_editing && (
+                                  <div className="flex shrink-0 gap-1">
+                                    <button
+                                      onClick={() => startEdit(q)}
+                                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                      <EditIcon className="size-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteQuestion(q)}
+                                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                    >
+                                      <Trash2Icon className="size-3.5" />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </>
                           )}
@@ -529,7 +625,7 @@ export function QuestionsPage() {
                           </Button>
                         </div>
                       </div>
-                    ) : (
+                    ) : !exam?.locked_for_editing ? (
                       <button
                         onClick={() => {
                           setAddingToSection(section)
@@ -541,7 +637,7 @@ export function QuestionsPage() {
                         <PlusIcon className="size-3.5" />
                         Add Question
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 )}
               </div>

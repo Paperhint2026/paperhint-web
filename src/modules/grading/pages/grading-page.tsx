@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ScanPagesModal } from "../components/scan-pages-modal"
+import { ExamCardsGrid } from "../components/exam-cards-grid"
 
 function compressForUpload(file: File): Promise<File> {
   return new Promise((resolve) => {
@@ -369,31 +370,38 @@ export function GradingPage() {
         onSubmit={handleScanUpload}
       />
 
-      {/* Exam selector + summary */}
+      {/* Exam selector + summary — visible only when an exam is already
+          selected (the per-student view). When no exam is selected, the
+          ExamCardsGrid below handles discovery with its own search + filter
+          chips, so a redundant dropdown would just fight it for space. */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Select
-            value={selectedExamId}
-            onValueChange={setSelectedExamId}
-            disabled={isLoadingExams || exams.length === 0}
-          >
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder={isLoadingExams ? "Loading exams..." : exams.length === 0 ? "No exams available" : "Select an exam"} />
-            </SelectTrigger>
-            <SelectContent>
-              {exams.map((exam) => (
-                <SelectItem key={exam.id} value={exam.id}>
-                  {exam.exam_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedExam && (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              {selectedExam.total_marks} marks · {selectedExam.question_count} questions
-            </span>
-          )}
-        </div>
+        {selectedExamId ? (
+          <div className="flex items-center gap-3">
+            <Select
+              value={selectedExamId}
+              onValueChange={setSelectedExamId}
+              disabled={isLoadingExams || exams.length === 0}
+            >
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder={isLoadingExams ? "Loading exams..." : exams.length === 0 ? "No exams available" : "Select an exam"} />
+              </SelectTrigger>
+              <SelectContent>
+                {exams.map((exam) => (
+                  <SelectItem key={exam.id} value={exam.id}>
+                    {exam.exam_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedExam && (
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                {selectedExam.total_marks} marks · {selectedExam.question_count} questions
+              </span>
+            )}
+          </div>
+        ) : (
+          <div />
+        )}
 
         {selectedExamId && !isLoadingList && students.length > 0 && (
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -406,10 +414,10 @@ export function GradingPage() {
       {/* Student list */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {!selectedExamId ? (
-          <div className="flex h-40 flex-col items-center justify-center gap-3">
-            <ClipboardCheckIcon className="size-12 text-muted-foreground/30" />
-            <p className="text-sm text-muted-foreground">Select an exam to view students</p>
-          </div>
+          <ExamCardsGrid
+            classSubjectId={classSubjectId ?? ""}
+            onSelectExam={(examId) => setSelectedExamId(examId)}
+          />
         ) : isLoadingList ? (
           <div className="flex h-40 items-center justify-center">
             <Loader2Icon className="size-6 animate-spin text-muted-foreground" />

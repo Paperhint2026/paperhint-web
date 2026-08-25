@@ -68,6 +68,27 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { BlueprintModal, type Blueprint, type BlueprintSection } from "../components/blueprint-modal"
+import { ChapterTopicPicker } from "../components/chapter-topic-picker"
+
+/**
+ * MCQ answers arrive from the AI in a few shapes:
+ *   "(A) 22338"   parenthesised
+ *   "A. 22338"    dotted
+ *   "A"           bare letter
+ * The option-letter rendered next to each choice is always the single letter,
+ * so pull the first A-D out of the answer key and compare on that. Case-
+ * insensitive because some models return lowercase.
+ */
+function matchesOptionLetter(answerKey: string | null | undefined, label: string): boolean {
+  if (!answerKey) return false
+  // Match the first A-D that appears near the start (optionally wrapped in
+  // parens). This deliberately does NOT scan the whole string, so an "A" that
+  // appears inside the answer text (e.g. "A perimeter of ...") isn't picked
+  // up as the option letter.
+  const m = answerKey.match(/^\s*\(?\s*([A-Da-d])\s*[).:\s]/)
+  if (!m) return false
+  return m[1].toUpperCase() === label.toUpperCase()
+}
 import { ScanPagesModal } from "@/modules/grading/components/scan-pages-modal"
 
 /* ─── Types ─────────────────────────────────────────────── */
@@ -79,7 +100,10 @@ interface Exam {
   blueprint: BlueprintSection[]
   chapters_selected: string[]
   total_marks: number
+  pass_marks: number | null
   question_count: number
+  submission_count?: number
+  graded_count?: number
   source: "ai" | "uploaded" | null
   created_at: string
 }
@@ -170,6 +194,7 @@ export function ExamsPage() {
 
   /* Question paper */
   const [questions, setQuestions] = useState<Question[]>([])
+  const [selectedExamLocked, setSelectedExamLocked] = useState(false)
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [showAnswers, setShowAnswers] = useState(false)
@@ -189,16 +214,14 @@ export function ExamsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [examName, setExamName] = useState("")
   const [chapters, setChapters] = useState<string[]>([])
-  const [chapterInput, setChapterInput] = useState("")
   const [blueprint, setBlueprint] = useState<BlueprintSection[]>(DEFAULT_BLUEPRINT)
   const [totalMarks, setTotalMarks] = useState(0)
+  const [passMarks, setPassMarks] = useState<number | null>(null)
   const [savedBlueprints, setSavedBlueprints] = useState<Blueprint[]>([])
   const [selectedBlueprintId, setSelectedBlueprintId] = useState("")
   const [blueprintModalOpen, setBlueprintModalOpen] = useState(false)
   const [blueprintEdited, setBlueprintEdited] = useState(false)
   const [showBlueprintSections, setShowBlueprintSections] = useState(false)
-  const [chapterSuggestions, setChapterSuggestions] = useState<string[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
 
   /* Delete exam */
   const [deleteExamConfirm, setDeleteExamConfirm] = useState<Exam | null>(null)
@@ -238,28 +261,20 @@ export function ExamsPage() {
     } catch { /* ignore */ }
   }, [])
 
-  const fetchChapterSuggestions = useCallback(async (csId: string) => {
-    try {
-      const res = await apiClient.get<{ materials: { tags: string[] }[] }>(`/api/knowledge/materials/${csId}`)
-      const tags = Array.from(new Set((res.materials ?? []).flatMap((m) => m.tags ?? [])))
-      setChapterSuggestions(tags)
-    } catch { /* ignore */ }
-  }, [])
-
   useEffect(() => {
     if (classSubjectId) {
       fetchExams(classSubjectId)
-      fetchChapterSuggestions(classSubjectId)
     }
     fetchBlueprints()
-  }, [classSubjectId, fetchExams, fetchChapterSuggestions, fetchBlueprints])
+  }, [classSubjectId, fetchExams, fetchBlueprints])
 
   /* ── Fetch question paper ── */
   const fetchQuestions = useCallback(async (examId: string) => {
     setIsLoadingQuestions(true)
     try {
-      const res = await apiClient.get<{ questions: Question[] }>(`/api/exams/${examId}`)
+      const res = await apiClient.get<{ questions: Question[]; exam: { locked_for_editing?: boolean } }>(`/api/exams/${examId}`)
       setQuestions(res.questions ?? [])
+      setSelectedExamLocked(!!res.exam?.locked_for_editing)
       const sections = new Set((res.questions ?? []).map((q) => q.section))
       setExpandedSections(sections)
     } catch {
@@ -320,8 +335,9 @@ export function ExamsPage() {
 
   /* ── Exam drawer helpers ── */
   const resetForm = () => {
-    setExamName(""); setChapters([]); setChapterInput(""); setBlueprint(DEFAULT_BLUEPRINT)
+    setExamName(""); setChapters([]); setBlueprint(DEFAULT_BLUEPRINT)
     setSelectedBlueprintId(""); setBlueprintEdited(false); setShowBlueprintSections(false); setEditExam(null)
+    setPassMarks(null)
   }
 
   const openCreate = () => { resetForm(); setDrawerOpen(true) }
@@ -331,19 +347,23 @@ export function ExamsPage() {
     setBlueprint(exam.blueprint ?? DEFAULT_BLUEPRINT)
     setShowBlueprintSections(!!(exam.blueprint && exam.blueprint.length > 0))
     setBlueprintEdited(false); setDrawerOpen(true)
+    setPassMarks(exam.pass_marks ?? null)
   }
 
   const handleSave = async () => {
     if (!examName.trim()) return toast.error("Exam name is required")
     if (chapters.length === 0) return toast.error("Select at least one chapter")
     if (!showBlueprintSections || blueprint.length === 0) return toast.error("Select or create a blueprint")
+    if (passMarks != null && (passMarks <= 0 || passMarks > totalMarks)) {
+      return toast.error(`Pass mark must be between 1 and ${totalMarks}`)
+    }
     setIsSaving(true)
     try {
       if (editExam) {
-        await apiClient.put(`/api/exams/${editExam.id}`, { exam_name: examName.trim(), chapters_selected: chapters, blueprint, total_marks: totalMarks })
+        await apiClient.put(`/api/exams/${editExam.id}`, { exam_name: examName.trim(), chapters_selected: chapters, blueprint, total_marks: totalMarks, pass_marks: passMarks })
         toast.success("Exam updated")
       } else {
-        await apiClient.post("/api/exams/create", { class_subject_id: classSubjectId, exam_name: examName.trim(), chapters_selected: chapters, blueprint, total_marks: totalMarks })
+        await apiClient.post("/api/exams/create", { class_subject_id: classSubjectId, exam_name: examName.trim(), chapters_selected: chapters, blueprint, total_marks: totalMarks, pass_marks: passMarks })
         toast.success("Exam created")
       }
       setDrawerOpen(false); resetForm()
@@ -369,12 +389,6 @@ export function ExamsPage() {
     } finally {
       setIsDeletingExam(false)
     }
-  }
-
-  const addChapter = (ch: string) => {
-    const t = ch.trim()
-    if (t && !chapters.includes(t)) setChapters([...chapters, t])
-    setChapterInput(""); setShowSuggestions(false)
   }
 
   const updateBlueprint = (idx: number, field: keyof BlueprintSection, value: string | number) => {
@@ -489,10 +503,6 @@ export function ExamsPage() {
   }, {})
   const sortedSections = Object.keys(sectionGroups).sort()
 
-  const filteredSuggestions = chapterSuggestions.filter(
-    (s) => s.toLowerCase().includes(chapterInput.toLowerCase()) && !chapters.includes(s),
-  )
-
   const gradedCount = submissions.filter((s) => s.status === "graded").length
 
   const filteredExams = searchQuery.trim()
@@ -586,6 +596,22 @@ export function ExamsPage() {
                         <span>
                           {exam.question_count} question{exam.question_count !== 1 ? "s" : ""}
                         </span>
+                        {exam.pass_marks != null && (
+                          <>
+                            <span>·</span>
+                            {/* Same wording as the exam-cards grid on the grading tab:
+                                shows the actual value and its percentage of total_marks
+                                so the teacher can eyeball the threshold at a glance. */}
+                            <span>
+                              pass {exam.pass_marks}
+                              {exam.total_marks > 0 && (
+                                <span className="text-muted-foreground/60">
+                                  {" "}({Math.round((exam.pass_marks / exam.total_marks) * 100)}%)
+                                </span>
+                              )}
+                            </span>
+                          </>
+                        )}
                       </div>
 
                       <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground/60">
@@ -786,6 +812,22 @@ export function ExamsPage() {
                                     <span className="ml-auto text-[11px] font-semibold text-muted-foreground">
                                       {q.marks} {q.marks === 1 ? "mark" : "marks"}
                                     </span>
+                                    {/* Per-question edit — routes to the full questions editor
+                                        (paperhint-web/src/modules/exams/pages/questions-page.tsx)
+                                        rather than duplicating an inline editor here. Hidden
+                                        once the backend reports the exam is locked for editing
+                                        (see exams.controller.js -> isExamLockedForEditing). */}
+                                    {!selectedExamLocked && (
+                                      <button
+                                        type="button"
+                                        onClick={() => navigate(`/class/${classSubjectId}/exams/${selectedExamId}/questions?edit=${q.id}`)}
+                                        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        aria-label={`Edit question ${qNum}`}
+                                        title="Edit question"
+                                      >
+                                        <EditIcon className="size-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                   <div className="px-4 py-3">
                                     <div className="prose prose-sm max-w-none text-sm leading-relaxed dark:prose-invert">
@@ -801,7 +843,7 @@ export function ExamsPage() {
                                       <div className="mt-3 space-y-1.5">
                                         {q.options.map((opt, oi) => {
                                           const label = String.fromCharCode(65 + oi)
-                                          const isCorrect = showAnswers && q.answer_key === label
+                                          const isCorrect = showAnswers && matchesOptionLetter(q.answer_key, label)
                                           return (
                                             <div
                                               key={oi}
@@ -828,7 +870,7 @@ export function ExamsPage() {
                                       </div>
                                     )}
 
-                                    {showAnswers && hasAnswerKey && (!q.options || q.options.length === 0) && (
+                                    {showAnswers && hasAnswerKey && (
                                       <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800/40 dark:bg-emerald-900/15">
                                         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
                                           Answer Key
@@ -1048,45 +1090,15 @@ export function ExamsPage() {
               />
             </div>
 
-            {/* Chapters */}
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-sm">Chapters / Topics</Label>
-              <div className="relative">
-                <Input
-                  placeholder="Type to search or add chapters…"
-                  value={chapterInput}
-                  onChange={(e) => { setChapterInput(e.target.value); setShowSuggestions(true) }}
-                  onFocus={() => setShowSuggestions(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && chapterInput.trim()) { e.preventDefault(); addChapter(chapterInput) }
-                  }}
-                />
-                {showSuggestions && chapterInput && filteredSuggestions.length > 0 && (
-                  <div className="absolute z-50 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-lg">
-                    {filteredSuggestions.map((s) => (
-                      <button
-                        key={s}
-                        className="w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-muted"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => addChapter(s)}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {chapters.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {chapters.map((ch) => (
-                    <span key={ch} className="flex items-center gap-1 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                      {ch}
-                      <button onClick={() => setChapters(chapters.filter((c) => c !== ch))} className="ml-0.5 hover:opacity-70">×</button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Chapters / Topics — sourced from the curriculum extracted per
+                material (see knowledge.controller.js -> getCurriculum, and
+                migration 005). Manual "+ Add" is preserved inside the picker
+                for chapters not yet in the catalog. */}
+            <ChapterTopicPicker
+              classSubjectId={classSubjectId ?? ""}
+              value={chapters}
+              onChange={setChapters}
+            />
 
             {/* Blueprint */}
             <div className="flex flex-col gap-1.5">
@@ -1154,6 +1166,38 @@ export function ExamsPage() {
                   <div className="flex items-center justify-between rounded-lg bg-primary/5 px-4 py-2.5">
                     <span className="text-sm font-medium">Total Marks</span>
                     <span className="text-lg font-bold text-primary">{totalMarks}</span>
+                  </div>
+
+                  {/* Pass mark — optional. When set, the grading tab renders
+                      a "Failing" count using this threshold; when left blank,
+                      that metric is omitted (see exam-cards-grid.tsx). */}
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="text-sm">
+                      Pass mark <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={totalMarks || undefined}
+                        step="0.5"
+                        value={passMarks ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setPassMarks(v === "" ? null : Number(v))
+                        }}
+                        placeholder={`e.g. ${Math.round(totalMarks * 0.33)} (33%)`}
+                        className="h-9 flex-1 text-xs"
+                      />
+                      <span className="whitespace-nowrap text-xs text-muted-foreground">
+                        {passMarks != null && totalMarks > 0
+                          ? `${Math.round((passMarks / totalMarks) * 100)}% of ${totalMarks}`
+                          : `of ${totalMarks}`}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Leave blank if this exam has no pass threshold (e.g. weekly practice tests for JEE / NEET coaching).
+                    </p>
                   </div>
                   {blueprintEdited && selectedBlueprintId && (
                     <button onClick={handleSaveEditedAsBlueprint} className="text-xs font-medium text-primary hover:underline">
