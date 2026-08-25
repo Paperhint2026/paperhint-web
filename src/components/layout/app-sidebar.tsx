@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom"
 import {
+  BookOpenIcon,
   ContactRoundIcon,
   GraduationCapIcon,
   HomeIcon,
@@ -87,6 +88,12 @@ export function AppSidebar() {
       icon: <GraduationCapIcon />,
       isActive: isActivePath("/students"),
       onClick: () => handleNav("/students"),
+    },
+    {
+      title: "Knowledge Library",
+      icon: <BookOpenIcon />,
+      isActive: isActivePath("/library"),
+      onClick: () => handleNav("/library"),
     },
   ]
 

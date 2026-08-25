@@ -3,6 +3,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { format } from "date-fns"
 import { CalendarIcon, Loader2Icon, XIcon } from "lucide-react"
 
+import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -31,6 +32,11 @@ import {
 } from "@/components/ui/select"
 import type { ClassItem } from "@/modules/students/components/student-class-card"
 
+export interface ElectiveChoice {
+  elective_group_id: string
+  class_subject_id: string
+}
+
 export interface StudentEntry {
   full_name: string
   date_of_birth: string
@@ -48,6 +54,7 @@ export interface StudentEntry {
   emergency_contact_name: string
   emergency_contact_relationship: string
   emergency_contact_phone: string
+  elective_choices?: ElectiveChoice[]
 }
 
 interface AddStudentDrawerProps {
@@ -58,6 +65,24 @@ interface AddStudentDrawerProps {
   isSaving?: boolean
   mode?: "create" | "edit"
   initialData?: StudentEntry | null
+}
+
+interface ElectiveGroupOption {
+  class_subject_id: string
+  subject_id: string
+  subject_name: string
+}
+
+interface ElectiveGroup {
+  elective_group_id: string
+  elective_group_name: string
+  options: ElectiveGroupOption[]
+}
+
+interface ClassSubjectsResponse {
+  class_id: string
+  core_subjects: unknown[]
+  elective_groups: ElectiveGroup[]
 }
 
 const emptyEntry: StudentEntry = {
@@ -77,6 +102,7 @@ const emptyEntry: StudentEntry = {
   emergency_contact_name: "",
   emergency_contact_relationship: "",
   emergency_contact_phone: "",
+  elective_choices: [],
 }
 
 const GENDER_OPTIONS = ["Male", "Female", "Other"]
@@ -93,6 +119,8 @@ export function AddStudentDrawer({
 }: AddStudentDrawerProps) {
   const isMobile = useIsMobile()
   const [entry, setEntry] = useState<StudentEntry>({ ...emptyEntry })
+  const [electiveGroups, setElectiveGroups] = useState<ElectiveGroup[]>([])
+  const [isLoadingElectives, setIsLoadingElectives] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -106,13 +134,14 @@ export function AddStudentDrawer({
     setEntry((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Unique sorted grades from classes
   const gradeOptions = useMemo(
-    () => [...new Set(classes.map((c) => String(c.grade)))].sort((a, b) => Number(a) - Number(b)),
+    () =>
+      [...new Set(classes.map((c) => String(c.grade)))].sort(
+        (a, b) => Number(a) - Number(b),
+      ),
     [classes],
   )
 
-  // Sections for the selected grade (or all if no grade picked)
   const sectionOptions = useMemo(() => {
     const pool = entry.grade
       ? classes.filter((c) => String(c.grade) === entry.grade)
@@ -120,15 +149,95 @@ export function AddStudentDrawer({
     return [...new Set(pool.map((c) => c.section))].sort()
   }, [classes, entry.grade])
 
+  const selectedClassId = useMemo(() => {
+    if (!entry.grade || !entry.section) return null
+    const cls = classes.find(
+      (c) => String(c.grade) === entry.grade && c.section === entry.section,
+    )
+    return cls?.id ?? null
+  }, [classes, entry.grade, entry.section])
+
+  useEffect(() => {
+    if (!selectedClassId) {
+      setElectiveGroups([])
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingElectives(true)
+
+    apiClient
+      .get<ClassSubjectsResponse>(
+        `/api/class-subjects/class/${selectedClassId}`,
+      )
+      .then((res) => {
+        if (cancelled) return
+        setElectiveGroups(res.elective_groups ?? [])
+
+        if (!initialData?.elective_choices?.length) {
+          setEntry((prev) => ({ ...prev, elective_choices: [] }))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setElectiveGroups([])
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingElectives(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedClassId])
+
   const handleGradeChange = (val: string) => {
     update("grade", val)
-    update("section", "") // reset section when grade changes
+    update("section", "")
+    setElectiveGroups([])
+    setEntry((prev) => ({ ...prev, elective_choices: [] }))
+  }
+
+  const handleSectionChange = (val: string) => {
+    update("section", val)
+    setEntry((prev) => ({ ...prev, elective_choices: [] }))
+  }
+
+  const handleElectiveChoice = (
+    electiveGroupId: string,
+    classSubjectId: string,
+  ) => {
+    setEntry((prev) => {
+      const existing = (prev.elective_choices ?? []).filter(
+        (c) => c.elective_group_id !== electiveGroupId,
+      )
+      return {
+        ...prev,
+        elective_choices: [
+          ...existing,
+          {
+            elective_group_id: electiveGroupId,
+            class_subject_id: classSubjectId,
+          },
+        ],
+      }
+    })
+  }
+
+  const getSelectedElective = (electiveGroupId: string): string => {
+    return (
+      entry.elective_choices?.find(
+        (c) => c.elective_group_id === electiveGroupId,
+      )?.class_subject_id ?? ""
+    )
   }
 
   const isFormValid =
     entry.full_name.trim() !== "" &&
     entry.date_of_birth !== "" &&
-    entry.gender !== ""
+    entry.gender !== "" &&
+    electiveGroups.every(
+      (g) => getSelectedElective(g.elective_group_id) !== "",
+    )
 
   const handleSave = () => {
     if (!isFormValid) return
@@ -138,11 +247,17 @@ export function AddStudentDrawer({
   const handleClose = () => {
     onOpenChange(false)
     setEntry({ ...emptyEntry })
+    setElectiveGroups([])
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side={isMobile ? "bottom" : "right"} size={isMobile ? "full" : "xl"} showCloseButton={false} className="flex h-full w-full flex-col p-0">
+      <SheetContent
+        side={isMobile ? "bottom" : "right"}
+        size={isMobile ? "full" : "xl"}
+        showCloseButton={false}
+        className="flex h-full w-full flex-col p-0"
+      >
         {/* Header */}
         <SheetHeader className="border-b bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-start justify-between gap-3">
@@ -170,12 +285,15 @@ export function AddStudentDrawer({
         {/* Body */}
         <div className="no-scrollbar flex-1 overflow-y-auto">
           <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
-
             {/* Personal Information */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Personal Information</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Personal Information
+            </p>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-sm">Full Name <span className="text-destructive">*</span></Label>
+              <Label className="text-sm">
+                Full Name <span className="text-destructive">*</span>
+              </Label>
               <Input
                 placeholder="e.g. John Doe"
                 value={entry.full_name}
@@ -186,7 +304,9 @@ export function AddStudentDrawer({
             {/* Date of Birth + Gender — 2 col */}
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label className="text-sm">Date of Birth <span className="text-destructive">*</span></Label>
+                <Label className="text-sm">
+                  Date of Birth <span className="text-destructive">*</span>
+                </Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -195,30 +315,51 @@ export function AddStudentDrawer({
                       className="w-full justify-start text-left font-normal data-[empty=true]:text-muted-foreground"
                     >
                       <CalendarIcon className="size-4" />
-                      {entry.date_of_birth
-                        ? format(new Date(entry.date_of_birth + "T00:00:00"), "PPP")
-                        : <span>Pick a date</span>}
+                      {entry.date_of_birth ? (
+                        format(
+                          new Date(entry.date_of_birth + "T00:00:00"),
+                          "PPP",
+                        )
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={entry.date_of_birth ? new Date(entry.date_of_birth + "T00:00:00") : undefined}
-                      onSelect={(d) => update("date_of_birth", d ? format(d, "yyyy-MM-dd") : "")}
+                      selected={
+                        entry.date_of_birth
+                          ? new Date(entry.date_of_birth + "T00:00:00")
+                          : undefined
+                      }
+                      onSelect={(d) =>
+                        update(
+                          "date_of_birth",
+                          d ? format(d, "yyyy-MM-dd") : "",
+                        )
+                      }
                       captionLayout="dropdown"
                     />
                   </PopoverContent>
                 </Popover>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label className="text-sm">Gender <span className="text-destructive">*</span></Label>
-                <Select value={entry.gender} onValueChange={(v) => update("gender", v)}>
+                <Label className="text-sm">
+                  Gender <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={entry.gender}
+                  onValueChange={(v) => update("gender", v)}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
                     {GENDER_OPTIONS.map((g) => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                      <SelectItem key={g} value={g}>
+                        {g}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -227,13 +368,18 @@ export function AddStudentDrawer({
 
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">Blood Group</Label>
-              <Select value={entry.blood_group} onValueChange={(v) => update("blood_group", v)}>
+              <Select
+                value={entry.blood_group}
+                onValueChange={(v) => update("blood_group", v)}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select blood group" />
                 </SelectTrigger>
                 <SelectContent>
                   {BLOOD_GROUPS.map((bg) => (
-                    <SelectItem key={bg} value={bg}>{bg}</SelectItem>
+                    <SelectItem key={bg} value={bg}>
+                      {bg}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -242,7 +388,9 @@ export function AddStudentDrawer({
             <Separator />
 
             {/* Academic Details */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Academic Details</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Academic Details
+            </p>
 
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">Admission Number</Label>
@@ -257,31 +405,104 @@ export function AddStudentDrawer({
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-sm">Grade</Label>
-                <Select value={entry.grade} onValueChange={handleGradeChange}>
+                <Select
+                  value={entry.grade}
+                  onValueChange={handleGradeChange}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select grade" />
                   </SelectTrigger>
                   <SelectContent>
                     {gradeOptions.map((g) => (
-                      <SelectItem key={g} value={g}>Grade {g}</SelectItem>
+                      <SelectItem key={g} value={g}>
+                        Grade {g}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label className="text-sm">Section</Label>
-                <Select value={entry.section} onValueChange={(v) => update("section", v)}>
+                <Select
+                  value={entry.section}
+                  onValueChange={handleSectionChange}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select section" />
                   </SelectTrigger>
                   <SelectContent>
                     {sectionOptions.map((s) => (
-                      <SelectItem key={s} value={s}>Section {s}</SelectItem>
+                      <SelectItem key={s} value={s}>
+                        Section {s}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {/* Elective Subjects — only shown when the class has elective groups */}
+            {isLoadingElectives && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2Icon className="size-3.5 animate-spin" />
+                Loading elective options…
+              </div>
+            )}
+
+            {!isLoadingElectives && electiveGroups.length > 0 && (
+              <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-800 dark:bg-amber-950/20">
+                <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                  Elective Subjects
+                </p>
+
+                {electiveGroups.map((group) => {
+                  const selected = getSelectedElective(
+                    group.elective_group_id,
+                  )
+                  return (
+                    <div
+                      key={group.elective_group_id}
+                      className="flex flex-col gap-1.5"
+                    >
+                      <Label className="text-sm">
+                        {group.elective_group_name}{" "}
+                        <span className="text-destructive">*</span>
+                      </Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.options.map((opt) => {
+                          const isSelected =
+                            selected === opt.class_subject_id
+                          return (
+                            <button
+                              key={opt.class_subject_id}
+                              type="button"
+                              onClick={() =>
+                                handleElectiveChoice(
+                                  group.elective_group_id,
+                                  opt.class_subject_id,
+                                )
+                              }
+                              className={
+                                isSelected
+                                  ? "inline-flex items-center rounded-full border border-amber-500 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors dark:border-amber-600 dark:bg-amber-900 dark:text-amber-200"
+                                  : "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                              }
+                            >
+                              {opt.subject_name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {!selected && (
+                        <p className="text-xs text-amber-600 dark:text-amber-500">
+                          Please select one option
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">Academic Year</Label>
@@ -320,7 +541,9 @@ export function AddStudentDrawer({
             <Separator />
 
             {/* Address */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Address</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Address
+            </p>
 
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">Street / House No.</Label>
@@ -353,7 +576,9 @@ export function AddStudentDrawer({
             <Separator />
 
             {/* Emergency Contact */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Emergency Contact</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Emergency Contact
+            </p>
 
             {/* Contact Name + Relationship — 2 col */}
             <div className="grid grid-cols-2 gap-4">
@@ -362,7 +587,9 @@ export function AddStudentDrawer({
                 <Input
                   placeholder="e.g. Jane Doe"
                   value={entry.emergency_contact_name}
-                  onChange={(e) => update("emergency_contact_name", e.target.value)}
+                  onChange={(e) =>
+                    update("emergency_contact_name", e.target.value)
+                  }
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -370,7 +597,9 @@ export function AddStudentDrawer({
                 <Input
                   placeholder="e.g. Parent"
                   value={entry.emergency_contact_relationship}
-                  onChange={(e) => update("emergency_contact_relationship", e.target.value)}
+                  onChange={(e) =>
+                    update("emergency_contact_relationship", e.target.value)
+                  }
                 />
               </div>
             </div>
@@ -381,10 +610,11 @@ export function AddStudentDrawer({
                 type="tel"
                 placeholder="e.g. +1 555 0199"
                 value={entry.emergency_contact_phone}
-                onChange={(e) => update("emergency_contact_phone", e.target.value)}
+                onChange={(e) =>
+                  update("emergency_contact_phone", e.target.value)
+                }
               />
             </div>
-
           </div>
         </div>
 
@@ -397,7 +627,11 @@ export function AddStudentDrawer({
             onClick={handleSave}
           >
             {isSaving && <Loader2Icon className="animate-spin" />}
-            {isSaving ? "Saving..." : isEdit ? "Update Student" : "Save Student"}
+            {isSaving
+              ? "Saving..."
+              : isEdit
+                ? "Update Student"
+                : "Save Student"}
           </Button>
           <Button
             variant="outline"

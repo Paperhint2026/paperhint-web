@@ -43,6 +43,7 @@ import { type ClassItem } from "@/modules/students/components/student-class-card
 import {
   AddStudentDrawer,
   type StudentEntry,
+  type ElectiveChoice,
 } from "@/modules/students/components/add-student-drawer"
 import { StudentDetailDrawer } from "@/modules/students/components/student-detail-drawer"
 import {
@@ -249,11 +250,34 @@ export function StudentsPage() {
     return () => setHeaderActions(null)
   }, [isAdmin, setHeaderActions])
 
+  const resolveClassId = (entry: StudentEntry): string | null => {
+    if (entry.grade && entry.section) {
+      const cls = classes.find(
+        (c) => String(c.grade) === entry.grade && c.section === entry.section,
+      )
+      if (cls) return cls.id
+    }
+    return selectedClass?.id ?? null
+  }
+
+  const saveElectiveChoices = async (studentId: string, choices?: ElectiveChoice[]) => {
+    if (!choices || choices.length === 0) return
+    const electives = choices.map((c) => ({
+      class_subject_id: c.class_subject_id,
+      elective_group_id: c.elective_group_id,
+    }))
+    await apiClient.post("/api/student-electives/bulk", {
+      student_id: studentId,
+      electives,
+    })
+  }
+
   const handleSaveStudents = async (entry: StudentEntry) => {
     setIsSaving(true)
     try {
-      await apiClient.post("/api/students", {
-        class_id: selectedClass?.id ?? null,
+      const classId = resolveClassId(entry)
+      const res = await apiClient.post<{ student: { id: string } }>("/api/students", {
+        class_id: classId,
         full_name: entry.full_name,
         date_of_birth: entry.date_of_birth || null,
         gender: entry.gender || null,
@@ -271,6 +295,9 @@ export function StudentsPage() {
         emergency_contact_relationship: entry.emergency_contact_relationship || null,
         emergency_contact_phone: entry.emergency_contact_phone || null,
       })
+
+      await saveElectiveChoices(res.student.id, entry.elective_choices)
+
       setDrawerOpen(false)
       await fetchAll()
     } catch (err) {
@@ -288,10 +315,28 @@ export function StudentsPage() {
   const handleEditStudent = async (studentId: string) => {
     setIsLoadingEdit(true)
     try {
-      const res = await apiClient.get<{ student: Record<string, unknown> }>(
-        `/api/students/${studentId}`,
-      )
-      const s = res.student as Record<string, string | number | null | undefined>
+      const [studentRes, electivesRes] = await Promise.all([
+        apiClient.get<{ student: Record<string, unknown> }>(
+          `/api/students/${studentId}`,
+        ),
+        apiClient
+          .get<{
+            student_electives: {
+              elective_group_id: string
+              class_subject_id: string
+            }[]
+          }>(`/api/student-electives/student/${studentId}`)
+          .catch(() => ({ student_electives: [] })),
+      ])
+
+      const s = studentRes.student as Record<string, string | number | null | undefined>
+      const electiveChoices: ElectiveChoice[] = (
+        electivesRes.student_electives ?? []
+      ).map((e) => ({
+        elective_group_id: e.elective_group_id,
+        class_subject_id: e.class_subject_id,
+      }))
+
       const entry: StudentEntry = {
         full_name: String(s.full_name ?? ""),
         date_of_birth: s.date_of_birth ? String(s.date_of_birth) : "",
@@ -309,6 +354,7 @@ export function StudentsPage() {
         emergency_contact_name: String(s.emergency_contact_name ?? ""),
         emergency_contact_relationship: String(s.emergency_contact_relationship ?? ""),
         emergency_contact_phone: String(s.emergency_contact_phone ?? ""),
+        elective_choices: electiveChoices,
       }
       setEditInitialData(entry)
       setEditStudentId(studentId)
@@ -341,6 +387,9 @@ export function StudentsPage() {
         emergency_contact_relationship: entry.emergency_contact_relationship || null,
         emergency_contact_phone: entry.emergency_contact_phone || null,
       })
+
+      await saveElectiveChoices(editStudentId, entry.elective_choices)
+
       setEditStudentId(null)
       setEditInitialData(null)
       await fetchAll()

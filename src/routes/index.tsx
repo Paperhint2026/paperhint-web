@@ -12,7 +12,9 @@ import { ClassOverviewPage } from "@/modules/classes/pages/class-overview-page"
 import { TeachersPage } from "@/modules/teachers/pages/teachers-page"
 import { TeacherOverviewPage } from "@/modules/teachers/pages/teacher-overview-page"
 import { StudentsPage } from "@/modules/students/pages/students-page"
+import { ClassStudentsMarksPage } from "@/modules/students/pages/class-students-marks-page"
 import { KnowledgePage } from "@/modules/knowledge/pages/knowledge-page"
+import { LibraryPage } from "@/modules/knowledge/pages/library-page"
 import { ExamsPage } from "@/modules/exams/pages/exams-page"
 import { GenerateQuestionsPage } from "@/modules/exams/pages/generate-questions-page"
 import { QuestionsPage } from "@/modules/exams/pages/questions-page"
@@ -41,6 +43,7 @@ export const router = createBrowserRouter([
           { path: "teachers", element: <TeachersPage /> },
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },
+          { path: "library", element: <LibraryPage /> },
 
           // Class-scoped modules
           { path: "class/:classSubjectId/knowledge", element: <KnowledgePage /> },
@@ -51,6 +54,7 @@ export const router = createBrowserRouter([
           { path: "class/:classSubjectId/exams/:examId/pdf-builder", element: <PdfBuilderPage /> },
           { path: "class/:classSubjectId/grading", element: <GradingPage /> },
           { path: "class/:classSubjectId/grading/:submissionId/review", element: <GradingReviewPage /> },
+          { path: "class/:classSubjectId/students", element: <ClassStudentsMarksPage /> },
 
           { path: "ask", element: <CopilotPage /> },
           { path: "settings", element: <SettingsPage /> },

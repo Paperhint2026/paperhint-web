@@ -8,7 +8,7 @@ export function getPageTitleFromPath(pathname: string): string {
   if (path.includes("/teachers/") && path.includes("/overview"))
     return "Teacher overview"
   if (path.startsWith("/teachers")) return "Teachers"
-  if (path.startsWith("/students")) return "Students"
+  if (path.includes("/students")) return "Students"
   if (path.startsWith("/settings")) return "Settings"
   if (path.startsWith("/help")) return "Help"
   if (path.startsWith("/ask")) return "Ask Hint AI"
@@ -18,6 +18,7 @@ export function getPageTitleFromPath(pathname: string): string {
   if (path.includes("/questions")) return "Questions"
   if (path.includes("/upload")) return "Upload paper"
   if (path.includes("/generate")) return "Generate questions"
+  if (path.startsWith("/library")) return "Knowledge library"
   if (path.includes("/knowledge")) return "Knowledge base"
   if (path.includes("/exams")) return "Question papers"
   return "PaperHint"

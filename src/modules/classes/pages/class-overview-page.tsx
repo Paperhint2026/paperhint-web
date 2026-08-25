@@ -62,6 +62,15 @@ interface Subject {
   id: string
   subject_name: string
   teachers?: Teacher[]
+  subject_type?: "core" | "elective"
+  elective_group_id?: string | null
+  elective_group_name?: string | null
+}
+
+interface ElectiveGroupData {
+  elective_group_id: string
+  elective_group_name: string
+  subjects: Subject[]
 }
 
 interface Student {
@@ -90,6 +99,8 @@ interface GradeOverview {
   total_students: number
   total_teachers: number
   subjects: Subject[]
+  core_subjects?: Subject[]
+  elective_groups?: ElectiveGroupData[]
   sections: Section[]
   teachers: Teacher[]
   created_by: string
@@ -298,6 +309,62 @@ function ClassExamsTab({ sections }: { sections: Section[] }) {
   )
 }
 
+/* ── Subject row (reused in panel + accordion) ──────────── */
+function SubjectRow({ subject }: { subject: Subject }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <BookIcon className="size-4 shrink-0 text-muted-foreground" />
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="flex-1 truncate text-sm font-medium text-secondary-foreground">
+          {subject.subject_name}
+        </span>
+        {subject.teachers && subject.teachers.length > 0 && (
+          <AvatarGroup className="shrink-0">
+            {subject.teachers.slice(0, 4).map((teacher) => (
+              <Avatar key={teacher.id} size="sm">
+                {teacher.profile_url ? (
+                  <AvatarImage src={teacher.profile_url} alt={teacher.full_name} />
+                ) : null}
+                <AvatarFallback>{getInitials(teacher.full_name)}</AvatarFallback>
+              </Avatar>
+            ))}
+          </AvatarGroup>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── Subject list with elective grouping ────────────────── */
+function SubjectsList({ data }: { data: GradeOverview }) {
+  const coreSubjects = data.core_subjects ?? data.subjects
+  const electiveGroups = data.elective_groups ?? []
+
+  return (
+    <div className="flex flex-col gap-4">
+      {coreSubjects.map((subject) => (
+        <SubjectRow key={subject.id} subject={subject} />
+      ))}
+
+      {electiveGroups.map((group) => (
+        <div
+          key={group.elective_group_id}
+          className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-800 dark:bg-amber-950/20"
+        >
+          <span className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+            {group.elective_group_name}
+          </span>
+          <div className="flex flex-col gap-2.5">
+            {group.subjects.map((subject) => (
+              <SubjectRow key={subject.id} subject={subject} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /* ── Shared right-panel content ─────────────────────────── */
 function RightPanelContent({ data }: { data: GradeOverview }) {
   return (
@@ -322,30 +389,7 @@ function RightPanelContent({ data }: { data: GradeOverview }) {
       {/* Subjects */}
       <div className="flex flex-col gap-4">
         <p className="text-sm font-medium text-secondary-foreground">Subjects</p>
-        <div className="flex flex-col gap-4">
-          {data.subjects.map((subject) => (
-            <div key={subject.id} className="flex items-center gap-2.5">
-              <BookIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <span className="flex-1 truncate text-sm font-medium text-secondary-foreground">
-                  {subject.subject_name}
-                </span>
-                {subject.teachers && subject.teachers.length > 0 && (
-                  <AvatarGroup className="shrink-0">
-                    {subject.teachers.slice(0, 4).map((teacher) => (
-                      <Avatar key={teacher.id} size="sm">
-                        {teacher.profile_url ? (
-                          <AvatarImage src={teacher.profile_url} alt={teacher.full_name} />
-                        ) : null}
-                        <AvatarFallback>{getInitials(teacher.full_name)}</AvatarFallback>
-                      </Avatar>
-                    ))}
-                  </AvatarGroup>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <SubjectsList data={data} />
         <Button variant="outline" className="w-full gap-2 rounded-full">
           <BookPlusIcon className="size-4" />
           Add Subject
@@ -528,28 +572,7 @@ export function ClassOverviewPage() {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="flex flex-col gap-4 pb-2">
-                  {data.subjects.map((subject) => (
-                    <div key={subject.id} className="flex items-center gap-2.5">
-                      <BookIcon className="size-4 shrink-0 text-muted-foreground" />
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <span className="flex-1 truncate text-sm font-medium text-secondary-foreground">
-                          {subject.subject_name}
-                        </span>
-                        {subject.teachers && subject.teachers.length > 0 && (
-                          <AvatarGroup className="shrink-0">
-                            {subject.teachers.slice(0, 4).map((teacher) => (
-                              <Avatar key={teacher.id} size="sm">
-                                {teacher.profile_url ? (
-                                  <AvatarImage src={teacher.profile_url} alt={teacher.full_name} />
-                                ) : null}
-                                <AvatarFallback>{getInitials(teacher.full_name)}</AvatarFallback>
-                              </Avatar>
-                            ))}
-                          </AvatarGroup>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  <SubjectsList data={data} />
                   <Button variant="outline" className="w-full gap-2 rounded-full">
                     <BookPlusIcon className="size-4" />
                     Add Subject

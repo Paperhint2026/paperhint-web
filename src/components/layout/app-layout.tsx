@@ -1,9 +1,20 @@
+import { Fragment, useState } from "react"
 import { Link, Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
-import { LayoutDashboardIcon, NewspaperIcon } from "lucide-react"
+import {
+  BookOpenIcon,
+  LayoutDashboardIcon,
+  ListChecksIcon,
+  NewspaperIcon,
+  SparklesIcon,
+  Users2Icon,
+} from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
 import { getPageTitleFromPath } from "@/lib/get-page-title"
 import { useTeacherAssignments, classLabel } from "@/hooks/use-teacher-assignments"
+import { useClassAiChat } from "@/hooks/use-class-ai-chat"
+import { Button } from "@/components/ui/button"
+import { ClassAiChatSheet } from "@/components/class-ai-chat/class-ai-chat-sheet"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -31,6 +42,9 @@ function AppLayoutInner() {
   const { user } = useAuth()
   const { assignments } = useTeacherAssignments()
   const { headerActions } = useHeaderActions()
+  const [aiChatOpen, setAiChatOpen] = useState(false)
+  // Lifted chat state — survives sheet close, resets on classSubjectId change.
+  const classAiChat = useClassAiChat(classSubjectId ?? null)
 
   const pageTab = (searchParams.get("tab") ?? "overview") as "overview" | "exams"
   const handleTabChange = (value: string) => {
@@ -39,6 +53,23 @@ function AppLayoutInner() {
     params.set("tab", value)
     navigate({ search: params.toString() }, { replace: true })
   }
+
+  // Active sub-tab inside a class-subject. We derive it from pathname so a
+  // teacher landing on /class/:csId/exams/:examId/questions still shows
+  // "Exams" highlighted.
+  const classSubTab: "knowledge" | "exams" | "grading" | "students" = (() => {
+    if (!classSubjectId) return "knowledge"
+    if (location.pathname.includes("/students")) return "students"
+    if (location.pathname.includes("/grading")) return "grading"
+    if (location.pathname.includes("/exams")) return "exams"
+    return "knowledge"
+  })()
+  const handleClassSubTabChange = (value: string) => {
+    if (!value || !classSubjectId) return
+    if (value === classSubTab) return
+    navigate(`/class/${classSubjectId}/${value}`)
+  }
+
   const rawTitle = getPageTitleFromPath(location.pathname)
 
   const classTitle = (() => {
@@ -87,9 +118,9 @@ function AppLayoutInner() {
                   {segments.map((seg, i) => {
                     const isLast = i === segments.length - 1
                     return (
-                      <BreadcrumbItem key={seg.label}>
-                        {!isLast && seg.href ? (
-                          <>
+                      <Fragment key={seg.label}>
+                        <BreadcrumbItem>
+                          {!isLast && seg.href ? (
                             <BreadcrumbLink asChild>
                               <Link
                                 to={seg.href}
@@ -98,20 +129,20 @@ function AppLayoutInner() {
                                 {seg.label}
                               </Link>
                             </BreadcrumbLink>
-                            <BreadcrumbSeparator />
-                          </>
-                        ) : (
-                          <BreadcrumbPage className="line-clamp-1 text-sm font-medium text-foreground">
-                            {seg.label}
-                          </BreadcrumbPage>
-                        )}
-                      </BreadcrumbItem>
+                          ) : (
+                            <BreadcrumbPage className="line-clamp-1 text-sm font-medium text-foreground">
+                              {seg.label}
+                            </BreadcrumbPage>
+                          )}
+                        </BreadcrumbItem>
+                        {!isLast && <BreadcrumbSeparator />}
+                      </Fragment>
                     )
                   })}
                 </BreadcrumbList>
               </Breadcrumb>
 
-              {/* Overview / Exams toggle — placed right after the grade name */}
+              {/* Overview / Exams toggle — grade-level pages */}
               {grade && (
                 <ToggleGroup
                   type="single"
@@ -132,14 +163,54 @@ function AppLayoutInner() {
                   </ToggleGroupItem>
                 </ToggleGroup>
               )}
+
+              {/* Knowledge / Exams / Grading toggle — class-subject scope */}
+              {classSubjectId && (
+                <ToggleGroup
+                  type="single"
+                  size="sm"
+                  variant="outline"
+                  spacing={2}
+                  value={classSubTab}
+                  onValueChange={handleClassSubTabChange}
+                  className="ml-2"
+                >
+                  <ToggleGroupItem value="knowledge" aria-label="Knowledge">
+                    <BookOpenIcon className="size-3.5" />
+                    <span className="hidden md:inline">Knowledge</span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="exams" aria-label="Exams">
+                    <NewspaperIcon className="size-3.5" />
+                    <span className="hidden md:inline">Exams</span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="grading" aria-label="Grading">
+                    <ListChecksIcon className="size-3.5" />
+                    <span className="hidden md:inline">Grading</span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="students" aria-label="Students">
+                    <Users2Icon className="size-3.5" />
+                    <span className="hidden md:inline">Students</span>
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              )}
             </div>
 
-            {/* Page-level CTA slot — populated by each page via useHeaderActions() */}
-            {headerActions && (
-              <div className="ml-auto flex items-center pl-2">
-                {headerActions}
-              </div>
-            )}
+            <div className="ml-auto flex items-center gap-2 pl-2">
+              {classSubjectId && user?.role === "teacher" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setAiChatOpen(true)}
+                  className="gap-1.5"
+                  title="Ask AI about this class"
+                >
+                  <SparklesIcon className="size-3.5 text-primary" />
+                  <span className="hidden sm:inline">Ask AI</span>
+                </Button>
+              )}
+              {/* Page-level CTA slot — populated by each page via useHeaderActions() */}
+              {headerActions}
+            </div>
           </header>
 
           <div className="relative min-h-0 flex-1">
@@ -149,6 +220,13 @@ function AppLayoutInner() {
           </div>
         </SidebarInset>
       </SidebarProvider>
+
+      <ClassAiChatSheet
+        open={aiChatOpen}
+        onOpenChange={setAiChatOpen}
+        classLabel={classTitle ?? undefined}
+        chat={classAiChat}
+      />
     </TooltipProvider>
   )
 }

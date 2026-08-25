@@ -305,7 +305,7 @@ export function TeacherDetailDrawer({
               </div>
 
               {/* Identity block — avatar overlaps cover */}
-              <div className="-mt-10 flex flex-col gap-3 px-5 pb-5">
+              <div className="relative z-10 -mt-10 flex flex-col gap-3 px-5 pb-5">
                 <div
                   className={`flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border text-xl font-semibold ${getAvatarColor(teacher.full_name)}`}
                 >

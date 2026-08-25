@@ -117,18 +117,30 @@ export function ClassesPage() {
         ),
       )
 
-      const subjectAssignments = classResults.flatMap((result, index) => {
+      const allAssignments = classResults.flatMap((result, index) => {
         const classId = result.class.id
-        const sectionSubjects = data.sections[index].subjects
-        return sectionSubjects.map((subjectId) =>
+        const section = data.sections[index]
+
+        const coreAssignments = section.subjects.map((subjectId) =>
           apiClient.post("/api/class-subjects", {
             class_id: classId,
             subject_id: subjectId,
           }),
         )
+
+        const electiveAssignments = section.electives.map((group) =>
+          apiClient.post("/api/class-subjects", {
+            class_id: classId,
+            subject_type: "elective",
+            subject_ids: group.subjectIds,
+            elective_group_name: group.groupName,
+          }),
+        )
+
+        return [...coreAssignments, ...electiveAssignments]
       })
 
-      await Promise.all(subjectAssignments)
+      await Promise.all(allAssignments)
 
       setDrawerOpen(false)
       fetchClasses()

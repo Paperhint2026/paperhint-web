@@ -518,7 +518,7 @@ function PdfDocument({ blocks }: { blocks: Block[] }) {
 export function PdfBuilderPage() {
   const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
   const navigate = useNavigate()
-  const backUrl = `/class/${classSubjectId}/exams/${examId}/questions`
+  const backUrl = `/class/${classSubjectId}/exams?exam=${examId}`
 
   const school = useAppSelector((state) => state.school.school)
 

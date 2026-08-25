@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import {
   BookOpenIcon,
   FileIcon,
   FileTextIcon,
   ImageIcon,
+  Link2Icon,
   Loader2Icon,
   RefreshCwIcon,
   SparklesIcon,
+  Trash2Icon,
   UploadIcon,
+  Users2Icon,
   XIcon,
 } from "lucide-react"
 
@@ -17,19 +20,27 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
+import {
+  useTeacherAssignments,
+  classLabel,
+} from "@/hooks/use-teacher-assignments"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-
-interface Material {
-  id: string
-  class_subject_id: string
-  teacher_id: string
-  title: string
-  file_url: string
-  tags?: string[] | null
-  processed?: boolean
-  uploaded_at: string
-}
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  ClassSubjectMultiSelect,
+  type ClassSubjectOption,
+} from "@/modules/knowledge/components/class-subject-multi-select"
+import { MaterialLinksDialog } from "@/modules/knowledge/components/material-links-dialog"
+import {
+  type ClassSubjectLabel,
+  formatClassSubjectLabel,
+  type Material,
+} from "@/modules/knowledge/lib/types"
 
 function getFileIcon(url: string) {
   const lower = url.toLowerCase()
@@ -41,26 +52,71 @@ function getFileIcon(url: string) {
 export function KnowledgePage() {
   const { user } = useAuth()
   const { classSubjectId } = useParams<{ classSubjectId: string }>()
+  const { assignments } = useTeacherAssignments()
+  const isTeacher = user?.role === "teacher"
 
   const [materials, setMaterials] = useState<Material[]>([])
+  const [csLabels, setCsLabels] = useState<Record<string, ClassSubjectLabel>>({})
+  const [canEdit, setCanEdit] = useState(isTeacher)
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
 
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; title: string }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [extraClassSubjectIds, setExtraClassSubjectIds] = useState<string[]>([])
+
   const [isUploading, setIsUploading] = useState(false)
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set())
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+
+  const [editLinksFor, setEditLinksFor] = useState<Material | null>(null)
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB
 
-  const fetchMaterials = useCallback(async (classSubjectId: string) => {
+  // Teacher's other class-subjects she can also link to
+  const shareOptions = useMemo<ClassSubjectOption[]>(() => {
+    if (!classSubjectId) return []
+    return assignments
+      .filter((a) => a.class_subject_id !== classSubjectId)
+      .map((a) => ({
+        class_subject_id: a.class_subject_id,
+        label: classLabel(a),
+      }))
+  }, [assignments, classSubjectId])
+
+  const allLinkOptions = useMemo<ClassSubjectOption[]>(
+    () =>
+      assignments.map((a) => ({
+        class_subject_id: a.class_subject_id,
+        label: classLabel(a),
+      })),
+    [assignments],
+  )
+
+  const primaryLabel = useCallback(
+    (csId: string) => {
+      const fromLabels = csLabels[csId]
+      if (fromLabels) return formatClassSubjectLabel(fromLabels)
+      const fromAssign = assignments.find((a) => a.class_subject_id === csId)
+      return fromAssign ? classLabel(fromAssign) : "Unknown class"
+    },
+    [csLabels, assignments],
+  )
+
+  const fetchMaterials = useCallback(async (csId: string) => {
     setIsLoadingMaterials(true)
     try {
-      const res = await apiClient.get<{ materials: Material[] }>(
-        `/api/knowledge/materials/${classSubjectId}`,
-      )
+      const res = await apiClient.get<{
+        materials: Material[]
+        class_subjects: ClassSubjectLabel[]
+        can_edit: boolean
+      }>(`/api/knowledge/materials/${csId}`)
       setMaterials(res.materials ?? [])
+      const map: Record<string, ClassSubjectLabel> = {}
+      for (const cs of res.class_subjects ?? []) map[cs.class_subject_id] = cs
+      setCsLabels(map)
+      setCanEdit(res.can_edit)
     } catch (err) {
       console.error("Failed to fetch materials:", err)
       setMaterials([])
@@ -70,9 +126,7 @@ export function KnowledgePage() {
   }, [])
 
   useEffect(() => {
-    if (classSubjectId) {
-      fetchMaterials(classSubjectId)
-    }
+    if (classSubjectId) fetchMaterials(classSubjectId)
   }, [classSubjectId, fetchMaterials])
 
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,6 +172,10 @@ export function KnowledgePage() {
     try {
       const formData = new FormData()
       formData.append("class_subject_id", classSubjectId)
+      formData.append(
+        "additional_class_subject_ids",
+        JSON.stringify(extraClassSubjectIds),
+      )
       formData.append("titles", JSON.stringify(selectedFiles.map((f) => f.title.trim())))
       selectedFiles.forEach((f) => formData.append("files", f.file))
 
@@ -146,6 +204,10 @@ export function KnowledgePage() {
       setMaterials((prev) => [...uploaded, ...prev])
       setProcessingIds((prev) => new Set([...prev, ...uploadedIds]))
       setSelectedFiles([])
+      setExtraClassSubjectIds([])
+
+      // Refresh labels so newly-linked ids have names
+      if (classSubjectId) fetchMaterials(classSubjectId)
 
       const processResults = await Promise.allSettled(
         uploaded.map((mat) =>
@@ -162,7 +224,11 @@ export function KnowledgePage() {
         if (result.status === "fulfilled") {
           successCount++
           setMaterials((prev) =>
-            prev.map((m) => (m.id === result.value.material.id ? result.value.material : m)),
+            prev.map((m) =>
+              m.id === result.value.material.id
+                ? { ...m, ...result.value.material }
+                : m,
+            ),
           )
         } else {
           toast.error(`Processing failed for "${uploaded[i].title}"`)
@@ -192,7 +258,7 @@ export function KnowledgePage() {
         { material_id: materialId },
       )
       setMaterials((prev) =>
-        prev.map((m) => (m.id === res.material.id ? res.material : m)),
+        prev.map((m) => (m.id === res.material.id ? { ...m, ...res.material } : m)),
       )
       toast.success("Material analyzed successfully")
     } catch {
@@ -228,7 +294,7 @@ export function KnowledgePage() {
         success++
         const val = (results[i] as PromiseFulfilledResult<{ material: Material }>).value
         setMaterials((prev) =>
-          prev.map((m) => (m.id === val.material.id ? val.material : m)),
+          prev.map((m) => (m.id === val.material.id ? { ...m, ...val.material } : m)),
         )
       }
     }
@@ -236,6 +302,43 @@ export function KnowledgePage() {
     setRetryingIds(new Set())
     if (success === failed.length) toast.success(`All ${success} material(s) analyzed`)
     else toast.error(`${success}/${failed.length} succeeded. Retry remaining ones.`)
+  }
+
+  const handleDeleteMaterial = async (material: Material) => {
+    if (!canEdit) return
+    const ok = window.confirm(`Delete "${material.title}"? This cannot be undone.`)
+    if (!ok) return
+
+    setDeletingIds((prev) => new Set(prev).add(material.id))
+    try {
+      await apiClient.delete(`/api/knowledge/material/${material.id}`)
+      setMaterials((prev) => prev.filter((m) => m.id !== material.id))
+      toast.success("Material deleted")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete material")
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(material.id)
+        return next
+      })
+    }
+  }
+
+  const handleLinksSaved = (materialId: string, linkedIds: string[]) => {
+    setMaterials((prev) =>
+      prev.map((m) =>
+        m.id === materialId ? { ...m, linked_class_subject_ids: linkedIds } : m,
+      ),
+    )
+    // If this view's class_subject is no longer in the linked list AND it's not
+    // the primary one either, remove the card locally. Backend authoritative.
+    if (classSubjectId && !linkedIds.includes(classSubjectId)) {
+      setMaterials((prev) =>
+        prev.filter((m) => m.id !== materialId || m.class_subject_id === classSubjectId),
+      )
+    }
+    if (classSubjectId) fetchMaterials(classSubjectId)
   }
 
   if (!user) return null
@@ -255,96 +358,177 @@ export function KnowledgePage() {
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6">
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
-          {/* ── Sources panel ── */}
           <div className="flex w-full flex-col">
-            {/* Fixed header: upload area */}
             <div className="shrink-0 border-b p-3">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   <BookOpenIcon className="size-3.5" />
                   Sources ({materials.length})
                 </h3>
-                {(() => {
-                  const failedCount = materials.filter((m) => !m.processed && !processingIds.has(m.id) && !retryingIds.has(m.id)).length
+                {canEdit && (() => {
+                  const failedCount = materials.filter(
+                    (m) =>
+                      !m.processed &&
+                      !processingIds.has(m.id) &&
+                      !retryingIds.has(m.id),
+                  ).length
                   return failedCount > 0 && !isUploading ? (
                     <button
                       disabled={retryingIds.size > 0}
                       onClick={retryAllFailed}
                       className="flex items-center gap-1 text-[10px] font-medium text-amber-600 transition-colors hover:text-amber-700 disabled:opacity-50 dark:text-amber-400"
                     >
-                      <RefreshCwIcon className={cn("size-2.5", retryingIds.size > 0 && "animate-spin")} />
+                      <RefreshCwIcon
+                        className={cn(
+                          "size-2.5",
+                          retryingIds.size > 0 && "animate-spin",
+                        )}
+                      />
                       Retry {failedCount}
                     </button>
                   ) : null
                 })()}
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isUploading}
-                className="w-full justify-center gap-1.5 border-dashed text-xs"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {isUploading ? (
-                  <Loader2Icon className="size-3.5 animate-spin" />
-                ) : (
-                  <UploadIcon className="size-3.5" />
-                )}
-                {isUploading ? "Processing..." : selectedFiles.length === 0 ? "Add Sources" : "Add More"}
-              </Button>
-              <p className="mt-1 text-center text-[9px] text-muted-foreground/60">
-                PDF, images up to 50 MB
-              </p>
+              {canEdit && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isUploading}
+                    className="w-full justify-center gap-1.5 border-dashed text-xs"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {isUploading ? (
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                    ) : (
+                      <UploadIcon className="size-3.5" />
+                    )}
+                    {isUploading
+                      ? "Processing..."
+                      : selectedFiles.length === 0
+                        ? "Add Sources"
+                        : "Add More"}
+                  </Button>
+                  <p className="mt-1 text-center text-[9px] text-muted-foreground/60">
+                    PDF, images up to 50 MB
+                  </p>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".pdf,image/*"
-                onChange={handleFilesSelected}
-                className="hidden"
-              />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,image/*"
+                    onChange={handleFilesSelected}
+                    className="hidden"
+                  />
+                </>
+              )}
 
-              {selectedFiles.length > 0 && (
-                <div className="mt-2 space-y-1.5">
-                  {selectedFiles.map((entry, idx) => (
-                    <div key={idx} className="flex items-center gap-2 rounded-md border bg-background px-2 py-1.5">
-                      <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <Input
-                          value={entry.title}
-                          onChange={(e) => updateFileTitle(idx, e.target.value)}
-                          placeholder="File title"
-                          className="h-6 border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
-                        />
-                        <p className="truncate text-[9px] text-muted-foreground">
-                          {entry.file.name}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => removeFile(idx)}
-                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
+              {canEdit && selectedFiles.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  <div className="space-y-1.5">
+                    {selectedFiles.map((entry, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 rounded-md border bg-background px-2 py-1.5"
                       >
-                        <XIcon className="size-3" />
-                      </button>
-                    </div>
-                  ))}
+                        <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <Input
+                            value={entry.title}
+                            onChange={(e) => updateFileTitle(idx, e.target.value)}
+                            placeholder="File title"
+                            className="h-6 border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
+                          />
+                          <p className="truncate text-[9px] text-muted-foreground">
+                            {entry.file.name}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => removeFile(idx)}
+                          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
+                        >
+                          <XIcon className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {shareOptions.length > 0 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between rounded-md border border-dashed bg-background px-2 py-1.5 text-left text-[10px] text-muted-foreground transition-colors hover:bg-muted/50"
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            <Users2Icon className="size-3" />
+                            Also add to{" "}
+                            {extraClassSubjectIds.length > 0
+                              ? `${extraClassSubjectIds.length} other class-subject(s)`
+                              : "other class-subjects"}
+                          </span>
+                          <span className="text-muted-foreground/60">Pick</span>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80" align="end">
+                        <div className="flex flex-col gap-2">
+                          <div>
+                            <p className="text-xs font-medium">Share to other sections</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Same file becomes visible in the picked class-subjects.
+                            </p>
+                          </div>
+                          <ClassSubjectMultiSelect
+                            options={shareOptions}
+                            value={extraClassSubjectIds}
+                            onChange={setExtraClassSubjectIds}
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+
                   <Button
                     onClick={handleUploadAndProcess}
-                    disabled={isUploading || selectedFiles.some((f) => !f.title.trim())}
+                    disabled={
+                      isUploading || selectedFiles.some((f) => !f.title.trim())
+                    }
                     size="sm"
                     className="w-full text-xs"
                   >
-                    {isUploading ? "Uploading..." : `Upload ${selectedFiles.length} file(s)`}
+                    {isUploading
+                      ? "Uploading..."
+                      : `Upload ${selectedFiles.length} file(s)`}
                   </Button>
                 </div>
               )}
 
-              {materials.length > 0 && (
-                <div className="mt-2 space-y-1">
+            </div>
+
+            {/* Scrollable list area — sits below the fixed upload header */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {isLoadingMaterials ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : materials.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-10 text-center">
+                  <BookOpenIcon className="size-8 text-muted-foreground/20" />
+                  <p className="text-xs text-muted-foreground">
+                    {canEdit
+                      ? "No sources yet. Upload a file to get started."
+                      : "No materials uploaded for this class-subject yet."}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
                   {materials.map((m) => {
                     const Icon = getFileIcon(m.file_url)
+                    const otherLinks = m.linked_class_subject_ids.filter(
+                      (id) => id !== classSubjectId,
+                    )
                     return (
                       <div
                         key={m.id}
@@ -364,6 +548,29 @@ export function KnowledgePage() {
                               {new Date(m.uploaded_at).toLocaleDateString()}
                             </p>
                           </div>
+                          {canEdit && (
+                            <>
+                              <button
+                                onClick={() => setEditLinksFor(m)}
+                                title="Share to other class-subjects"
+                                className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                              >
+                                <Link2Icon className="size-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMaterial(m)}
+                                disabled={deletingIds.has(m.id)}
+                                title="Delete material"
+                                className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive disabled:opacity-50"
+                              >
+                                {deletingIds.has(m.id) ? (
+                                  <Loader2Icon className="size-3 animate-spin" />
+                                ) : (
+                                  <Trash2Icon className="size-3" />
+                                )}
+                              </button>
+                            </>
+                          )}
                           {m.processed ? (
                             <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
                               <SparklesIcon className="size-2.5 text-emerald-600 dark:text-emerald-400" />
@@ -372,7 +579,7 @@ export function KnowledgePage() {
                             <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-500/15">
                               <Loader2Icon className="size-2.5 animate-spin text-blue-600 dark:text-blue-400" />
                             </span>
-                          ) : (
+                          ) : canEdit ? (
                             <button
                               onClick={() => retryProcessing(m.id)}
                               disabled={retryingIds.has(m.id)}
@@ -380,8 +587,25 @@ export function KnowledgePage() {
                             >
                               <RefreshCwIcon className="size-2.5 text-amber-600 dark:text-amber-400" />
                             </button>
-                          )}
+                          ) : null}
                         </div>
+
+                        {otherLinks.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-9">
+                            <span className="text-[9px] text-muted-foreground/70">
+                              Shared with:
+                            </span>
+                            {otherLinks.map((csId) => (
+                              <span
+                                key={csId}
+                                className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] leading-none text-primary"
+                              >
+                                {primaryLabel(csId)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
                         {m.tags && m.tags.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1 pl-9">
                             {m.tags.map((tag) => (
@@ -400,24 +624,18 @@ export function KnowledgePage() {
                 </div>
               )}
             </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
-              {isLoadingMaterials ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : materials.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-10 text-center">
-                  <BookOpenIcon className="size-8 text-muted-foreground/20" />
-                  <p className="text-xs text-muted-foreground">
-                    No sources yet. Upload a file to get started.
-                  </p>
-                </div>
-              ) : null}
-            </div>
           </div>
         </div>
       </div>
+
+      <MaterialLinksDialog
+        open={!!editLinksFor}
+        onOpenChange={(o) => !o && setEditLinksFor(null)}
+        material={editLinksFor}
+        options={allLinkOptions}
+        primaryLabel={primaryLabel}
+        onSaved={handleLinksSaved}
+      />
     </div>
   )
 }
