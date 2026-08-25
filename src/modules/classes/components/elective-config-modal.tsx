@@ -45,11 +45,6 @@ export function ElectiveConfigModal({
       : [{ groupName: "", subjectIds: [] }],
   )
 
-  const allUsedSubjectIds = new Set([
-    ...coreSubjectIds,
-    ...groups.flatMap((g) => g.subjectIds),
-  ])
-
   const addGroup = () => {
     setGroups((prev) => [...prev, { groupName: "", subjectIds: [] }])
   }
