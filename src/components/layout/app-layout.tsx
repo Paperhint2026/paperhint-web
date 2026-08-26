@@ -1,8 +1,7 @@
 import { Fragment, useState } from "react"
-import { Link, Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
+import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom"
 import {
   BookOpenIcon,
-  LayoutDashboardIcon,
   ListChecksIcon,
   NewspaperIcon,
   SparklesIcon,
@@ -38,21 +37,12 @@ function AppLayoutInner() {
   const location = useLocation()
   const { classSubjectId, grade } = useParams()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const { assignments } = useTeacherAssignments()
   const { headerActions } = useHeaderActions()
   const [aiChatOpen, setAiChatOpen] = useState(false)
   // Lifted chat state — survives sheet close, resets on classSubjectId change.
   const classAiChat = useClassAiChat(classSubjectId ?? null)
-
-  const pageTab = (searchParams.get("tab") ?? "overview") as "overview" | "exams"
-  const handleTabChange = (value: string) => {
-    if (!value) return
-    const params = new URLSearchParams(searchParams)
-    params.set("tab", value)
-    navigate({ search: params.toString() }, { replace: true })
-  }
 
   // Active sub-tab inside a class-subject. We derive it from pathname so a
   // teacher landing on /class/:csId/exams/:examId/questions still shows
@@ -141,28 +131,6 @@ function AppLayoutInner() {
                   })}
                 </BreadcrumbList>
               </Breadcrumb>
-
-              {/* Overview / Exams toggle — grade-level pages */}
-              {grade && (
-                <ToggleGroup
-                  type="single"
-                  size="sm"
-                  variant="outline"
-                  spacing={2}
-                  value={pageTab}
-                  onValueChange={handleTabChange}
-                  className="ml-2"
-                >
-                  <ToggleGroupItem value="overview" aria-label="Overview">
-                    <LayoutDashboardIcon className="size-3.5" />
-                    Overview
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="exams" aria-label="Exams">
-                    <NewspaperIcon className="size-3.5" />
-                    Exams
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              )}
 
               {/* Knowledge / Exams / Grading toggle — class-subject scope */}
               {classSubjectId && (
