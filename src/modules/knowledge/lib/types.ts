@@ -8,6 +8,7 @@ export interface Material {
   processed?: boolean
   uploaded_at: string
   linked_class_subject_ids: string[]
+  visibility?: "public" | "private"
 }
 
 export interface ClassSubjectLabel {

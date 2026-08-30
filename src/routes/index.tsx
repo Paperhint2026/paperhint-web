@@ -15,6 +15,7 @@ import { StudentsPage } from "@/modules/students/pages/students-page"
 import { ClassStudentsMarksPage } from "@/modules/students/pages/class-students-marks-page"
 import { KnowledgePage } from "@/modules/knowledge/pages/knowledge-page"
 import { LibraryPage } from "@/modules/knowledge/pages/library-page"
+import { BankPage } from "@/modules/knowledge/pages/bank-page"
 import { ExamsPage } from "@/modules/exams/pages/exams-page"
 import { GenerateQuestionsPage } from "@/modules/exams/pages/generate-questions-page"
 import { QuestionsPage } from "@/modules/exams/pages/questions-page"
@@ -44,6 +45,7 @@ export const router = createBrowserRouter([
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },
           { path: "library", element: <LibraryPage /> },
+          { path: "library/bank", element: <BankPage /> },
 
           // Class-scoped modules
           { path: "class/:classSubjectId/knowledge", element: <KnowledgePage /> },

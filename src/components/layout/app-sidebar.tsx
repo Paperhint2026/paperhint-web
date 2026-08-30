@@ -4,6 +4,7 @@ import {
   ContactRoundIcon,
   GraduationCapIcon,
   HomeIcon,
+  LibraryIcon,
   SchoolIcon,
   SparklesIcon,
 } from "lucide-react"
@@ -92,8 +93,16 @@ export function AppSidebar() {
     {
       title: "Knowledge Library",
       icon: <BookOpenIcon />,
-      isActive: isActivePath("/library"),
+      // Active only on /library itself (not /library/bank); the Bank has
+      // its own entry below and we don't want both highlighted at once.
+      isActive: location.pathname === "/library",
       onClick: () => handleNav("/library"),
+    },
+    {
+      title: "Shared Library",
+      icon: <LibraryIcon />,
+      isActive: isActivePath("/library/bank"),
+      onClick: () => handleNav("/library/bank"),
     },
   ]
 

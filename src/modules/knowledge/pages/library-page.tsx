@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   BookOpenIcon,
+  CheckIcon,
+  EyeIcon,
+  EyeOffIcon,
   FileIcon,
   FileTextIcon,
   ImageIcon,
   Link2Icon,
   Loader2Icon,
   RefreshCwIcon,
+  Share2Icon,
   SparklesIcon,
   Trash2Icon,
   UploadIcon,
@@ -36,7 +40,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   ClassSubjectMultiSelect,
   type ClassSubjectOption,
@@ -90,10 +109,28 @@ export function LibraryPage() {
 
   const [uploadOpen, setUploadOpen] = useState(false)
   const [editLinksFor, setEditLinksFor] = useState<Material | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Material | null>(null)
 
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set())
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkPickerOpen, setBulkPickerOpen] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
 
   const fetchLibrary = useCallback(async () => {
     setIsLoading(true)
@@ -161,15 +198,161 @@ export function LibraryPage() {
     })
   }, [materials, filterCsId, search])
 
-  const handleDelete = async (material: Material) => {
+  const toggleVisibility = async (material: Material) => {
     if (!canEdit) return
-    const ok = window.confirm(`Delete "${material.title}"? This cannot be undone.`)
-    if (!ok) return
+    const next = material.visibility === "private" ? "public" : "private"
+    setTogglingIds((prev) => new Set(prev).add(material.id))
+    try {
+      await apiClient.patch(`/api/knowledge/material/${material.id}`, {
+        visibility: next,
+      })
+      setMaterials((prev) =>
+        prev.map((m) => (m.id === material.id ? { ...m, visibility: next } : m)),
+      )
+      toast.success(
+        next === "public"
+          ? "Published to the school bank"
+          : "Hidden from the school bank",
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update visibility")
+    } finally {
+      setTogglingIds((prev) => {
+        const nextSet = new Set(prev)
+        nextSet.delete(material.id)
+        return nextSet
+      })
+    }
+  }
+
+  // Bulk actions fan out to the existing single-item endpoints. Cheaper than
+  // shipping bulk endpoints on day one, and the fan-out gives us per-item
+  // pass/fail counts for the toast when a subset fails.
+  const bulkTargets = () => materials.filter((m) => selectedIds.has(m.id))
+
+  const bulkSetVisibility = async (next: "public" | "private") => {
+    const targets = bulkTargets()
+    if (targets.length === 0) return
+    setBulkBusy(true)
+    try {
+      const results = await Promise.allSettled(
+        targets.map((m) =>
+          apiClient.patch(`/api/knowledge/material/${m.id}`, { visibility: next }),
+        ),
+      )
+      const ok = results.filter((r) => r.status === "fulfilled").length
+      const fail = results.length - ok
+      setMaterials((prev) =>
+        prev.map((m) =>
+          selectedIds.has(m.id) ? { ...m, visibility: next } : m,
+        ),
+      )
+      if (fail === 0) toast.success(`${ok} material${ok === 1 ? "" : "s"} set to ${next}`)
+      else toast.warning(`${ok} updated, ${fail} failed`)
+      clearSelection()
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const bulkShareTo = async (targetCsIds: string[]) => {
+    const targets = bulkTargets()
+    if (targets.length === 0 || targetCsIds.length === 0) return
+    setBulkBusy(true)
+    try {
+      const results = await Promise.allSettled(
+        targets.map((m) => {
+          // Merge existing links with new targets; PATCH /links is replace-mode.
+          const desired = Array.from(
+            new Set([...(m.linked_class_subject_ids || []), ...targetCsIds]),
+          )
+          return apiClient
+            .patch<{ linked_class_subject_ids: string[] }>(
+              `/api/knowledge/material/${m.id}/links`,
+              { class_subject_ids: desired },
+            )
+            .then((res) => ({
+              id: m.id,
+              linked: res.linked_class_subject_ids ?? desired,
+            }))
+        }),
+      )
+      const ok = results.filter((r) => r.status === "fulfilled").length
+      const fail = results.length - ok
+      setMaterials((prev) =>
+        prev.map((m) => {
+          const hit = results.find(
+            (r) => r.status === "fulfilled" && r.value.id === m.id,
+          )
+          if (!hit || hit.status !== "fulfilled") return m
+          return { ...m, linked_class_subject_ids: hit.value.linked }
+        }),
+      )
+      if (fail === 0) toast.success(`Shared to ${targetCsIds.length} class-subject${targetCsIds.length === 1 ? "" : "s"}`)
+      else toast.warning(`${ok} updated, ${fail} failed`)
+      clearSelection()
+      setBulkPickerOpen(false)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const confirmBulkDelete = async () => {
+    const targets = bulkTargets()
+    setBulkDeleteOpen(false)
+    if (targets.length === 0) return
+    setBulkBusy(true)
+    setDeletingIds((prev) => {
+      const next = new Set(prev)
+      for (const t of targets) next.add(t.id)
+      return next
+    })
+    try {
+      const results = await Promise.allSettled(
+        targets.map((m) => apiClient.delete(`/api/knowledge/material/${m.id}`)),
+      )
+      const ok = results.filter((r) => r.status === "fulfilled").length
+      const fail = results.length - ok
+      // Optimistically drop the succeeded ones from the local list; keep the
+      // ones that failed so the user can retry via the row-level trash.
+      const okIds = new Set<string>()
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") okIds.add(targets[i].id)
+      })
+      setMaterials((prev) => prev.filter((m) => !okIds.has(m.id)))
+      if (fail === 0) toast.success(`${ok} material${ok === 1 ? "" : "s"} removed`)
+      else toast.warning(`${ok} removed, ${fail} failed`)
+      clearSelection()
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev)
+        for (const t of targets) next.delete(t.id)
+        return next
+      })
+      setBulkBusy(false)
+    }
+  }
+
+  const requestDelete = (material: Material) => {
+    if (!canEdit) return
+    setPendingDelete(material)
+  }
+
+  const confirmDelete = async () => {
+    const material = pendingDelete
+    if (!material) return
+    setPendingDelete(null)
     setDeletingIds((prev) => new Set(prev).add(material.id))
     try {
-      await apiClient.delete(`/api/knowledge/material/${material.id}`)
+      const res = await apiClient.delete<{ storage_warning?: string | null }>(
+        `/api/knowledge/material/${material.id}`,
+      )
       setMaterials((prev) => prev.filter((m) => m.id !== material.id))
-      toast.success("Material deleted")
+      if (res?.storage_warning) {
+        toast.warning(res.storage_warning)
+      } else {
+        toast.success("Material deleted")
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete material")
     } finally {
@@ -192,8 +375,10 @@ export function LibraryPage() {
         prev.map((m) => (m.id === res.material.id ? { ...m, ...res.material } : m)),
       )
       toast.success("Material analyzed successfully")
-    } catch {
-      toast.error("Processing failed. Please try again.")
+    } catch (err) {
+      // Surface the actual server error so upload retries stop feeling silent.
+      const message = err instanceof Error ? err.message : "Processing failed"
+      toast.error(message)
     } finally {
       setRetryingIds((prev) => {
         const next = new Set(prev)
@@ -329,7 +514,26 @@ export function LibraryPage() {
               return (
                 <div
                   key={m.id}
-                  className="group flex flex-col gap-2.5 rounded-xl border bg-background p-3 transition-colors hover:border-foreground/20 hover:bg-muted/20"
+                  role={canEdit ? "button" : undefined}
+                  tabIndex={canEdit ? 0 : undefined}
+                  aria-pressed={canEdit ? selectedIds.has(m.id) : undefined}
+                  onClick={canEdit ? () => toggleSelected(m.id) : undefined}
+                  onKeyDown={
+                    canEdit
+                      ? (e) => {
+                          if (e.key === " " || e.key === "Enter") {
+                            e.preventDefault()
+                            toggleSelected(m.id)
+                          }
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    "group relative flex flex-col gap-2.5 rounded-xl border bg-background p-3 transition-colors hover:border-foreground/20 hover:bg-muted/20",
+                    canEdit && "cursor-pointer",
+                    selectedIds.has(m.id) &&
+                      "border-primary bg-primary/[0.06] hover:border-primary hover:bg-primary/[0.08]",
+                  )}
                 >
                   <div className="flex items-start gap-2">
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -353,12 +557,19 @@ export function LibraryPage() {
                       </span>
                     ) : canEdit ? (
                       <button
-                        onClick={() => retryProcessing(m.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          retryProcessing(m.id)
+                        }}
                         disabled={retryingIds.has(m.id)}
-                        title="Retry processing"
-                        className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 transition-colors hover:bg-amber-500/25"
+                        title={retryingIds.has(m.id) ? "Retrying…" : "Retry processing"}
+                        className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 transition-colors hover:bg-amber-500/25 disabled:opacity-70"
                       >
-                        <RefreshCwIcon className="size-2.5 text-amber-600 dark:text-amber-400" />
+                        {retryingIds.has(m.id) ? (
+                          <Loader2Icon className="size-2.5 animate-spin text-amber-600 dark:text-amber-400" />
+                        ) : (
+                          <RefreshCwIcon className="size-2.5 text-amber-600 dark:text-amber-400" />
+                        )}
                       </button>
                     ) : null}
                   </div>
@@ -418,26 +629,59 @@ export function LibraryPage() {
                     )}
 
                     {canEdit && (
-                      <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="flex items-center gap-1">
                         <button
-                          onClick={() => setEditLinksFor(m)}
-                          title="Share to other class-subjects"
-                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          <Link2Icon className="size-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(m)}
-                          disabled={deletingIds.has(m.id)}
-                          title="Delete material"
-                          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive disabled:opacity-50"
-                        >
-                          {deletingIds.has(m.id) ? (
-                            <Loader2Icon className="size-3.5 animate-spin" />
-                          ) : (
-                            <Trash2Icon className="size-3.5" />
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleVisibility(m)
+                          }}
+                          disabled={togglingIds.has(m.id)}
+                          title={
+                            m.visibility === "private"
+                              ? "Private — click to publish to the school bank"
+                              : "Public in the school bank — click to make private"
+                          }
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50",
+                            m.visibility === "private"
+                              ? "bg-muted text-muted-foreground hover:bg-muted/70"
+                              : "bg-primary/10 text-primary hover:bg-primary/20",
                           )}
+                        >
+                          {togglingIds.has(m.id)
+                            ? "…"
+                            : m.visibility === "private"
+                              ? "Private"
+                              : "Public"}
                         </button>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditLinksFor(m)
+                            }}
+                            title="Share to other class-subjects"
+                            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          >
+                            <Link2Icon className="size-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              requestDelete(m)
+                            }}
+                            disabled={deletingIds.has(m.id)}
+                            title="Delete material"
+                            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive disabled:opacity-50"
+                          >
+                            {deletingIds.has(m.id) ? (
+                              <Loader2Icon className="size-3.5 animate-spin" />
+                            ) : (
+                              <Trash2Icon className="size-3.5" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -496,6 +740,137 @@ export function LibraryPage() {
         primaryLabel={csLabelFor}
         onSaved={handleLinksSaved}
       />
+
+      {selectedIds.size > 0 && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-full border bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
+            <span className="pl-1 pr-2 text-sm font-medium">
+              {selectedIds.size} selected
+            </span>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 rounded-full text-xs"
+              onClick={() => bulkSetVisibility("public")}
+              disabled={bulkBusy}
+            >
+              <EyeIcon className="size-3.5" />
+              Make Public
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 rounded-full text-xs"
+              onClick={() => bulkSetVisibility("private")}
+              disabled={bulkBusy}
+            >
+              <EyeOffIcon className="size-3.5" />
+              Make Private
+            </Button>
+
+            <Popover open={bulkPickerOpen} onOpenChange={setBulkPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 rounded-full text-xs"
+                  disabled={bulkBusy}
+                >
+                  <Share2Icon className="size-3.5" />
+                  Share to…
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="center" className="w-64 p-2">
+                <BulkSharePicker
+                  assignments={assignments ?? []}
+                  onCancel={() => setBulkPickerOpen(false)}
+                  onApply={bulkShareTo}
+                  busy={bulkBusy}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 rounded-full text-xs text-destructive hover:text-destructive"
+              onClick={() => setBulkDeleteOpen(true)}
+              disabled={bulkBusy}
+            >
+              <Trash2Icon className="size-3.5" />
+              Remove
+            </Button>
+
+            <Separator orientation="vertical" className="h-5" />
+
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-1.5 rounded-full text-xs"
+              onClick={clearSelection}
+              disabled={bulkBusy}
+            >
+              <XIcon className="size-3.5" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove {selectedIds.size} material{selectedIds.size === 1 ? "" : "s"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Each material will be removed from every one of your classes and,
+              if you uploaded it, retired from the school shared library. Any
+              teacher who already picked it into their own class keeps it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this material?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium text-foreground">
+                {pendingDelete?.title ?? ""}
+              </span>{" "}
+              will be removed from every class you have it linked to. If you
+              uploaded it, it will also stop appearing in the school
+              knowledge bank. Any teacher who already picked it into their
+              own class keeps their copy.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -697,5 +1072,100 @@ function UploadDialog({ open, onOpenChange, options, onComplete }: UploadDialogP
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Small in-line picker used inside the bulk action bar's "Share to…" popover.
+// Lets the teacher tick multiple of their own class-subjects and apply — the
+// parent handler merges the picks into each selected material's link set.
+interface BulkAssignmentLike {
+  class_subject_id: string
+  class: { id: string; grade: number; section: string } | null
+  subject: { id: string; subject_name: string } | null
+}
+function BulkSharePicker({
+  assignments,
+  onCancel,
+  onApply,
+  busy,
+}: {
+  assignments: BulkAssignmentLike[]
+  onCancel: () => void
+  onApply: (ids: string[]) => void
+  busy: boolean
+}) {
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+
+  const toggle = (id: string) => {
+    setChecked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  if (assignments.length === 0) {
+    return (
+      <p className="p-2 text-xs text-muted-foreground">
+        You aren&apos;t assigned to any classes yet.
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col">
+      <p className="p-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+        Add every selected material to
+      </p>
+      <div className="max-h-64 overflow-y-auto">
+        {assignments.map((a) => {
+          const isOn = checked.has(a.class_subject_id)
+          return (
+            <button
+              key={a.class_subject_id}
+              type="button"
+              onClick={() => toggle(a.class_subject_id)}
+              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+            >
+              <span
+                className={cn(
+                  "flex size-4 shrink-0 items-center justify-center rounded border",
+                  isOn
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-muted-foreground/30",
+                )}
+              >
+                {isOn && <CheckIcon className="size-3" />}
+              </span>
+              <span className="truncate">
+                {a.class ? `Grade ${a.class.grade}${a.class.section}` : "Class"}
+                {" · "}
+                {a.subject?.subject_name ?? "Subject"}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <div className="mt-1 flex items-center justify-end gap-1 border-t pt-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 rounded-full text-xs"
+          onClick={onCancel}
+          disabled={busy}
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          className="h-7 rounded-full text-xs"
+          disabled={checked.size === 0 || busy}
+          onClick={() => onApply(Array.from(checked))}
+        >
+          {busy ? "Applying…" : "Add"}
+        </Button>
+      </div>
+    </div>
   )
 }

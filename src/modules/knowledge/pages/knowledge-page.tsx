@@ -37,6 +37,16 @@ import {
 } from "@/modules/knowledge/components/class-subject-multi-select"
 import { MaterialLinksDialog } from "@/modules/knowledge/components/material-links-dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   type ClassSubjectLabel,
   formatClassSubjectLabel,
   type Material,
@@ -71,6 +81,7 @@ export function KnowledgePage() {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
 
   const [editLinksFor, setEditLinksFor] = useState<Material | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Material | null>(null)
 
   const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB
 
@@ -304,18 +315,29 @@ export function KnowledgePage() {
     else toast.error(`${success}/${failed.length} succeeded. Retry remaining ones.`)
   }
 
-  const handleDeleteMaterial = async (material: Material) => {
+  const requestDeleteMaterial = (material: Material) => {
     if (!canEdit) return
-    const ok = window.confirm(`Delete "${material.title}"? This cannot be undone.`)
-    if (!ok) return
+    setPendingDelete(material)
+  }
+
+  const confirmDeleteMaterial = async () => {
+    const material = pendingDelete
+    if (!material || !classSubjectId) return
+    setPendingDelete(null)
 
     setDeletingIds((prev) => new Set(prev).add(material.id))
     try {
-      await apiClient.delete(`/api/knowledge/material/${material.id}`)
+      const res = await apiClient.delete<{ storage_warning?: string | null }>(
+        `/api/knowledge/material/${material.id}/class-subject/${classSubjectId}`,
+      )
       setMaterials((prev) => prev.filter((m) => m.id !== material.id))
-      toast.success("Material deleted")
+      if (res?.storage_warning) {
+        toast.warning(res.storage_warning)
+      } else {
+        toast.success("Removed from this class")
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete material")
+      toast.error(err instanceof Error ? err.message : "Failed to remove material")
     } finally {
       setDeletingIds((prev) => {
         const next = new Set(prev)
@@ -558,7 +580,7 @@ export function KnowledgePage() {
                                 <Link2Icon className="size-3" />
                               </button>
                               <button
-                                onClick={() => handleDeleteMaterial(m)}
+                                onClick={() => requestDeleteMaterial(m)}
                                 disabled={deletingIds.has(m.id)}
                                 title="Delete material"
                                 className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive disabled:opacity-50"
@@ -636,6 +658,33 @@ export function KnowledgePage() {
         primaryLabel={primaryLabel}
         onSaved={handleLinksSaved}
       />
+
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from this class?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium text-foreground">
+                {pendingDelete?.title ?? ""}
+              </span>{" "}
+              will be removed from this class only. Your other classes and
+              any teacher who picked it from the knowledge bank keep it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteMaterial}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
