@@ -69,6 +69,17 @@ import {
 } from "@/components/ui/select"
 import { BlueprintModal, type Blueprint, type BlueprintSection } from "../components/blueprint-modal"
 import { ChapterTopicPicker } from "../components/chapter-topic-picker"
+import {
+  useTeacherAssignments,
+  classLabel,
+  type Assignment,
+} from "@/hooks/use-teacher-assignments"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { CheckIcon, CopyIcon } from "lucide-react"
 
 /**
  * MCQ answers arrive from the AI in a few shapes:
@@ -184,6 +195,7 @@ function compressForUpload(file: File): Promise<File> {
 export function ExamsPage() {
   const isMobile = useIsMobile()
   const { user } = useAuth()
+  const { assignments } = useTeacherAssignments()
   const navigate = useNavigate()
   const { classSubjectId } = useParams<{ classSubjectId: string }>()
 
@@ -225,6 +237,7 @@ export function ExamsPage() {
 
   /* Delete exam */
   const [deleteExamConfirm, setDeleteExamConfirm] = useState<Exam | null>(null)
+  const [cloneOpen, setCloneOpen] = useState(false)
   const [isDeletingExam, setIsDeletingExam] = useState(false)
 
   /* Search */
@@ -540,10 +553,21 @@ export function ExamsPage() {
               className="h-8 pl-8 text-xs"
             />
           </div>
-          <Button size="sm" onClick={openCreate} className="ml-auto gap-1.5 shrink-0">
-            <PlusIcon className="size-3.5" />
-            New Exam
-          </Button>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setCloneOpen(true)}
+            >
+              <CopyIcon className="size-3.5" />
+              Clone from another section
+            </Button>
+            <Button size="sm" onClick={openCreate} className="gap-1.5">
+              <PlusIcon className="size-3.5" />
+              New Exam
+            </Button>
+          </div>
         </div>
 
         {/* Cards */}
@@ -561,10 +585,17 @@ export function ExamsPage() {
                 {searchQuery ? "No exams match your search" : "No exams yet"}
               </p>
               {!searchQuery && (
-                <Button size="sm" variant="outline" onClick={openCreate}>
-                  <PlusIcon className="mr-1.5 size-3.5" />
-                  Create your first exam
-                </Button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button size="sm" variant="outline" onClick={openCreate}>
+                    <PlusIcon className="mr-1.5 size-3.5" />
+                    Create your first exam
+                  </Button>
+                  <span className="text-xs text-muted-foreground">or</span>
+                  <Button size="sm" variant="outline" onClick={() => setCloneOpen(true)}>
+                    <CopyIcon className="mr-1.5 size-3.5" />
+                    Clone from another section
+                  </Button>
+                </div>
               )}
             </div>
           ) : (
@@ -692,6 +723,16 @@ export function ExamsPage() {
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {/* Copy-to-sections is available in both empty-exam and ready-exam
+                  states. Copying an empty exam clones the setup (chapters,
+                  blueprint, marks); the target starts empty and the teacher
+                  generates/uploads independently. */}
+              <DuplicateExamPopover
+                sourceExam={selectedExam}
+                currentClassSubjectId={classSubjectId ?? null}
+                assignments={assignments ?? []}
+                onDuplicated={() => classSubjectId && fetchExams(classSubjectId)}
+              />
               {selectedExam && selectedExam.question_count === 0 ? (
                 <>
                   <Button
@@ -1225,6 +1266,332 @@ export function ExamsPage() {
         onClose={() => setBlueprintModalOpen(false)}
         onSaved={handleBlueprintCreated}
       />
+
+      <CloneFromSectionSheet
+        open={cloneOpen}
+        onOpenChange={setCloneOpen}
+        targetClassSubjectId={classSubjectId ?? null}
+        onCloned={(newExamId) => {
+          setCloneOpen(false)
+          // Refresh the exam list in the background.
+          if (classSubjectId) fetchExams(classSubjectId)
+          // Auto-open the cloned exam so the teacher lands on its detail.
+          // selectExam() relies on the exams array to look up question_count,
+          // but the fetch above hasn't landed yet — so mirror its side effects
+          // inline and kick fetchQuestions/students directly.
+          setSelectedExamId(newExamId)
+          setQuestions([])
+          setStudents([])
+          setSubmissions([])
+          setShowAnswers(false)
+          fetchQuestions(newExamId)
+          if (classSubjectId) fetchStudentsAndSubmissions(classSubjectId, newExamId)
+        }}
+      />
     </>
+  )
+}
+
+/* ─── Duplicate-to-sections popover ──────────────────────── */
+
+function DuplicateExamPopover({
+  sourceExam,
+  currentClassSubjectId,
+  assignments,
+  onDuplicated,
+}: {
+  sourceExam: Exam | null
+  currentClassSubjectId: string | null
+  assignments: Assignment[]
+  onDuplicated: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+
+  // Reset the picked set every time the popover reopens on a new exam.
+  useEffect(() => {
+    if (open) setPicked(new Set())
+  }, [open, sourceExam?.id])
+
+  if (!sourceExam) return null
+
+  // Only offer OTHER class-subjects the teacher owns — same section as
+  // source is a duplicate that would silently share a name and nothing else.
+  const targets = assignments.filter(
+    (a) => a.class_subject_id !== currentClassSubjectId,
+  )
+
+  const toggle = (id: string) => {
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleApply = async () => {
+    if (picked.size === 0) return
+    setBusy(true)
+    try {
+      type DupResult = {
+        message: string
+        results: Array<{ ok: boolean; target_class_subject_id: string; new_exam_id?: string; error?: string }>
+      }
+      const res = await apiClient.post<DupResult>(
+        `/api/exams/${sourceExam.id}/duplicate`,
+        { target_class_subject_ids: Array.from(picked) },
+      )
+      const okCount = res.results.filter((r) => r.ok).length
+      const failCount = res.results.length - okCount
+      if (failCount === 0) toast.success(`Copied to ${okCount} class-subject${okCount === 1 ? "" : "s"}`)
+      else toast.warning(`${okCount} copied, ${failCount} failed`)
+      onDuplicated()
+      setOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to duplicate")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline">
+          <CopyIcon className="mr-1.5 size-3.5" />
+          Copy to…
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-3">
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium">Copy this exam to</p>
+          {targets.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              You&apos;re not assigned to any other classes.
+            </p>
+          ) : (
+            <>
+              <div className="flex max-h-64 flex-col overflow-y-auto">
+                {targets.map((a) => {
+                  const isOn = picked.has(a.class_subject_id)
+                  return (
+                    <button
+                      key={a.class_subject_id}
+                      type="button"
+                      onClick={() => toggle(a.class_subject_id)}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+                    >
+                      <span
+                        className={cn(
+                          "flex size-4 shrink-0 items-center justify-center rounded border",
+                          isOn
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-muted-foreground/30",
+                        )}
+                      >
+                        {isOn && <CheckIcon className="size-3" />}
+                      </span>
+                      <span className="truncate">{classLabel(a)}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Each copy is independent — edits on the copy won&apos;t affect this exam.
+              </p>
+              <div className="mt-1 flex items-center justify-end gap-1 border-t pt-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 rounded-full text-xs"
+                  onClick={() => setOpen(false)}
+                  disabled={busy}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 rounded-full text-xs"
+                  disabled={picked.size === 0 || busy}
+                  onClick={handleApply}
+                >
+                  {busy ? "Copying…" : `Copy${picked.size > 0 ? ` (${picked.size})` : ""}`}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/* ─── Clone-from-another-section sheet ───────────────────── */
+
+interface DiscoverableExam {
+  id: string
+  exam_name: string
+  total_marks: number
+  pass_marks: number | null
+  chapters_selected: string[]
+  question_count: number
+  visibility: "public" | "private"
+  created_at: string
+  is_mine: boolean
+  section_label: string | null
+  uploader: { id: string; full_name: string; profile_url?: string } | null
+}
+
+function CloneFromSectionSheet({
+  open,
+  onOpenChange,
+  targetClassSubjectId,
+  onCloned,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  targetClassSubjectId: string | null
+  onCloned: (newExamId: string) => void
+}) {
+  const [exams, setExams] = useState<DiscoverableExam[]>([])
+  const [loading, setLoading] = useState(false)
+  const [cloningId, setCloningId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || !targetClassSubjectId) return
+    let cancelled = false
+    setLoading(true)
+    apiClient
+      .get<{ exams: DiscoverableExam[] }>(
+        `/api/exams/discoverable?class_subject_id=${targetClassSubjectId}`,
+      )
+      .then((res) => { if (!cancelled) setExams(res.exams ?? []) })
+      .catch((err) => {
+        if (cancelled) return
+        toast.error(err instanceof Error ? err.message : "Failed to load exams")
+        setExams([])
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [open, targetClassSubjectId])
+
+  const handleClone = async (source: DiscoverableExam) => {
+    if (!targetClassSubjectId) return
+    setCloningId(source.id)
+    try {
+      type DupResult = {
+        results: Array<{ ok: boolean; new_exam_id?: string; error?: string }>
+      }
+      const res = await apiClient.post<DupResult>(
+        `/api/exams/${source.id}/duplicate`,
+        { target_class_subject_ids: [targetClassSubjectId] },
+      )
+      const hit = res.results.find((r) => r.ok && r.new_exam_id)
+      if (!hit || !hit.new_exam_id) {
+        toast.error(res.results[0]?.error || "Clone failed")
+        return
+      }
+      toast.success("Cloned into this section")
+      onCloned(hit.new_exam_id)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Clone failed")
+    } finally {
+      setCloningId(null)
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" size="md" className="flex h-full flex-col p-0">
+        <SheetHeader className="border-b bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
+          <SheetTitle className="text-base">Clone from another section</SheetTitle>
+        </SheetHeader>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 sm:p-6">
+          <p className="text-xs text-muted-foreground">
+            Exams in the same grade + subject, from your other sections or from
+            other teachers who marked them public. Clones start private and
+            editing them won&apos;t affect the original.
+          </p>
+
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : exams.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <FileTextIcon className="size-10 text-muted-foreground/20" />
+              <p className="text-sm text-muted-foreground">
+                No exams available to clone yet.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                When you or another teacher creates an exam in another section of
+                this grade + subject, it will show up here.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {exams.map((e) => (
+                <div key={e.id} className="rounded-xl border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-sm font-medium">{e.exam_name}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {e.total_marks} marks · {e.question_count} question{e.question_count !== 1 ? "s" : ""}
+                        {e.pass_marks != null ? ` · pass ${e.pass_marks}` : ""}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 shrink-0 gap-1 text-xs"
+                      onClick={() => handleClone(e)}
+                      disabled={cloningId === e.id}
+                    >
+                      {cloningId === e.id ? (
+                        <Loader2Icon className="size-3 animate-spin" />
+                      ) : (
+                        <CopyIcon className="size-3" />
+                      )}
+                      Clone
+                    </Button>
+                  </div>
+
+                  {e.chapters_selected.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {e.chapters_selected.slice(0, 4).map((c) => (
+                        <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          {c}
+                        </span>
+                      ))}
+                      {e.chapters_selected.length > 4 && (
+                        <span className="text-[10px] text-muted-foreground/60">
+                          +{e.chapters_selected.length - 4} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span>{e.section_label ?? "Class"}</span>
+                    <span>·</span>
+                    <span className="truncate">
+                      {e.is_mine ? "Your section" : `by ${e.uploader?.full_name ?? "another teacher"}`}
+                    </span>
+                    {!e.is_mine && (
+                      <span className="ml-auto rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                        Shared
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
