@@ -10,8 +10,12 @@ async function request<T>(
 ): Promise<T> {
   const { body, headers: customHeaders, ...rest } = options
 
+  // FormData carries its own multipart Content-Type with a boundary; forcing
+  // application/json here would break file uploads. Let the browser set it.
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData
+
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...customHeaders,
   }
 
@@ -22,7 +26,11 @@ async function request<T>(
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body == null
+      ? undefined
+      : isFormData
+        ? (body as FormData)
+        : JSON.stringify(body),
     ...rest,
   })
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
@@ -36,6 +36,7 @@ import {
   Page as PdfPage,
   Text,
   View,
+  Image as PdfImage,
   StyleSheet,
   PDFDownloadLink,
   BlobProvider,
@@ -81,8 +82,26 @@ interface Block {
     section?: string
     questionType?: string
     originalId?: string
+    // Per-image resize box for the PDF export. Indexed by the same order
+    // extractImageUrls() returns. Undefined/absent → default box.
+    // widthPct is the fraction of the question column width (15-100).
+    // heightPx is the on-screen pixel height; react-pdf converts to
+    // points (px * 0.75) with a hard maxHeight safety net.
+    // Builder-local: not persisted to question_text, so a page reload
+    // resets everything. Intentional for pilot — teachers usually
+    // dial in sizes and export within one session.
+    imageBoxes?: ImageBox[]
   }
 }
+
+interface ImageBox {
+  widthPct: number
+  heightPx: number
+}
+const DEFAULT_IMAGE_BOX: ImageBox = { widthPct: 60, heightPx: 220 }
+const MIN_WIDTH_PCT = 15
+const MIN_HEIGHT_PX = 60
+const MAX_HEIGHT_PX = 640
 
 // ─── Helpers ──────────────────────────────────────────
 
@@ -96,13 +115,126 @@ function stripMarkdown(text: string): string {
     .replace(/\$\$[\s\S]*?\$\$/g, "[Formula]")
     .replace(/\$[^$]+\$/g, "[Formula]")
     .replace(/<svg[\s\S]*?<\/svg>/gi, "[Diagram]")
+    // <img> tags render as separate <Image> components below the question
+    // text; strip them from the prose so the raw markup doesn't print.
+    .replace(/<img\b[^>]*?\/?\s*>/gi, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\*(.*?)\*/g, "$1")
     .replace(/#{1,6}\s/g, "")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/^\s*[-*+]\s/gm, "• ")
+    .replace(/\n{3,}/g, "\n\n")
     .trim()
+}
+
+// Extract every <img src="..."> URL from a question content string, in
+// document order. The PDF renderer emits one <Image> per URL after the
+// question's prose; the builder-preview does the same with plain <img>.
+function extractImageUrls(text: string): string[] {
+  if (!text) return []
+  const urls: string[] = []
+  const re = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["'][^>]*?\/?\s*>/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) urls.push(m[1])
+  return urls
+}
+
+// The builder's on-screen textarea should show the prose only, with SVG
+// and <img> tags hidden. Combined with reassembleQuestionContent below,
+// this lets a teacher edit the prose while keeping the markup intact.
+const IMG_OR_SVG_RE = /<svg\b[\s\S]*?<\/svg>|<img\b[^>]*?\/?\s*>/gi
+function stripQuestionMarkupForPreview(text: string): string {
+  if (!text) return ""
+  return text.replace(IMG_OR_SVG_RE, "").replace(/\n{3,}/g, "\n\n").trim()
+}
+
+function reassembleQuestionContent(original: string, editedProse: string): string {
+  const media: string[] = []
+  original.replace(IMG_OR_SVG_RE, (m) => {
+    media.push(m)
+    return ""
+  })
+  if (media.length === 0) return editedProse
+  return editedProse.replace(/\s+$/, "") + "\n\n" + media.join("\n")
+}
+
+// Corner-drag resizable image thumbnail used only in the PDF builder.
+// widthPct is a percentage of the outer question column; heightPx is on-
+// screen pixels (react-pdf converts to points via width × 0.75).
+function ResizableImage({
+  url,
+  box,
+  onChange,
+}: {
+  url: string
+  box: ImageBox
+  onChange: (next: ImageBox) => void
+}) {
+  const outerRef = useRef<HTMLDivElement>(null)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const parent = outerRef.current?.parentElement
+    // Width of the flex row holding all thumbnails — used to translate
+    // horizontal pixel drag into a percentage of the question column.
+    const parentWidth = parent?.getBoundingClientRect().width ?? 800
+    const startX = e.clientX
+    const startY = e.clientY
+    const startBox = box
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      const nextWidthPct = clamp(
+        startBox.widthPct + (dx / parentWidth) * 100,
+        MIN_WIDTH_PCT,
+        100,
+      )
+      const nextHeightPx = clamp(startBox.heightPx + dy, MIN_HEIGHT_PX, MAX_HEIGHT_PX)
+      onChange({ widthPct: nextWidthPct, heightPx: nextHeightPx })
+    }
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+  }
+
+  return (
+    <div
+      ref={outerRef}
+      className="group relative rounded border bg-muted/10 p-1"
+      style={{ width: `${box.widthPct}%`, height: `${box.heightPx}px` }}
+    >
+      <img
+        src={url}
+        alt="attached diagram"
+        className="h-full w-full rounded object-contain"
+        draggable={false}
+      />
+      <div
+        role="slider"
+        aria-label="Resize image"
+        onMouseDown={handleMouseDown}
+        className={cn(
+          "absolute -bottom-1 -right-1 flex size-4 cursor-nwse-resize items-center justify-center rounded-sm border border-border/60 bg-background/70 text-muted-foreground shadow-sm backdrop-blur",
+          "opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground",
+        )}
+      >
+        {/* Two short strokes forming the corner-grip glyph */}
+        <svg viewBox="0 0 8 8" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.2">
+          <path d="M2 7 L7 2" />
+          <path d="M4.5 7 L7 4.5" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function clamp(v: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, v))
 }
 
 function buildInitialBlocks(
@@ -320,9 +452,11 @@ function SortableBlock({
                 {block.meta?.questionNumber}.
               </span>
               <textarea
-                value={block.content}
-                onChange={(e) => handleContentChange(e.target.value)}
-                rows={Math.max(2, Math.ceil(block.content.length / 80))}
+                value={stripQuestionMarkupForPreview(block.content)}
+                onChange={(e) => handleContentChange(
+                  reassembleQuestionContent(block.content, e.target.value),
+                )}
+                rows={Math.max(2, Math.ceil(stripQuestionMarkupForPreview(block.content).length / 80))}
                 className="w-full resize-none border-none bg-transparent text-xs leading-relaxed outline-none ring-0 focus:ring-0"
                 placeholder="Question text..."
               />
@@ -330,6 +464,30 @@ function SortableBlock({
                 [{block.meta?.marks}]
               </span>
             </div>
+            {extractImageUrls(block.content).length > 0 && (
+              <div className="ml-6 mt-2 flex flex-wrap gap-3">
+                {extractImageUrls(block.content).map((url, i) => {
+                  const box: ImageBox = block.meta?.imageBoxes?.[i] ?? DEFAULT_IMAGE_BOX
+                  const setBox = (next: ImageBox) => {
+                    const current = block.meta?.imageBoxes ?? []
+                    const nextBoxes = [...current]
+                    for (let k = 0; k <= i; k++) {
+                      if (nextBoxes[k] === undefined) nextBoxes[k] = DEFAULT_IMAGE_BOX
+                    }
+                    nextBoxes[i] = next
+                    onUpdate(block.id, { meta: { ...block.meta, imageBoxes: nextBoxes } })
+                  }
+                  return (
+                    <ResizableImage
+                      key={`${block.id}-preview-img-${i}`}
+                      url={url}
+                      box={box}
+                      onChange={setBox}
+                    />
+                  )
+                })}
+              </div>
+            )}
             {block.meta?.options && block.meta.options.length > 0 && (
               <div className="mt-2">
                 {/* Layout toggle */}
@@ -428,6 +586,10 @@ const pdfStyles = StyleSheet.create({
   optionsRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 2, marginLeft: 30, marginBottom: 2 },
   optionItem2Col: { width: "48%", fontSize: 9, marginBottom: 3 },
   optionItem1Col: { width: "100%", fontSize: 9, marginBottom: 4 },
+  imageRow: { flexDirection: "column", marginLeft: 30, marginTop: 4, marginBottom: 6 },
+  // Width + height are set per-image based on the builder's drag box.
+  // objectFit: contain preserves aspect ratio within the box.
+  questionImage: { marginBottom: 4, objectFit: "contain" },
   spacer: { height: 16 },
   divider: { borderBottomWidth: 1, borderBottomColor: "#000", marginVertical: 8 },
 })
@@ -469,7 +631,8 @@ function PdfDocument({ blocks }: { blocks: Block[] }) {
                     {block.content}
                   </Text>
                 )
-              case "question":
+              case "question": {
+                const imageUrls = extractImageUrls(block.content)
                 return (
                   <View key={block.id}>
                     <View style={pdfStyles.questionRow}>
@@ -483,6 +646,27 @@ function PdfDocument({ blocks }: { blocks: Block[] }) {
                         [{block.meta?.marks}]
                       </Text>
                     </View>
+                    {imageUrls.length > 0 && (
+                      <View style={pdfStyles.imageRow}>
+                        {imageUrls.map((url, i) => {
+                          const bx = block.meta?.imageBoxes?.[i] ?? DEFAULT_IMAGE_BOX
+                          // Convert on-screen pixel height to PDF points
+                          // (1 pt ≈ 1.333 px at 96 dpi).
+                          const heightPt = Math.round(bx.heightPx * 0.75)
+                          return (
+                            <PdfImage
+                              key={`${block.id}-img-${i}`}
+                              src={url}
+                              style={{
+                                ...pdfStyles.questionImage,
+                                width: `${bx.widthPct}%`,
+                                height: heightPt,
+                              }}
+                            />
+                          )
+                        })}
+                      </View>
+                    )}
                     {block.meta?.options && block.meta.options.length > 0 && (
                       <View style={pdfStyles.optionsRow}>
                         {block.meta.options.map((opt, i) => (
@@ -501,6 +685,7 @@ function PdfDocument({ blocks }: { blocks: Block[] }) {
                     )}
                   </View>
                 )
+              }
               case "spacer":
                 return <View key={block.id} style={pdfStyles.spacer} />
               default:
