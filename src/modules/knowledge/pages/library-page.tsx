@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   BookOpenIcon,
   CheckIcon,
+  CircleAlertIcon,
+  CircleCheckIcon,
   EyeIcon,
   EyeOffIcon,
   FileIcon,
@@ -10,12 +12,14 @@ import {
   Link2Icon,
   Loader2Icon,
   RefreshCwIcon,
+  SearchIcon,
   Share2Icon,
-  SparklesIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   UploadIcon,
   XIcon,
 } from "lucide-react"
+import dayjs from "dayjs"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
@@ -25,13 +29,30 @@ import {
   useTeacherAssignments,
   classLabel,
 } from "@/hooks/use-teacher-assignments"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Spinner } from "@/components/ui/spinner"
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { FilterChip } from "@/components/shared/filter-controls"
+import { useHeaderActions } from "@/components/layout/header-actions-context"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Dialog,
   DialogContent,
@@ -97,10 +118,15 @@ interface LibraryResponse {
 export function LibraryPage() {
   const { user } = useAuth()
   const { assignments } = useTeacherAssignments()
+  const { setHeaderActions } = useHeaderActions()
 
   const [materials, setMaterials] = useState<Material[]>([])
-  const [csLabels, setCsLabels] = useState<Record<string, ClassSubjectLabel>>({})
-  const [teachersMap, setTeachersMap] = useState<Record<string, TeacherLite>>({})
+  const [csLabels, setCsLabels] = useState<Record<string, ClassSubjectLabel>>(
+    {}
+  )
+  const [teachersMap, setTeachersMap] = useState<Record<string, TeacherLite>>(
+    {}
+  )
   const [canEdit, setCanEdit] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -156,13 +182,36 @@ export function LibraryPage() {
     fetchLibrary()
   }, [fetchLibrary])
 
+  const teacherOptionCount = assignments.length
+
+  useEffect(() => {
+    if (!canEdit) return
+    setHeaderActions(
+      <Button
+        size="lg"
+        className="rounded-full"
+        onClick={() => setUploadOpen(true)}
+        disabled={teacherOptionCount === 0}
+        title={
+          teacherOptionCount === 0
+            ? "You need to be assigned to a class-subject first"
+            : undefined
+        }
+      >
+        <UploadIcon className="size-3.5" />
+        <span className="hidden sm:inline">Upload</span>
+      </Button>
+    )
+    return () => setHeaderActions(null)
+  }, [canEdit, teacherOptionCount, setHeaderActions])
+
   const teacherOptions = useMemo<ClassSubjectOption[]>(
     () =>
       assignments.map((a) => ({
         class_subject_id: a.class_subject_id,
         label: classLabel(a),
       })),
-    [assignments],
+    [assignments]
   )
 
   const csLabelFor = useCallback(
@@ -172,14 +221,15 @@ export function LibraryPage() {
       const fromAssign = assignments.find((a) => a.class_subject_id === csId)
       return fromAssign ? classLabel(fromAssign) : "Unknown class"
     },
-    [csLabels, assignments],
+    [csLabels, assignments]
   )
 
   // Build filter chips from the union of all class-subjects referenced by
   // any material the user can see.
   const filterChips = useMemo(() => {
     const ids = new Set<string>()
-    for (const m of materials) for (const cs of m.linked_class_subject_ids) ids.add(cs)
+    for (const m of materials)
+      for (const cs of m.linked_class_subject_ids) ids.add(cs)
     return [...ids]
       .map((id) => ({ id, label: csLabelFor(id) }))
       .sort((a, b) => a.label.localeCompare(b.label))
@@ -187,7 +237,8 @@ export function LibraryPage() {
 
   const filteredMaterials = useMemo(() => {
     return materials.filter((m) => {
-      if (filterCsId && !m.linked_class_subject_ids.includes(filterCsId)) return false
+      if (filterCsId && !m.linked_class_subject_ids.includes(filterCsId))
+        return false
       if (search) {
         const q = search.toLowerCase()
         const inTitle = m.title.toLowerCase().includes(q)
@@ -198,6 +249,25 @@ export function LibraryPage() {
     })
   }, [materials, filterCsId, search])
 
+  const allFilteredSelected =
+    filteredMaterials.length > 0 &&
+    filteredMaterials.every((m) => selectedIds.has(m.id))
+  const someFilteredSelected = filteredMaterials.some((m) =>
+    selectedIds.has(m.id)
+  )
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allFilteredSelected) {
+        for (const m of filteredMaterials) next.delete(m.id)
+      } else {
+        for (const m of filteredMaterials) next.add(m.id)
+      }
+      return next
+    })
+  }
+
   const toggleVisibility = async (material: Material) => {
     if (!canEdit) return
     const next = material.visibility === "private" ? "public" : "private"
@@ -207,15 +277,17 @@ export function LibraryPage() {
         visibility: next,
       })
       setMaterials((prev) =>
-        prev.map((m) => (m.id === material.id ? { ...m, visibility: next } : m)),
+        prev.map((m) => (m.id === material.id ? { ...m, visibility: next } : m))
       )
       toast.success(
         next === "public"
           ? "Published to the school bank"
-          : "Hidden from the school bank",
+          : "Hidden from the school bank"
       )
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update visibility")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update visibility"
+      )
     } finally {
       setTogglingIds((prev) => {
         const nextSet = new Set(prev)
@@ -237,17 +309,20 @@ export function LibraryPage() {
     try {
       const results = await Promise.allSettled(
         targets.map((m) =>
-          apiClient.patch(`/api/knowledge/material/${m.id}`, { visibility: next }),
-        ),
+          apiClient.patch(`/api/knowledge/material/${m.id}`, {
+            visibility: next,
+          })
+        )
       )
       const ok = results.filter((r) => r.status === "fulfilled").length
       const fail = results.length - ok
       setMaterials((prev) =>
         prev.map((m) =>
-          selectedIds.has(m.id) ? { ...m, visibility: next } : m,
-        ),
+          selectedIds.has(m.id) ? { ...m, visibility: next } : m
+        )
       )
-      if (fail === 0) toast.success(`${ok} material${ok === 1 ? "" : "s"} set to ${next}`)
+      if (fail === 0)
+        toast.success(`${ok} material${ok === 1 ? "" : "s"} set to ${next}`)
       else toast.warning(`${ok} updated, ${fail} failed`)
       clearSelection()
     } finally {
@@ -264,31 +339,35 @@ export function LibraryPage() {
         targets.map((m) => {
           // Merge existing links with new targets; PATCH /links is replace-mode.
           const desired = Array.from(
-            new Set([...(m.linked_class_subject_ids || []), ...targetCsIds]),
+            new Set([...(m.linked_class_subject_ids || []), ...targetCsIds])
           )
           return apiClient
-            .patch<{ linked_class_subject_ids: string[] }>(
-              `/api/knowledge/material/${m.id}/links`,
-              { class_subject_ids: desired },
-            )
+            .patch<{
+              linked_class_subject_ids: string[]
+            }>(`/api/knowledge/material/${m.id}/links`, {
+              class_subject_ids: desired,
+            })
             .then((res) => ({
               id: m.id,
               linked: res.linked_class_subject_ids ?? desired,
             }))
-        }),
+        })
       )
       const ok = results.filter((r) => r.status === "fulfilled").length
       const fail = results.length - ok
       setMaterials((prev) =>
         prev.map((m) => {
           const hit = results.find(
-            (r) => r.status === "fulfilled" && r.value.id === m.id,
+            (r) => r.status === "fulfilled" && r.value.id === m.id
           )
           if (!hit || hit.status !== "fulfilled") return m
           return { ...m, linked_class_subject_ids: hit.value.linked }
-        }),
+        })
       )
-      if (fail === 0) toast.success(`Shared to ${targetCsIds.length} class-subject${targetCsIds.length === 1 ? "" : "s"}`)
+      if (fail === 0)
+        toast.success(
+          `Shared to ${targetCsIds.length} class-subject${targetCsIds.length === 1 ? "" : "s"}`
+        )
       else toast.warning(`${ok} updated, ${fail} failed`)
       clearSelection()
       setBulkPickerOpen(false)
@@ -309,7 +388,7 @@ export function LibraryPage() {
     })
     try {
       const results = await Promise.allSettled(
-        targets.map((m) => apiClient.delete(`/api/knowledge/material/${m.id}`)),
+        targets.map((m) => apiClient.delete(`/api/knowledge/material/${m.id}`))
       )
       const ok = results.filter((r) => r.status === "fulfilled").length
       const fail = results.length - ok
@@ -320,7 +399,8 @@ export function LibraryPage() {
         if (r.status === "fulfilled") okIds.add(targets[i].id)
       })
       setMaterials((prev) => prev.filter((m) => !okIds.has(m.id)))
-      if (fail === 0) toast.success(`${ok} material${ok === 1 ? "" : "s"} removed`)
+      if (fail === 0)
+        toast.success(`${ok} material${ok === 1 ? "" : "s"} removed`)
       else toast.warning(`${ok} removed, ${fail} failed`)
       clearSelection()
     } finally {
@@ -345,7 +425,7 @@ export function LibraryPage() {
     setDeletingIds((prev) => new Set(prev).add(material.id))
     try {
       const res = await apiClient.delete<{ storage_warning?: string | null }>(
-        `/api/knowledge/material/${material.id}`,
+        `/api/knowledge/material/${material.id}`
       )
       setMaterials((prev) => prev.filter((m) => m.id !== material.id))
       if (res?.storage_warning) {
@@ -354,7 +434,9 @@ export function LibraryPage() {
         toast.success("Material deleted")
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete material")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete material"
+      )
     } finally {
       setDeletingIds((prev) => {
         const next = new Set(prev)
@@ -369,10 +451,12 @@ export function LibraryPage() {
     try {
       const res = await apiClient.post<{ material: Material }>(
         "/api/knowledge/process-material",
-        { material_id: materialId },
+        { material_id: materialId }
       )
       setMaterials((prev) =>
-        prev.map((m) => (m.id === res.material.id ? { ...m, ...res.material } : m)),
+        prev.map((m) =>
+          m.id === res.material.id ? { ...m, ...res.material } : m
+        )
       )
       toast.success("Material analyzed successfully")
     } catch (err) {
@@ -391,8 +475,8 @@ export function LibraryPage() {
   const handleLinksSaved = (materialId: string, linkedIds: string[]) => {
     setMaterials((prev) =>
       prev.map((m) =>
-        m.id === materialId ? { ...m, linked_class_subject_ids: linkedIds } : m,
-      ),
+        m.id === materialId ? { ...m, linked_class_subject_ids: linkedIds } : m
+      )
     )
     fetchLibrary()
   }
@@ -400,242 +484,315 @@ export function LibraryPage() {
   if (!user) return null
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
-      <div className="shrink-0 border-b bg-background/60 px-4 py-3 md:px-6 md:py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="font-heading text-lg font-semibold">Knowledge Library</h1>
-            <p className="text-xs text-muted-foreground">
-              {canEdit
-                ? "Upload once, tag any class-subject you teach. Reuse across sections."
-                : "All materials uploaded by teachers in your school."}
-            </p>
+    <div className="flex h-full w-full flex-col gap-4 p-4 md:p-6">
+      {/* Toolbar — search + filter popover + active-filter chip */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:max-w-72">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search materials..."
+              className="h-9 rounded-full pl-9"
+            />
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search title or tag..."
-                className="h-8 w-56 pr-7 text-xs"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"
+          {filterChips.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-full"
                 >
-                  <XIcon className="size-3" />
-                </button>
-              )}
-            </div>
-            {canEdit && (
-              <Button
-                size="sm"
-                onClick={() => setUploadOpen(true)}
-                disabled={teacherOptions.length === 0}
-                title={
-                  teacherOptions.length === 0
-                    ? "You need to be assigned to a class-subject first"
-                    : undefined
-                }
-              >
-                <UploadIcon className="size-3.5" />
-                Upload
-              </Button>
-            )}
-          </div>
+                  <SlidersHorizontalIcon className="size-3.5" />
+                  Filters
+                  {filterCsId && (
+                    <Badge
+                      variant="secondary"
+                      className="ml-1 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
+                    >
+                      1
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <p className="text-sm font-medium">Filters</p>
+                  {filterCsId && (
+                    <button
+                      onClick={() => setFilterCsId(null)}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 p-4">
+                  <Label className="text-xs text-muted-foreground">
+                    Class-subject
+                  </Label>
+                  <Select
+                    value={filterCsId ?? "__all"}
+                    onValueChange={(v) =>
+                      setFilterCsId(v === "__all" ? null : v)
+                    }
+                  >
+                    <SelectTrigger className="h-9 w-full text-sm">
+                      <SelectValue placeholder="All class-subjects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all">
+                        All class-subjects ({materials.length})
+                      </SelectItem>
+                      {filterChips.map((c) => {
+                        const count = materials.filter((m) =>
+                          m.linked_class_subject_ids.includes(c.id)
+                        ).length
+                        return (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.label} ({count})
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
-        {filterChips.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <button
-              onClick={() => setFilterCsId(null)}
-              className={cn(
-                "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                filterCsId === null
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              All ({materials.length})
-            </button>
-            {filterChips.map((c) => {
-              const count = materials.filter((m) =>
-                m.linked_class_subject_ids.includes(c.id),
-              ).length
-              return (
-                <button
-                  key={c.id}
-                  onClick={() =>
-                    setFilterCsId((prev) => (prev === c.id ? null : c.id))
-                  }
-                  className={cn(
-                    "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                    filterCsId === c.id
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  {c.label} ({count})
-                </button>
-              )
-            })}
+        {filterCsId && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <FilterChip
+              label={csLabelFor(filterCsId)}
+              onRemove={() => setFilterCsId(null)}
+            />
           </div>
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
+      {isLoading ? (
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner className="size-6" />
+        </div>
+      ) : filteredMaterials.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-sidebar p-5">
+          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
+            <BookOpenIcon className="size-6 text-muted-foreground" />
           </div>
-        ) : filteredMaterials.length === 0 ? (
-          <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-20 text-center">
-            <BookOpenIcon className="size-10 text-muted-foreground/30" />
-            <p className="text-sm font-medium">
+          <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
+            <p className="text-base font-medium text-secondary-foreground">
               {materials.length === 0
                 ? canEdit
-                  ? "Your knowledge library is empty"
+                  ? "Your library is empty"
                   : "No materials uploaded yet"
-                : "No materials match this filter"}
+                : "No materials match your filters"}
             </p>
-            <p className="text-xs text-muted-foreground">
-              {materials.length === 0 && canEdit
-                ? "Upload a file and tag it to one or more of your class-subjects. It will show up in every tagged class's knowledge view."
-                : "Try clearing the filters above."}
+            <p className="text-sm text-muted-foreground">
+              {materials.length === 0
+                ? canEdit
+                  ? "Upload a file and tag it to your class-subjects — it appears in every tagged class."
+                  : "Materials shared by teachers will show up here."
+                : "Try clearing the search or filters above."}
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredMaterials.map((m) => {
-              const Icon = getFileIcon(m.file_url)
-              const teacher = teachersMap[m.teacher_id]
-              return (
-                <div
-                  key={m.id}
-                  role={canEdit ? "button" : undefined}
-                  tabIndex={canEdit ? 0 : undefined}
-                  aria-pressed={canEdit ? selectedIds.has(m.id) : undefined}
-                  onClick={canEdit ? () => toggleSelected(m.id) : undefined}
-                  onKeyDown={
-                    canEdit
-                      ? (e) => {
-                          if (e.key === " " || e.key === "Enter") {
-                            e.preventDefault()
-                            toggleSelected(m.id)
-                          }
-                        }
-                      : undefined
-                  }
-                  className={cn(
-                    "group relative flex flex-col gap-2.5 rounded-xl border bg-background p-3 transition-colors hover:border-foreground/20 hover:bg-muted/20",
-                    canEdit && "cursor-pointer",
-                    selectedIds.has(m.id) &&
-                      "border-primary bg-primary/[0.06] hover:border-primary hover:bg-primary/[0.08]",
-                  )}
-                >
-                  <div className="flex items-start gap-2">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <Icon className="size-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-sm font-medium leading-tight">
-                        {m.title}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        {new Date(m.uploaded_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {m.processed ? (
-                      <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
-                        <SparklesIcon className="size-2.5 text-emerald-600 dark:text-emerald-400" />
-                      </span>
-                    ) : processingIds.has(m.id) ? (
-                      <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-500/15">
-                        <Loader2Icon className="size-2.5 animate-spin text-blue-600 dark:text-blue-400" />
-                      </span>
-                    ) : canEdit ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          retryProcessing(m.id)
-                        }}
-                        disabled={retryingIds.has(m.id)}
-                        title={retryingIds.has(m.id) ? "Retrying…" : "Retry processing"}
-                        className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 transition-colors hover:bg-amber-500/25 disabled:opacity-70"
-                      >
-                        {retryingIds.has(m.id) ? (
-                          <Loader2Icon className="size-2.5 animate-spin text-amber-600 dark:text-amber-400" />
-                        ) : (
-                          <RefreshCwIcon className="size-2.5 text-amber-600 dark:text-amber-400" />
-                        )}
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-wrap gap-1">
-                    {m.linked_class_subject_ids.length > 0 ? (
-                      m.linked_class_subject_ids.map((csId) => (
-                        <span
-                          key={csId}
-                          className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] leading-none text-primary"
-                        >
-                          {csLabelFor(csId)}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
-                        Unlinked
-                      </span>
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto overscroll-none rounded-lg border [&_[data-slot=table-container]]:overflow-visible">
+          <Table className="border-collapse">
+            <TableHeader className="sticky top-0 z-20 bg-sidebar shadow-[0_1px_0_0_var(--border)] [&_th]:h-10 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
+              <TableRow className="hover:bg-transparent">
+                {canEdit && (
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={
+                        allFilteredSelected
+                          ? true
+                          : someFilteredSelected
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all materials"
+                    />
+                  </TableHead>
+                )}
+                <TableHead className="min-w-56">Title</TableHead>
+                <TableHead className="min-w-40">Classes</TableHead>
+                <TableHead className="min-w-32">Tags</TableHead>
+                <TableHead className="min-w-28">Uploaded</TableHead>
+                {!canEdit && (
+                  <TableHead className="min-w-40">Uploaded by</TableHead>
+                )}
+                <TableHead className="min-w-28">Status</TableHead>
+                {canEdit && <TableHead className="w-24">Visibility</TableHead>}
+                {canEdit && (
+                  <TableHead className="w-20 text-right">Actions</TableHead>
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredMaterials.map((m) => {
+                const Icon = getFileIcon(m.file_url)
+                const teacher = teachersMap[m.teacher_id]
+                const extraClasses = m.linked_class_subject_ids.slice(2)
+                return (
+                  <TableRow
+                    key={m.id}
+                    data-state={selectedIds.has(m.id) ? "selected" : undefined}
+                  >
+                    {canEdit && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(m.id)}
+                          onCheckedChange={() => toggleSelected(m.id)}
+                          aria-label={`Select ${m.title}`}
+                        />
+                      </TableCell>
                     )}
-                  </div>
-
-                  {m.tags && m.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {m.tags.slice(0, 4).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {m.tags.length > 4 && (
-                        <span className="text-[10px] text-muted-foreground/60">
-                          +{m.tags.length - 4}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="mt-auto flex items-center justify-between pt-1">
-                    {!canEdit && teacher ? (
-                      <div className="flex items-center gap-1.5">
-                        <Avatar className="size-5">
-                          {teacher.profile_url ? (
-                            <AvatarImage src={teacher.profile_url} alt={teacher.full_name} />
-                          ) : null}
-                          <AvatarFallback className="text-[9px]">
-                            {initials(teacher.full_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate text-[10px] text-muted-foreground">
-                          {teacher.full_name}
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background">
+                          <Icon className="size-3.5 text-muted-foreground" />
+                        </div>
+                        <span className="max-w-72 truncate text-sm font-medium text-secondary-foreground">
+                          {m.title}
                         </span>
                       </div>
-                    ) : (
-                      <span />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {m.linked_class_subject_ids.length > 0 ? (
+                          <>
+                            {m.linked_class_subject_ids
+                              .slice(0, 2)
+                              .map((csId) => (
+                                <span
+                                  key={csId}
+                                  className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-accent-foreground"
+                                >
+                                  {csLabelFor(csId)}
+                                </span>
+                              ))}
+                            {extraClasses.length > 0 && (
+                              <span
+                                title={extraClasses
+                                  .map((csId) => csLabelFor(csId))
+                                  .join(", ")}
+                                className="text-[11px] text-muted-foreground/60"
+                              >
+                                +{extraClasses.length}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                            Unlinked
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {m.tags && m.tags.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1">
+                          {m.tags.slice(0, 2).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {m.tags.length > 2 && (
+                            <span
+                              title={m.tags.slice(2).join(", ")}
+                              className="text-[11px] text-muted-foreground/60"
+                            >
+                              +{m.tags.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/60">
+                          —
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {dayjs(m.uploaded_at).format("MMM D, YYYY")}
+                    </TableCell>
+                    {!canEdit && (
+                      <TableCell>
+                        {teacher ? (
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <Avatar className="size-5">
+                              {teacher.profile_url ? (
+                                <AvatarImage
+                                  src={teacher.profile_url}
+                                  alt={teacher.full_name}
+                                />
+                              ) : null}
+                              <AvatarFallback className="text-[9px]">
+                                {initials(teacher.full_name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="truncate text-xs text-muted-foreground">
+                              {teacher.full_name}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/60">
+                            —
+                          </span>
+                        )}
+                      </TableCell>
                     )}
-
+                    <TableCell>
+                      {m.processed ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          <CircleCheckIcon className="size-3.5" />
+                          Analyzed
+                        </span>
+                      ) : processingIds.has(m.id) ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                          <Loader2Icon className="size-3.5 animate-spin" />
+                          Processing
+                        </span>
+                      ) : canEdit ? (
+                        <button
+                          onClick={() => retryProcessing(m.id)}
+                          disabled={retryingIds.has(m.id)}
+                          title="Analysis failed — click to retry"
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 transition-colors hover:text-amber-700 disabled:opacity-70 dark:text-amber-400 dark:hover:text-amber-300"
+                        >
+                          {retryingIds.has(m.id) ? (
+                            <>
+                              <Loader2Icon className="size-3.5 animate-spin" />
+                              Retrying
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCwIcon className="size-3.5" />
+                              Retry
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          <CircleAlertIcon className="size-3.5" />
+                          Not analyzed
+                        </span>
+                      )}
+                    </TableCell>
                     {canEdit && (
-                      <div className="flex items-center gap-1">
+                      <TableCell>
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleVisibility(m)
-                          }}
+                          onClick={() => toggleVisibility(m)}
                           disabled={togglingIds.has(m.id)}
                           title={
                             m.visibility === "private"
@@ -643,10 +800,10 @@ export function LibraryPage() {
                               : "Public in the school bank — click to make private"
                           }
                           className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50",
+                            "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-50",
                             m.visibility === "private"
                               ? "bg-muted text-muted-foreground hover:bg-muted/70"
-                              : "bg-primary/10 text-primary hover:bg-primary/20",
+                              : "bg-primary/10 text-primary hover:bg-primary/20"
                           )}
                         >
                           {togglingIds.has(m.id)
@@ -655,25 +812,23 @@ export function LibraryPage() {
                               ? "Private"
                               : "Public"}
                         </button>
-                        <div className="flex items-center gap-0.5">
+                      </TableCell>
+                    )}
+                    {canEdit && (
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-0.5">
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditLinksFor(m)
-                            }}
+                            onClick={() => setEditLinksFor(m)}
                             title="Share to other class-subjects"
-                            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                           >
                             <Link2Icon className="size-3.5" />
                           </button>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              requestDelete(m)
-                            }}
+                            onClick={() => requestDelete(m)}
                             disabled={deletingIds.has(m.id)}
                             title="Delete material"
-                            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive disabled:opacity-50"
+                            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-destructive disabled:opacity-50"
                           >
                             {deletingIds.has(m.id) ? (
                               <Loader2Icon className="size-3.5 animate-spin" />
@@ -682,15 +837,15 @@ export function LibraryPage() {
                             )}
                           </button>
                         </div>
-                      </div>
+                      </TableCell>
                     )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <UploadDialog
         open={uploadOpen}
@@ -709,17 +864,19 @@ export function LibraryPage() {
             newMaterials.map((mat) =>
               apiClient.post<{ material: Material }>(
                 "/api/knowledge/process-material",
-                { material_id: mat.id },
-              ),
-            ),
+                { material_id: mat.id }
+              )
+            )
           ).then((results) => {
             for (let i = 0; i < results.length; i++) {
               const r = results[i]
               if (r.status === "fulfilled") {
                 setMaterials((prev) =>
                   prev.map((m) =>
-                    m.id === r.value.material.id ? { ...m, ...r.value.material } : m,
-                  ),
+                    m.id === r.value.material.id
+                      ? { ...m, ...r.value.material }
+                      : m
+                  )
                 )
               }
             }
@@ -744,7 +901,7 @@ export function LibraryPage() {
       {selectedIds.size > 0 && (
         <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
           <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-full border bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
-            <span className="pl-1 pr-2 text-sm font-medium">
+            <span className="pr-2 pl-1 text-sm font-medium">
               {selectedIds.size} selected
             </span>
 
@@ -823,7 +980,8 @@ export function LibraryPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Remove {selectedIds.size} material{selectedIds.size === 1 ? "" : "s"}?
+              Remove {selectedIds.size} material
+              {selectedIds.size === 1 ? "" : "s"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
               Each material will be removed from every one of your classes and,
@@ -835,7 +993,7 @@ export function LibraryPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmBulkDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             >
               Remove
             </AlertDialogAction>
@@ -855,16 +1013,16 @@ export function LibraryPage() {
                 {pendingDelete?.title ?? ""}
               </span>{" "}
               will be removed from every class you have it linked to. If you
-              uploaded it, it will also stop appearing in the school
-              knowledge bank. Any teacher who already picked it into their
-              own class keeps their copy.
+              uploaded it, it will also stop appearing in the school knowledge
+              bank. Any teacher who already picked it into their own class keeps
+              their copy.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             >
               Remove
             </AlertDialogAction>
@@ -882,7 +1040,12 @@ interface UploadDialogProps {
   onComplete: (materials: Material[]) => void
 }
 
-function UploadDialog({ open, onOpenChange, options, onComplete }: UploadDialogProps) {
+function UploadDialog({
+  open,
+  onOpenChange,
+  options,
+  onComplete,
+}: UploadDialogProps) {
   const [selectedCs, setSelectedCs] = useState<string[]>([])
   const [files, setFiles] = useState<{ file: File; title: string }[]>([])
   const [uploading, setUploading] = useState(false)
@@ -931,8 +1094,14 @@ function UploadDialog({ open, onOpenChange, options, onComplete }: UploadDialogP
     try {
       const formData = new FormData()
       formData.append("class_subject_id", primaryCs)
-      formData.append("additional_class_subject_ids", JSON.stringify(additionalCs))
-      formData.append("titles", JSON.stringify(files.map((f) => f.title.trim())))
+      formData.append(
+        "additional_class_subject_ids",
+        JSON.stringify(additionalCs)
+      )
+      formData.append(
+        "titles",
+        JSON.stringify(files.map((f) => f.title.trim()))
+      )
       files.forEach((f) => formData.append("files", f.file))
 
       const token = localStorage.getItem("access_token")
@@ -952,7 +1121,8 @@ function UploadDialog({ open, onOpenChange, options, onComplete }: UploadDialogP
         if ("material" in r) uploaded.push(r.material)
         else toast.error(`Failed: ${r.title} — ${r.error}`)
       }
-      if (uploaded.length > 0) toast.success(`${uploaded.length} material(s) uploaded`)
+      if (uploaded.length > 0)
+        toast.success(`${uploaded.length} material(s) uploaded`)
       onComplete(uploaded)
       onOpenChange(false)
     } catch (err) {
@@ -975,7 +1145,7 @@ function UploadDialog({ open, onOpenChange, options, onComplete }: UploadDialogP
 
         <div className="flex flex-col gap-4 overflow-y-auto px-6 py-4">
           <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Class-subjects ({selectedCs.length} selected)
             </p>
             <ClassSubjectMultiSelect
@@ -988,7 +1158,7 @@ function UploadDialog({ open, onOpenChange, options, onComplete }: UploadDialogP
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 Files ({files.length})
               </p>
               <Button
@@ -1028,8 +1198,8 @@ function UploadDialog({ open, onOpenChange, options, onComplete }: UploadDialogP
                         onChange={(e) =>
                           setFiles((prev) =>
                             prev.map((f, i) =>
-                              i === idx ? { ...f, title: e.target.value } : f,
-                            ),
+                              i === idx ? { ...f, title: e.target.value } : f
+                            )
                           )
                         }
                         placeholder="File title"
@@ -1115,7 +1285,7 @@ function BulkSharePicker({
 
   return (
     <div className="flex flex-col">
-      <p className="p-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+      <p className="p-2 text-[10px] tracking-wide text-muted-foreground uppercase">
         Add every selected material to
       </p>
       <div className="max-h-64 overflow-y-auto">
@@ -1133,7 +1303,7 @@ function BulkSharePicker({
                   "flex size-4 shrink-0 items-center justify-center rounded border",
                   isOn
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-muted-foreground/30",
+                    : "border-muted-foreground/30"
                 )}
               >
                 {isOn && <CheckIcon className="size-3" />}

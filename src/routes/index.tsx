@@ -9,6 +9,7 @@ import { SetPasswordPage } from "@/modules/auth/pages/set-password-page"
 import { HomePage } from "@/modules/home/pages/home-page"
 import { ClassesPage } from "@/modules/classes/pages/classes-page"
 import { ClassOverviewPage } from "@/modules/classes/pages/class-overview-page"
+import { ClassHomePage } from "@/modules/classes/pages/class-home-page"
 import { TeachersPage } from "@/modules/teachers/pages/teachers-page"
 import { TeacherOverviewPage } from "@/modules/teachers/pages/teacher-overview-page"
 import { StudentsPage } from "@/modules/students/pages/students-page"
@@ -48,15 +49,37 @@ export const router = createBrowserRouter([
           { path: "library/bank", element: <BankPage /> },
 
           // Class-scoped modules
-          { path: "class/:classSubjectId/knowledge", element: <KnowledgePage /> },
+          { path: "class/:classSubjectId", element: <ClassHomePage /> },
+          {
+            path: "class/:classSubjectId/knowledge",
+            element: <KnowledgePage />,
+          },
           { path: "class/:classSubjectId/exams", element: <ExamsPage /> },
-          { path: "class/:classSubjectId/exams/:examId/generate", element: <GenerateQuestionsPage /> },
-          { path: "class/:classSubjectId/exams/:examId/upload", element: <UploadPaperPage /> },
-          { path: "class/:classSubjectId/exams/:examId/questions", element: <QuestionsPage /> },
-          { path: "class/:classSubjectId/exams/:examId/pdf-builder", element: <PdfBuilderPage /> },
+          {
+            path: "class/:classSubjectId/exams/:examId/generate",
+            element: <GenerateQuestionsPage />,
+          },
+          {
+            path: "class/:classSubjectId/exams/:examId/upload",
+            element: <UploadPaperPage />,
+          },
+          {
+            path: "class/:classSubjectId/exams/:examId/questions",
+            element: <QuestionsPage />,
+          },
+          {
+            path: "class/:classSubjectId/exams/:examId/pdf-builder",
+            element: <PdfBuilderPage />,
+          },
           { path: "class/:classSubjectId/grading", element: <GradingPage /> },
-          { path: "class/:classSubjectId/grading/:submissionId/review", element: <GradingReviewPage /> },
-          { path: "class/:classSubjectId/students", element: <ClassStudentsMarksPage /> },
+          {
+            path: "class/:classSubjectId/grading/:submissionId/review",
+            element: <GradingReviewPage />,
+          },
+          {
+            path: "class/:classSubjectId/students",
+            element: <ClassStudentsMarksPage />,
+          },
 
           { path: "ask", element: <CopilotPage /> },
           { path: "settings", element: <SettingsPage /> },

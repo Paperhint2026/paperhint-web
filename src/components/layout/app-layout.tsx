@@ -1,16 +1,13 @@
 import { Fragment, useState } from "react"
-import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom"
-import {
-  BookOpenIcon,
-  ListChecksIcon,
-  NewspaperIcon,
-  SparklesIcon,
-  Users2Icon,
-} from "lucide-react"
+import { Link, Outlet, useLocation, useParams } from "react-router-dom"
+import { SparklesIcon } from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
 import { getPageTitleFromPath } from "@/lib/get-page-title"
-import { useTeacherAssignments, classLabel } from "@/hooks/use-teacher-assignments"
+import {
+  useTeacherAssignments,
+  classLabel,
+} from "@/hooks/use-teacher-assignments"
 import { useClassAiChat } from "@/hooks/use-class-ai-chat"
 import { Button } from "@/components/ui/button"
 import { ClassAiChatSheet } from "@/components/class-ai-chat/class-ai-chat-sheet"
@@ -29,14 +26,15 @@ import {
 } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { AppSidebar } from "@/components/layout/app-sidebar"
-import { HeaderActionsProvider, useHeaderActions } from "@/components/layout/header-actions-context"
+import {
+  HeaderActionsProvider,
+  useHeaderActions,
+} from "@/components/layout/header-actions-context"
 
 function AppLayoutInner() {
   const location = useLocation()
   const { classSubjectId, grade } = useParams()
-  const navigate = useNavigate()
   const { user } = useAuth()
   const { assignments } = useTeacherAssignments()
   const { headerActions } = useHeaderActions()
@@ -44,27 +42,36 @@ function AppLayoutInner() {
   // Lifted chat state — survives sheet close, resets on classSubjectId change.
   const classAiChat = useClassAiChat(classSubjectId ?? null)
 
-  // Active sub-tab inside a class-subject. We derive it from pathname so a
-  // teacher landing on /class/:csId/exams/:examId/questions still shows
-  // "Exams" highlighted.
-  const classSubTab: "knowledge" | "exams" | "grading" | "students" = (() => {
-    if (!classSubjectId) return "knowledge"
-    if (location.pathname.includes("/students")) return "students"
-    if (location.pathname.includes("/grading")) return "grading"
-    if (location.pathname.includes("/exams")) return "exams"
-    return "knowledge"
-  })()
-  const handleClassSubTabChange = (value: string) => {
-    if (!value || !classSubjectId) return
-    if (value === classSubTab) return
-    navigate(`/class/${classSubjectId}/${value}`)
-  }
-
   const rawTitle = getPageTitleFromPath(location.pathname)
+
+  // Label of the section inside a class-subject, derived from the pathname.
+  // null on the class home (/class/:csId) itself. Deeper pages (questions,
+  // review, PDF builder…) fall through to their specific page title.
+  const classSubLabel = (() => {
+    if (!classSubjectId) return null
+    const rest = location.pathname.split(`/class/${classSubjectId}`)[1] ?? ""
+    const parts = rest.split("/").filter(Boolean)
+    if (parts.length === 0) return null
+    if (parts.length > 1) return rawTitle
+    switch (parts[0]) {
+      case "knowledge":
+        return "Knowledge"
+      case "exams":
+        return "Exams"
+      case "grading":
+        return "Grading"
+      case "students":
+        return "Students"
+      default:
+        return rawTitle
+    }
+  })()
 
   const classTitle = (() => {
     if (!classSubjectId) return null
-    const assignment = assignments.find((a) => a.class_subject_id === classSubjectId)
+    const assignment = assignments.find(
+      (a) => a.class_subject_id === classSubjectId
+    )
     return assignment ? classLabel(assignment) : null
   })()
 
@@ -75,11 +82,16 @@ function AppLayoutInner() {
       return [{ label: `Welcome, ${user.full_name.split(" ")[0]}` }]
     }
     if (classTitle) {
-      // /class/:classSubjectId/* → Classes › Class Name
-      return [
-        { label: "Classes", href: "/classes" },
-        { label: classTitle },
-      ]
+      // /class/:csId → Classes › Class Name
+      // /class/:csId/<section> → Classes › Class Name › Section
+      if (classSubLabel) {
+        return [
+          { label: "Classes", href: "/classes" },
+          { label: classTitle, href: `/class/${classSubjectId}` },
+          { label: classSubLabel },
+        ]
+      }
+      return [{ label: "Classes", href: "/classes" }, { label: classTitle }]
     }
     if (grade) {
       // /classes/:grade/overview → Classes › Grade X
@@ -131,36 +143,6 @@ function AppLayoutInner() {
                   })}
                 </BreadcrumbList>
               </Breadcrumb>
-
-              {/* Knowledge / Exams / Grading toggle — class-subject scope */}
-              {classSubjectId && (
-                <ToggleGroup
-                  type="single"
-                  size="sm"
-                  variant="outline"
-                  spacing={2}
-                  value={classSubTab}
-                  onValueChange={handleClassSubTabChange}
-                  className="ml-2"
-                >
-                  <ToggleGroupItem value="knowledge" aria-label="Knowledge">
-                    <BookOpenIcon className="size-3.5" />
-                    <span className="hidden md:inline">Knowledge</span>
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="exams" aria-label="Exams">
-                    <NewspaperIcon className="size-3.5" />
-                    <span className="hidden md:inline">Exams</span>
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="grading" aria-label="Grading">
-                    <ListChecksIcon className="size-3.5" />
-                    <span className="hidden md:inline">Grading</span>
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="students" aria-label="Students">
-                    <Users2Icon className="size-3.5" />
-                    <span className="hidden md:inline">Students</span>
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              )}
             </div>
 
             <div className="ml-auto flex items-center gap-2 pl-2">

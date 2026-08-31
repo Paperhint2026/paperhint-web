@@ -1,7 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { differenceInYears, format } from "date-fns"
-import { DropletIcon, GraduationCapIcon, Loader2Icon, MoreHorizontalIcon, PencilIcon, PhoneIcon, PlusIcon, SearchIcon, SlidersHorizontalIcon, Trash2Icon } from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  DropletIcon,
+  GraduationCapIcon,
+  Loader2Icon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  SearchIcon,
+  SlidersHorizontalIcon,
+  Trash2Icon,
+} from "lucide-react"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import {
   FilterChip,
@@ -78,12 +93,19 @@ const AVATAR_COLORS = [
 
 const GENDER_BADGE: Record<string, string> = {
   Male: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800",
-  Female: "bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/60 dark:text-pink-300 dark:border-pink-800",
-  Other: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+  Female:
+    "bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/60 dark:text-pink-300 dark:border-pink-800",
+  Other:
+    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
 }
 
 function getInitials(name: string) {
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
 }
 
 function getAvatarColor(name: string) {
@@ -91,7 +113,10 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[sum % AVATAR_COLORS.length]
 }
 
-interface StudentWithClass extends Omit<Student, "grade" | "section" | "academic_year"> {
+interface StudentWithClass extends Omit<
+  Student,
+  "grade" | "section" | "academic_year"
+> {
   grade: number
   section: string
   academic_year: string
@@ -128,15 +153,20 @@ export function StudentsPage() {
   const [isSaving, setIsSaving] = useState(false)
 
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null
+  )
 
   const [isScrolledX, setIsScrolledX] = useState(false)
 
-  const [studentToDelete, setStudentToDelete] = useState<StudentWithClass | null>(null)
+  const [studentToDelete, setStudentToDelete] =
+    useState<StudentWithClass | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const [editStudentId, setEditStudentId] = useState<string | null>(null)
-  const [editInitialData, setEditInitialData] = useState<StudentEntry | null>(null)
+  const [editInitialData, setEditInitialData] = useState<StudentEntry | null>(
+    null
+  )
   const [isLoadingEdit, setIsLoadingEdit] = useState(false)
 
   const fetchAll = useCallback(async () => {
@@ -160,10 +190,10 @@ export function StudentsPage() {
                 grade: c.grade,
                 section: c.section,
                 academic_year: c.academic_year,
-              })),
+              }))
             )
-            .catch(() => [] as StudentWithClass[]),
-        ),
+            .catch(() => [] as StudentWithClass[])
+        )
       )
       setAllStudents(studentResults.flat())
     } catch (err) {
@@ -175,19 +205,25 @@ export function StudentsPage() {
     }
   }, [])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => {
+    fetchAll()
+  }, [fetchAll])
 
   // Unique grades from classes
   const grades = useMemo(
-    () => [...new Set(classes.map((c) => String(c.grade)))].sort((a, b) => Number(a) - Number(b)),
-    [classes],
+    () =>
+      [...new Set(classes.map((c) => String(c.grade)))].sort(
+        (a, b) => Number(a) - Number(b)
+      ),
+    [classes]
   )
 
   // Sections available for the selected grades
   const sections = useMemo(() => {
-    const pool = selectedGrades.length === 0
-      ? classes
-      : classes.filter((c) => selectedGrades.includes(String(c.grade)))
+    const pool =
+      selectedGrades.length === 0
+        ? classes
+        : classes.filter((c) => selectedGrades.includes(String(c.grade)))
     return [...new Set(pool.map((c) => c.section))].sort()
   }, [classes, selectedGrades])
 
@@ -201,21 +237,30 @@ export function StudentsPage() {
 
   // The class matching a single grade+section pair (for Add Students)
   const selectedClass = useMemo(() => {
-    if (selectedGrades.length !== 1 || selectedSections.length !== 1) return null
-    return classes.find(
-      (c) =>
-        String(c.grade) === selectedGrades[0] &&
-        c.section === selectedSections[0],
-    ) ?? null
+    if (selectedGrades.length !== 1 || selectedSections.length !== 1)
+      return null
+    return (
+      classes.find(
+        (c) =>
+          String(c.grade) === selectedGrades[0] &&
+          c.section === selectedSections[0]
+      ) ?? null
+    )
   }, [classes, selectedGrades, selectedSections])
 
   // Filtered students
   const filtered = useMemo(() => {
     let list = allStudents
-    if (selectedGrades.length > 0) list = list.filter((s) => selectedGrades.includes(String(s.grade)))
-    if (selectedSections.length > 0) list = list.filter((s) => selectedSections.includes(s.section))
-    if (selectedGenders.length > 0) list = list.filter((s) => s.gender && selectedGenders.includes(s.gender))
-    if (selectedBloodGroups.length > 0) list = list.filter((s) => s.blood_group && selectedBloodGroups.includes(s.blood_group))
+    if (selectedGrades.length > 0)
+      list = list.filter((s) => selectedGrades.includes(String(s.grade)))
+    if (selectedSections.length > 0)
+      list = list.filter((s) => selectedSections.includes(s.section))
+    if (selectedGenders.length > 0)
+      list = list.filter((s) => s.gender && selectedGenders.includes(s.gender))
+    if (selectedBloodGroups.length > 0)
+      list = list.filter(
+        (s) => s.blood_group && selectedBloodGroups.includes(s.blood_group)
+      )
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -223,17 +268,36 @@ export function StudentsPage() {
           s.full_name.toLowerCase().includes(q) ||
           String(s.roll_number).includes(q) ||
           s.register_number?.toLowerCase().includes(q) ||
-          s.admission_number?.toLowerCase().includes(q),
+          s.admission_number?.toLowerCase().includes(q)
       )
     }
     return list
-  }, [allStudents, selectedGrades, selectedSections, selectedGenders, selectedBloodGroups, search])
+  }, [
+    allStudents,
+    selectedGrades,
+    selectedSections,
+    selectedGenders,
+    selectedBloodGroups,
+    search,
+  ])
 
   // Reset to page 1 when filters, search, or page size change
-  useEffect(() => { setPage(1) }, [search, selectedGrades, selectedSections, selectedGenders, selectedBloodGroups, pageSize])
+  useEffect(() => {
+    setPage(1)
+  }, [
+    search,
+    selectedGrades,
+    selectedSections,
+    selectedGenders,
+    selectedBloodGroups,
+    pageSize,
+  ])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const paginatedStudents = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const paginatedStudents = filtered.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  )
 
   // Header Add Students button — always visible for admins
   useEffect(() => {
@@ -242,7 +306,11 @@ export function StudentsPage() {
       return
     }
     setHeaderActions(
-      <Button size="lg" className="rounded-full" onClick={() => setDrawerOpen(true)}>
+      <Button
+        size="lg"
+        className="rounded-full"
+        onClick={() => setDrawerOpen(true)}
+      >
         <PlusIcon className="size-3.5" />
         <span className="hidden sm:inline">Add Students</span>
       </Button>
@@ -253,14 +321,17 @@ export function StudentsPage() {
   const resolveClassId = (entry: StudentEntry): string | null => {
     if (entry.grade && entry.section) {
       const cls = classes.find(
-        (c) => String(c.grade) === entry.grade && c.section === entry.section,
+        (c) => String(c.grade) === entry.grade && c.section === entry.section
       )
       if (cls) return cls.id
     }
     return selectedClass?.id ?? null
   }
 
-  const saveElectiveChoices = async (studentId: string, choices?: ElectiveChoice[]) => {
+  const saveElectiveChoices = async (
+    studentId: string,
+    choices?: ElectiveChoice[]
+  ) => {
     if (!choices || choices.length === 0) return
     const electives = choices.map((c) => ({
       class_subject_id: c.class_subject_id,
@@ -276,25 +347,29 @@ export function StudentsPage() {
     setIsSaving(true)
     try {
       const classId = resolveClassId(entry)
-      const res = await apiClient.post<{ student: { id: string } }>("/api/students", {
-        class_id: classId,
-        full_name: entry.full_name,
-        date_of_birth: entry.date_of_birth || null,
-        gender: entry.gender || null,
-        blood_group: entry.blood_group || null,
-        admission_number: entry.admission_number || null,
-        academic_year: entry.academic_year || null,
-        grade: entry.grade || null,
-        section: entry.section || null,
-        roll_number: entry.roll_number !== "" ? entry.roll_number : null,
-        register_number: entry.register_number || null,
-        street: entry.street || null,
-        city: entry.city || null,
-        contact_number: entry.contact_number || null,
-        emergency_contact_name: entry.emergency_contact_name || null,
-        emergency_contact_relationship: entry.emergency_contact_relationship || null,
-        emergency_contact_phone: entry.emergency_contact_phone || null,
-      })
+      const res = await apiClient.post<{ student: { id: string } }>(
+        "/api/students",
+        {
+          class_id: classId,
+          full_name: entry.full_name,
+          date_of_birth: entry.date_of_birth || null,
+          gender: entry.gender || null,
+          blood_group: entry.blood_group || null,
+          admission_number: entry.admission_number || null,
+          academic_year: entry.academic_year || null,
+          grade: entry.grade || null,
+          section: entry.section || null,
+          roll_number: entry.roll_number !== "" ? entry.roll_number : null,
+          register_number: entry.register_number || null,
+          street: entry.street || null,
+          city: entry.city || null,
+          contact_number: entry.contact_number || null,
+          emergency_contact_name: entry.emergency_contact_name || null,
+          emergency_contact_relationship:
+            entry.emergency_contact_relationship || null,
+          emergency_contact_phone: entry.emergency_contact_phone || null,
+        }
+      )
 
       await saveElectiveChoices(res.student.id, entry.elective_choices)
 
@@ -317,7 +392,7 @@ export function StudentsPage() {
     try {
       const [studentRes, electivesRes] = await Promise.all([
         apiClient.get<{ student: Record<string, unknown> }>(
-          `/api/students/${studentId}`,
+          `/api/students/${studentId}`
         ),
         apiClient
           .get<{
@@ -329,7 +404,10 @@ export function StudentsPage() {
           .catch(() => ({ student_electives: [] })),
       ])
 
-      const s = studentRes.student as Record<string, string | number | null | undefined>
+      const s = studentRes.student as Record<
+        string,
+        string | number | null | undefined
+      >
       const electiveChoices: ElectiveChoice[] = (
         electivesRes.student_electives ?? []
       ).map((e) => ({
@@ -346,13 +424,18 @@ export function StudentsPage() {
         academic_year: String(s.academic_year ?? ""),
         grade: s.grade != null ? String(s.grade) : "",
         section: String(s.section ?? ""),
-        roll_number: s.roll_number != null && s.roll_number !== "" ? Number(s.roll_number) : "",
+        roll_number:
+          s.roll_number != null && s.roll_number !== ""
+            ? Number(s.roll_number)
+            : "",
         register_number: String(s.register_number ?? ""),
         street: String(s.street ?? ""),
         city: String(s.city ?? ""),
         contact_number: String(s.contact_number ?? ""),
         emergency_contact_name: String(s.emergency_contact_name ?? ""),
-        emergency_contact_relationship: String(s.emergency_contact_relationship ?? ""),
+        emergency_contact_relationship: String(
+          s.emergency_contact_relationship ?? ""
+        ),
         emergency_contact_phone: String(s.emergency_contact_phone ?? ""),
         elective_choices: electiveChoices,
       }
@@ -384,7 +467,8 @@ export function StudentsPage() {
         city: entry.city || null,
         contact_number: entry.contact_number || null,
         emergency_contact_name: entry.emergency_contact_name || null,
-        emergency_contact_relationship: entry.emergency_contact_relationship || null,
+        emergency_contact_relationship:
+          entry.emergency_contact_relationship || null,
         emergency_contact_phone: entry.emergency_contact_phone || null,
       })
 
@@ -426,7 +510,9 @@ export function StudentsPage() {
     return (
       <div className="flex min-h-full w-full flex-col items-center justify-center gap-4">
         <p className="text-sm text-destructive">{error}</p>
-        <Button variant="outline" onClick={fetchAll}>Retry</Button>
+        <Button variant="outline" onClick={fetchAll}>
+          Retry
+        </Button>
       </div>
     )
   }
@@ -438,9 +524,12 @@ export function StudentsPage() {
           <GraduationCapIcon className="size-6 text-muted-foreground" />
         </div>
         <div className="flex max-w-sm flex-col items-center gap-1 text-center">
-          <p className="text-base font-medium text-secondary-foreground">No classes found</p>
+          <p className="text-base font-medium text-secondary-foreground">
+            No classes found
+          </p>
           <p className="text-sm text-muted-foreground">
-            Create classes first in the Classes module, then come back here to manage students.
+            Create classes first in the Classes module, then come back here to
+            manage students.
           </p>
         </div>
       </div>
@@ -468,7 +557,7 @@ export function StudentsPage() {
           value: string,
           label: string,
           selected: boolean,
-          onToggle: () => void,
+          onToggle: () => void
         ) => (
           <button
             key={value}
@@ -489,7 +578,7 @@ export function StudentsPage() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <div className="relative min-w-0 flex-1 sm:max-w-72">
-                <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search students..."
                   value={search}
@@ -533,7 +622,10 @@ export function StudentsPage() {
                     <MultiSelectField
                       label="Grade"
                       placeholder="All Grades"
-                      options={grades.map((g) => ({ value: g, label: `Grade ${g}` }))}
+                      options={grades.map((g) => ({
+                        value: g,
+                        label: `Grade ${g}`,
+                      }))}
                       selected={selectedGrades}
                       onToggle={(v) => toggleArrayValue(setSelectedGrades, v)}
                       onClear={() => setSelectedGrades([])}
@@ -541,36 +633,44 @@ export function StudentsPage() {
                     />
                     <MultiSelectField
                       label="Section"
-                      placeholder={sections.length === 0 ? "No sections available" : "All Sections"}
-                      options={sections.map((s) => ({ value: s, label: `Section ${s}` }))}
+                      placeholder={
+                        sections.length === 0
+                          ? "No sections available"
+                          : "All Sections"
+                      }
+                      options={sections.map((s) => ({
+                        value: s,
+                        label: `Section ${s}`,
+                      }))}
                       selected={selectedSections}
                       onToggle={(v) => toggleArrayValue(setSelectedSections, v)}
                       onClear={() => setSelectedSections([])}
                       searchable={sections.length > 8}
                     />
                     <div className="flex flex-col gap-2">
-                      <Label className="text-xs text-muted-foreground">Gender</Label>
+                      <Label className="text-xs text-muted-foreground">
+                        Gender
+                      </Label>
                       <div className="flex flex-wrap gap-1.5">
                         {GENDER_OPTIONS.map((g) =>
-                          renderOption(
-                            g,
-                            g,
-                            selectedGenders.includes(g),
-                            () => toggleArrayValue(setSelectedGenders, g),
-                          ),
+                          renderOption(g, g, selectedGenders.includes(g), () =>
+                            toggleArrayValue(setSelectedGenders, g)
+                          )
                         )}
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <Label className="text-xs text-muted-foreground">Blood Group</Label>
+                      <Label className="text-xs text-muted-foreground">
+                        Blood Group
+                      </Label>
                       <div className="flex flex-wrap gap-1.5">
                         {BLOOD_GROUPS.map((bg) =>
                           renderOption(
                             bg,
                             bg,
                             selectedBloodGroups.includes(bg),
-                            () => toggleArrayValue(setSelectedBloodGroups, bg),
-                          ),
+                            () => toggleArrayValue(setSelectedBloodGroups, bg)
+                          )
                         )}
                       </div>
                     </div>
@@ -606,7 +706,9 @@ export function StudentsPage() {
                   <FilterChip
                     key={`blood-${bg}`}
                     label={bg}
-                    onRemove={() => toggleArrayValue(setSelectedBloodGroups, bg)}
+                    onRemove={() =>
+                      toggleArrayValue(setSelectedBloodGroups, bg)
+                    }
                   />
                 ))}
                 <button
@@ -625,13 +727,17 @@ export function StudentsPage() {
       <div
         onScroll={(e) => setIsScrolledX(e.currentTarget.scrollLeft > 0)}
         data-scrolled-x={isScrolledX || undefined}
-        className="group/table min-h-0 flex-1 overflow-auto rounded-lg border [&_[data-slot=table-container]]:overflow-visible"
+        className="group/table min-h-0 flex-1 overflow-auto overscroll-none rounded-lg border [&_[data-slot=table-container]]:overflow-visible"
       >
         <Table className="border-collapse">
-          <TableHeader className="sticky top-0 z-20 bg-background">
-            <TableRow>
-              <TableHead className="sticky left-0 z-30 w-10 shrink-0 bg-background">#</TableHead>
-              <TableHead className="sticky left-10 z-30 min-w-56 bg-background transition-shadow group-data-[scrolled-x]/table:border-r group-data-[scrolled-x]/table:border-border group-data-[scrolled-x]/table:shadow-[6px_0_8px_-6px_rgba(0,0,0,0.18)]">Name</TableHead>
+          <TableHeader className="sticky top-0 z-20 bg-sidebar shadow-[0_1px_0_0_var(--border)] [&_th]:h-10 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="sticky left-0 z-30 w-10 shrink-0 bg-sidebar">
+                #
+              </TableHead>
+              <TableHead className="sticky left-10 z-30 min-w-56 bg-sidebar transition-shadow group-data-[scrolled-x]/table:border-r group-data-[scrolled-x]/table:border-border group-data-[scrolled-x]/table:shadow-[6px_0_8px_-6px_rgba(0,0,0,0.18)]">
+                Name
+              </TableHead>
               <TableHead className="min-w-36">Class</TableHead>
               <TableHead className="min-w-40">Admission No.</TableHead>
               <TableHead className="min-w-28">Roll No.</TableHead>
@@ -645,8 +751,15 @@ export function StudentsPage() {
           <TableBody>
             {paginatedStudents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-32 text-center text-sm text-muted-foreground">
-                  {search || selectedGrades.length > 0 || selectedSections.length > 0 || selectedGenders.length > 0 || selectedBloodGroups.length > 0
+                <TableCell
+                  colSpan={10}
+                  className="h-32 text-center text-sm text-muted-foreground"
+                >
+                  {search ||
+                  selectedGrades.length > 0 ||
+                  selectedSections.length > 0 ||
+                  selectedGenders.length > 0 ||
+                  selectedBloodGroups.length > 0
                     ? "No students match your filters."
                     : "No students found."}
                 </TableCell>
@@ -656,7 +769,9 @@ export function StudentsPage() {
                 const dobDate = student.date_of_birth
                   ? new Date(student.date_of_birth + "T00:00:00")
                   : null
-                const age = dobDate ? differenceInYears(new Date(), dobDate) : null
+                const age = dobDate
+                  ? differenceInYears(new Date(), dobDate)
+                  : null
 
                 return (
                   <TableRow
@@ -665,18 +780,22 @@ export function StudentsPage() {
                     onClick={() => handleRowClick(student.id)}
                   >
                     {/* Index */}
-                    <TableCell className="sticky left-0 z-10 bg-background text-xs text-muted-foreground group-hover:bg-muted">
+                    <TableCell className="sticky left-0 z-10 bg-background text-xs text-muted-foreground group-hover:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-background))]">
                       {(page - 1) * pageSize + idx + 1}
                     </TableCell>
 
                     {/* Name with avatar + hover actions */}
-                    <TableCell className="sticky left-10 z-10 bg-background transition-shadow group-hover:bg-muted group-data-[scrolled-x]/table:border-r group-data-[scrolled-x]/table:border-border group-data-[scrolled-x]/table:shadow-[6px_0_8px_-6px_rgba(0,0,0,0.18)]">
+                    <TableCell className="sticky left-10 z-10 bg-background transition-shadow group-hover:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-background))] group-data-[scrolled-x]/table:border-r group-data-[scrolled-x]/table:border-border group-data-[scrolled-x]/table:shadow-[6px_0_8px_-6px_rgba(0,0,0,0.18)]">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${getAvatarColor(student.full_name)}`}>
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <div
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${getAvatarColor(student.full_name)}`}
+                          >
                             {getInitials(student.full_name)}
                           </div>
-                          <span className="truncate font-medium text-secondary-foreground">{student.full_name}</span>
+                          <span className="max-w-72 truncate text-sm font-medium text-secondary-foreground">
+                            {student.full_name}
+                          </span>
                         </div>
                         {isAdmin && (
                           <div onClick={(e) => e.stopPropagation()}>
@@ -719,69 +838,93 @@ export function StudentsPage() {
 
                     {/* Class (Grade + Section merged) */}
                     <TableCell>
-                      <span className="inline-flex items-center rounded-md border bg-muted px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
                         G{student.grade} · {student.section}
                       </span>
                     </TableCell>
 
                     {/* Admission No. */}
-                    <TableCell>
-                      {student.admission_number
-                        ? <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{student.admission_number}</span>
-                        : <span className="text-muted-foreground/40">—</span>}
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {student.admission_number || (
+                        <span className="font-sans text-muted-foreground/60">
+                          —
+                        </span>
+                      )}
                     </TableCell>
 
                     {/* Roll No. */}
-                    <TableCell className="text-sm text-secondary-foreground">
-                      {student.roll_number || <span className="text-muted-foreground/40">—</span>}
+                    <TableCell className="text-xs text-muted-foreground tabular-nums">
+                      {student.roll_number || (
+                        <span className="text-muted-foreground/60">—</span>
+                      )}
                     </TableCell>
 
                     {/* Register No. */}
-                    <TableCell>
-                      {student.register_number
-                        ? <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{student.register_number}</span>
-                        : <span className="text-muted-foreground/40">—</span>}
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {student.register_number || (
+                        <span className="font-sans text-muted-foreground/60">
+                          —
+                        </span>
+                      )}
                     </TableCell>
 
                     {/* Gender badge */}
                     <TableCell>
-                      {student.gender
-                        ? <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${GENDER_BADGE[student.gender] ?? "bg-muted text-muted-foreground border-border"}`}>
-                            {student.gender}
-                          </span>
-                        : <span className="text-muted-foreground/40">—</span>}
+                      {student.gender ? (
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${GENDER_BADGE[student.gender] ?? "border-border bg-muted text-muted-foreground"}`}
+                        >
+                          {student.gender}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/60">
+                          —
+                        </span>
+                      )}
                     </TableCell>
 
-                    {/* Date of Birth + age */}
-                    <TableCell>
-                      {dobDate
-                        ? <div className="flex flex-col gap-0.5">
-                            <span className="text-sm text-secondary-foreground">{format(dobDate, "MMM d, yyyy")}</span>
-                            <span className="text-xs text-muted-foreground">{age} yrs</span>
-                          </div>
-                        : <span className="text-muted-foreground/40">—</span>}
+                    {/* Date of Birth + age — single line */}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {dobDate ? (
+                        <>
+                          {format(dobDate, "MMM d, yyyy")}
+                          <span className="text-muted-foreground/60">
+                            {" "}
+                            · {age} yrs
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground/60">—</span>
+                      )}
                     </TableCell>
 
                     {/* Blood Group badge */}
                     <TableCell>
-                      {student.blood_group
-                        ? <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400">
-                            <DropletIcon className="size-3" />
-                            {student.blood_group}
-                          </span>
-                        : <span className="text-muted-foreground/40">—</span>}
+                      {student.blood_group ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400">
+                          <DropletIcon className="size-3" />
+                          {student.blood_group}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/60">
+                          —
+                        </span>
+                      )}
                     </TableCell>
 
                     {/* Contact No. */}
                     <TableCell>
-                      {student.contact_number
-                        ? <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <PhoneIcon className="size-3.5 shrink-0 text-muted-foreground/50" />
-                            {student.contact_number}
-                          </span>
-                        : <span className="text-muted-foreground/40">—</span>}
+                      {student.contact_number ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <PhoneIcon className="size-3 shrink-0 text-muted-foreground/50" />
+                          {student.contact_number}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/60">
+                          —
+                        </span>
+                      )}
                     </TableCell>
-
                   </TableRow>
                 )
               })
@@ -793,7 +936,10 @@ export function StudentsPage() {
       {/* Footer: rows-per-page left, prev/next right */}
       <div className="flex items-center justify-between gap-4">
         <Field orientation="horizontal" className="w-fit">
-          <FieldLabel htmlFor="rows-per-page" className="text-xs text-muted-foreground">
+          <FieldLabel
+            htmlFor="rows-per-page"
+            className="text-xs text-muted-foreground"
+          >
             Rows per page
           </FieldLabel>
           <Select
@@ -812,6 +958,11 @@ export function StudentsPage() {
           </Select>
         </Field>
 
+        <p className="hidden text-xs text-muted-foreground sm:block">
+          Page {page} of {totalPages} · {filtered.length} student
+          {filtered.length !== 1 ? "s" : ""}
+        </p>
+
         <Pagination className="mx-0 w-auto">
           <PaginationContent>
             <PaginationItem>
@@ -825,7 +976,9 @@ export function StudentsPage() {
               <PaginationNext
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 aria-disabled={page === totalPages}
-                className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+                className={
+                  page === totalPages ? "pointer-events-none opacity-50" : ""
+                }
               />
             </PaginationItem>
           </PaginationContent>

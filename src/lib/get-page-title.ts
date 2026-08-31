@@ -18,6 +18,7 @@ export function getPageTitleFromPath(pathname: string): string {
   if (path.includes("/questions")) return "Questions"
   if (path.includes("/upload")) return "Upload paper"
   if (path.includes("/generate")) return "Generate questions"
+  if (path.startsWith("/library/bank")) return "Shared library"
   if (path.startsWith("/library")) return "Knowledge library"
   if (path.includes("/knowledge")) return "Knowledge base"
   if (path.includes("/exams")) return "Question papers"

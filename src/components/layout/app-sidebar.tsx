@@ -10,7 +10,10 @@ import {
 } from "lucide-react"
 
 import { useAuth } from "@/lib/auth"
-import { useTeacherAssignments, classLabel } from "@/hooks/use-teacher-assignments"
+import {
+  useTeacherAssignments,
+  classLabel,
+} from "@/hooks/use-teacher-assignments"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { NavWorkspaces } from "@/components/nav-workspaces"
@@ -114,9 +117,12 @@ export function AppSidebar() {
             pages: assignments.map((a) => ({
               name: classLabel(a),
               icon: <SchoolIcon className="size-3.5" />,
-              isActive: location.pathname.startsWith(`/class/${a.class_subject_id}`),
-              onClick: () =>
-                handleNav(`/class/${a.class_subject_id}/exams`),
+              isActive: location.pathname.startsWith(
+                `/class/${a.class_subject_id}`
+              ),
+              // Land on the class home — an overview of everything happening
+              // in the class, with links into each area.
+              onClick: () => handleNav(`/class/${a.class_subject_id}`),
             })),
           },
         ]
@@ -127,7 +133,10 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="pointer-events-none px-[6px]">
+            <SidebarMenuButton
+              size="lg"
+              className="pointer-events-none px-[6px]"
+            >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <SparklesIcon className="size-4" />
               </div>
@@ -138,7 +147,9 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={mainItems} />
-        {workspaces.length > 0 ? <NavWorkspaces workspaces={workspaces} /> : null}
+        {workspaces.length > 0 ? (
+          <NavWorkspaces workspaces={workspaces} />
+        ) : null}
       </SidebarContent>
       <SidebarFooter>
         {user ? (

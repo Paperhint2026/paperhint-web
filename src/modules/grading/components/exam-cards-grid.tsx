@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react"
-import { AlertTriangleIcon, ChevronRightIcon, ClipboardCheckIcon, SearchIcon, UploadIcon } from "lucide-react"
+import {
+  AlertTriangleIcon,
+  ChevronRightIcon,
+  ClipboardCheckIcon,
+  SearchIcon,
+  TrendingDownIcon,
+  TrendingUpIcon,
+  TrophyIcon,
+  UploadIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 
+import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -17,14 +27,26 @@ type ExamCard = {
   pass_marks: number | null
   created_at: string
   questions_count: number
-  submissions: { total: number; graded: number; pending: number; failed: number }
+  submissions: {
+    total: number
+    graded: number
+    pending: number
+    failed: number
+  }
   marks: {
     average: number | null
-    top: { marks: number; student_id: string; student_name: string | null } | null
+    top: {
+      marks: number
+      student_id: string
+      student_name: string | null
+    } | null
     // null when exams.pass_marks is unset — UI omits the metric slot entirely.
     failing_count: number | null
   }
-  review: { submissions_needing_review: number; total_flagged_questions: number }
+  review: {
+    submissions_needing_review: number
+    total_flagged_questions: number
+  }
 }
 
 type ExamCardsResponse = {
@@ -70,8 +92,15 @@ function classify(card: ExamCard, totalStudents: number): Filter {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
-  const [data, setData] = useState<ExamCardsResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  // Loading is derived: the response is stamped with the class-subject it
+  // was fetched for, so switching classes shows the skeleton without a
+  // synchronous setState inside the effect.
+  const [fetched, setFetched] = useState<{
+    csId: string
+    data: ExamCardsResponse | null
+  } | null>(null)
+  const isLoading = fetched?.csId !== classSubjectId
+  const data = fetched?.csId === classSubjectId ? fetched.data : null
   const [filter, setFilter] = useState<Filter | "all">("all")
   const [searchInput, setSearchInput] = useState("")
   // Debounced value drives the actual filter. 200ms is short enough to feel
@@ -79,25 +108,27 @@ export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
   // when the list is longer (large classes may have 30+ exams).
   const [debouncedSearch, setDebouncedSearch] = useState("")
   useEffect(() => {
-    const handle = setTimeout(() => setDebouncedSearch(searchInput.trim().toLowerCase()), 200)
+    const handle = setTimeout(
+      () => setDebouncedSearch(searchInput.trim().toLowerCase()),
+      200
+    )
     return () => clearTimeout(handle)
   }, [searchInput])
 
   useEffect(() => {
     if (!classSubjectId) return
     let cancelled = false
-    setIsLoading(true)
     apiClient
-      .get<ExamCardsResponse>(`/api/grading/class-subject/${classSubjectId}/exam-cards`)
+      .get<ExamCardsResponse>(
+        `/api/grading/class-subject/${classSubjectId}/exam-cards`
+      )
       .then((res) => {
-        if (!cancelled) setData(res)
+        if (!cancelled) setFetched({ csId: classSubjectId, data: res })
       })
       .catch((err) => {
         console.error("Failed to fetch exam cards:", err)
         toast.error("Couldn't load exams")
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false)
+        if (!cancelled) setFetched({ csId: classSubjectId, data: null })
       })
     return () => {
       cancelled = true
@@ -108,11 +139,14 @@ export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
 
   const filteredExams = useMemo(() => {
     if (!data) return []
-    const byBucket = filter === "all"
-      ? data.exams
-      : data.exams.filter((c) => classify(c, totalStudents) === filter)
+    const byBucket =
+      filter === "all"
+        ? data.exams
+        : data.exams.filter((c) => classify(c, totalStudents) === filter)
     if (!debouncedSearch) return byBucket
-    return byBucket.filter((c) => c.exam_name.toLowerCase().includes(debouncedSearch))
+    return byBucket.filter((c) =>
+      c.exam_name.toLowerCase().includes(debouncedSearch)
+    )
   }, [data, filter, totalStudents, debouncedSearch])
 
   if (isLoading) {
@@ -141,53 +175,64 @@ export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
     )
   }
 
-  const summary = [
-    `${data.totals.exams} exam${data.totals.exams === 1 ? "" : "s"}`,
-    data.totals.needs_review > 0 && `${data.totals.needs_review} need review`,
-    data.totals.in_progress > 0 && `${data.totals.in_progress} in progress`,
-    data.totals.done > 0 && `${data.totals.done} fully graded`,
-  ]
-    .filter(Boolean)
-    .join(" · ")
-
   return (
     <div className="space-y-3">
-      {/* Toolbar: summary line + search + filter chips */}
-      <div className="flex flex-col gap-3 border-b pb-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm text-muted-foreground">{summary}</span>
-          <div className="relative w-full sm:max-w-xs">
-            <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search exams…"
-              className="h-9 pl-8 text-sm"
-              aria-label="Search exams by name"
-            />
-          </div>
-        </div>
+      {/* Toolbar: filter chips (with counts) + search */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5">
           {(
             [
-              { key: "all", label: "All" },
-              { key: "needs-review", label: `Needs review${data.totals.needs_review ? ` (${data.totals.needs_review})` : ""}` },
-              { key: "in-progress", label: "In progress" },
-              { key: "done", label: "Done" },
-            ] as { key: Filter; label: string }[]
-          ).map((chip) => (
-            <button
-              key={chip.key}
-              onClick={() => setFilter(chip.key)}
-              className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
-                filter === chip.key
-                  ? "border-foreground/20 bg-muted font-medium text-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted/50"
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
+              { key: "all", label: "All", count: data.totals.exams },
+              {
+                key: "needs-review",
+                label: "Needs review",
+                count: data.totals.needs_review,
+              },
+              {
+                key: "in-progress",
+                label: "In progress",
+                count: data.totals.in_progress,
+              },
+              { key: "done", label: "Done", count: data.totals.done },
+            ] as { key: Filter; label: string; count: number }[]
+          ).map((chip) => {
+            const isActive = filter === chip.key
+            return (
+              <button
+                key={chip.key}
+                onClick={() => setFilter(chip.key)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
+                  isActive
+                    ? "border-foreground/20 bg-muted font-medium text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                {chip.label}
+                <span
+                  className={`rounded-full px-1.5 py-px text-[10px] font-medium tabular-nums ${
+                    isActive
+                      ? "bg-background text-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {chip.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="relative w-full sm:max-w-72">
+          <SearchIcon
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search exams…"
+            className="h-9 rounded-full pl-9"
+            aria-label="Search exams by name"
+          />
         </div>
       </div>
 
@@ -232,9 +277,14 @@ function ExamCardView({
   // who uploaded — a class of 26 with 20 graded and 0 pending should still
   // show 20/26, not 20/20.
   const progressPct =
-    totalStudents > 0 ? Math.min(100, Math.round((submissions.graded / totalStudents) * 100)) : 0
+    totalStudents > 0
+      ? Math.min(100, Math.round((submissions.graded / totalStudents) * 100))
+      : 0
 
-  const isDone = totalStudents > 0 && submissions.graded === totalStudents && review.submissions_needing_review === 0
+  const isDone =
+    totalStudents > 0 &&
+    submissions.graded === totalStudents &&
+    review.submissions_needing_review === 0
   const isEmpty = submissions.total === 0
   // "Remaining" folds together not-started, uploaded/processing, and failed —
   // a teacher opening the card sees per-student detail there.
@@ -256,20 +306,22 @@ function ExamCardView({
       className="group flex cursor-pointer flex-col gap-2.5 rounded-xl border bg-card p-4 transition-colors hover:border-foreground/20"
     >
       {/* Head */}
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <p className="truncate text-sm font-medium">{card.exam_name}</p>
-          <ChevronRightIcon
-            className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
-            aria-hidden="true"
-          />
-        </div>
-        <span className="whitespace-nowrap text-xs text-muted-foreground">/{card.total_marks}</span>
+      <div className="flex items-center gap-1.5">
+        <p className="min-w-0 truncate text-sm font-medium">{card.exam_name}</p>
+        <ChevronRightIcon
+          className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
+          aria-hidden="true"
+        />
+        {isDone && (
+          <span className="ml-auto shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+            Done
+          </span>
+        )}
       </div>
 
       <p className="-mt-1.5 text-xs text-muted-foreground">
         {formatDate(card.created_at)} · {card.questions_count} question
-        {card.questions_count === 1 ? "" : "s"}
+        {card.questions_count === 1 ? "" : "s"} · {card.total_marks} marks
         {card.pass_marks == null && !isEmpty ? " · no pass mark" : ""}
       </p>
 
@@ -285,30 +337,33 @@ function ExamCardView({
           <span>
             {submissions.graded} of {totalStudents} graded
           </span>
-          {isDone ? (
-            <span className="font-medium text-emerald-600 dark:text-emerald-400">complete</span>
-          ) : remaining > 0 ? (
-            <span>{remaining} pending</span>
-          ) : null}
+          {!isDone && remaining > 0 && <span>{remaining} pending</span>}
         </div>
       </div>
 
       {/* Metrics (only when at least one submission is graded) */}
       {submissions.graded > 0 && marks.average != null && (
         <div
-          className={`grid gap-1.5 border-t pt-2.5 ${
+          className={`grid gap-3 border-t pt-2.5 ${
             showFailing ? "grid-cols-3" : "grid-cols-2"
           }`}
         >
-          <Metric label="Average" value={String(marks.average)} />
           <Metric
-            label="Top"
+            icon={<TrendingUpIcon className="size-3" />}
+            label="Average"
+            value={String(marks.average)}
+            suffix={`/ ${card.total_marks}`}
+          />
+          <Metric
+            icon={<TrophyIcon className="size-3" />}
+            label="Top score"
             value={marks.top ? String(marks.top.marks) : "—"}
+            suffix={marks.top ? `/ ${card.total_marks}` : undefined}
             sub={marks.top?.student_name ?? undefined}
-            size="sm"
           />
           {showFailing && (
             <Metric
+              icon={<TrendingDownIcon className="size-3" />}
               label="Failing"
               value={String(marks.failing_count)}
               tone={marks.failing_count! > 0 ? "danger" : "default"}
@@ -321,8 +376,10 @@ function ExamCardView({
       {isEmpty && (
         <div className="mt-1 flex flex-col items-center justify-center gap-1 border-t py-3 text-center">
           <UploadIcon className="size-4 text-muted-foreground/50" />
-          <p className="text-xs text-muted-foreground">No sheets uploaded yet</p>
-          <p className="text-[11px] italic text-muted-foreground/70">
+          <p className="text-xs text-muted-foreground">
+            No sheets uploaded yet
+          </p>
+          <p className="text-[11px] text-muted-foreground/70 italic">
             Open the exam to upload per student
           </p>
         </div>
@@ -353,30 +410,43 @@ function ExamCardView({
 }
 
 function Metric({
+  icon,
   label,
   value,
+  suffix,
   sub,
-  size = "md",
   tone = "default",
 }: {
+  icon: React.ReactNode
   label: string
   value: string
+  suffix?: string
   sub?: string
-  size?: "sm" | "md"
   tone?: "default" | "danger"
 }) {
   return (
-    <div>
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+    <div className="min-w-0">
+      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+        {icon}
+        {label}
+      </div>
       <div
-        className={`mt-0.5 font-medium leading-tight ${
-          size === "sm" ? "text-sm" : "text-lg"
-        } ${tone === "danger" ? "text-red-600 dark:text-red-400" : ""}`}
+        className={cn(
+          "mt-0.5 text-sm leading-tight font-semibold tabular-nums",
+          tone === "danger" && "text-red-600 dark:text-red-400"
+        )}
       >
         {value}
+        {suffix && (
+          <span className="ml-0.5 text-xs font-normal text-muted-foreground">
+            {suffix}
+          </span>
+        )}
       </div>
       {sub && (
-        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</div>
+        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          {sub}
+        </div>
       )}
     </div>
   )

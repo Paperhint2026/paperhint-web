@@ -6,8 +6,8 @@ import {
   SearchIcon,
   SlidersHorizontalIcon,
   UsersRoundIcon,
-  XIcon,
 } from "lucide-react"
+import dayjs from "dayjs"
 import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
@@ -16,9 +16,21 @@ import {
   useTeacherAssignments,
   type Assignment,
 } from "@/hooks/use-teacher-assignments"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Spinner } from "@/components/ui/spinner"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { FilterChip } from "@/components/shared/filter-controls"
 import {
   Popover,
   PopoverContent,
@@ -95,10 +107,12 @@ export function BankPage() {
     setIsLoading(true)
     const params = new URLSearchParams()
     if (debouncedSearch) params.set("q", debouncedSearch)
-    if (subjectFilter)   params.set("subject", subjectFilter)
-    if (gradeFilter)     params.set("grade", gradeFilter)
+    if (subjectFilter) params.set("subject", subjectFilter)
+    if (gradeFilter) params.set("grade", gradeFilter)
     apiClient
-      .get<BankResponse>(`/api/knowledge/bank${params.toString() ? `?${params}` : ""}`)
+      .get<BankResponse>(
+        `/api/knowledge/bank${params.toString() ? `?${params}` : ""}`
+      )
       .then((res) => {
         if (cancelled) return
         setMaterials(res.materials ?? [])
@@ -121,27 +135,34 @@ export function BankPage() {
   const availableSubjects = useMemo(
     () =>
       Array.from(
-        new Set(materials.map((m) => m.primary_subject_name).filter(Boolean) as string[]),
+        new Set(
+          materials
+            .map((m) => m.primary_subject_name)
+            .filter(Boolean) as string[]
+        )
       ).sort(),
-    [materials],
+    [materials]
   )
   const availableGrades = useMemo(
     () =>
       Array.from(
-        new Set(materials.map((m) => (m.primary_grade == null ? null : String(m.primary_grade))).filter(Boolean) as string[]),
+        new Set(
+          materials
+            .map((m) =>
+              m.primary_grade == null ? null : String(m.primary_grade)
+            )
+            .filter(Boolean) as string[]
+        )
       ).sort(),
-    [materials],
+    [materials]
   )
 
-  const handlePick = async (
-    material: BankMaterial,
-    classSubjectId: string,
-  ) => {
+  const handlePick = async (material: BankMaterial, classSubjectId: string) => {
     setPickingId(material.id)
     try {
       const res = await apiClient.post<{ coverage_warning?: string | null }>(
         `/api/knowledge/material/${material.id}/pick`,
-        { class_subject_id: classSubjectId },
+        { class_subject_id: classSubjectId }
       )
       // Mark it locally so the button flips to "Added" without a refetch.
       setMaterials((prev) =>
@@ -150,11 +171,11 @@ export function BankPage() {
             ? {
                 ...m,
                 linked_class_subject_ids: Array.from(
-                  new Set([...m.linked_class_subject_ids, classSubjectId]),
+                  new Set([...m.linked_class_subject_ids, classSubjectId])
                 ),
               }
-            : m,
-        ),
+            : m
+        )
       )
       if (res?.coverage_warning) toast.warning(res.coverage_warning)
       else toast.success("Added to your class")
@@ -166,83 +187,103 @@ export function BankPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-5 p-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-medium text-secondary-foreground">
-            Shared Library
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Public materials from teachers across your school. Pick one into any
-            class you teach.
-          </p>
+    <div className="flex h-full w-full flex-col gap-4 p-4 md:p-6">
+      {/* Toolbar — search + filter popover + active-filter chips */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:max-w-72">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search materials..."
+              className="h-9 rounded-full pl-9"
+            />
+          </div>
+
+          {(availableSubjects.length > 0 || availableGrades.length > 0) && (
+            <FiltersPopover
+              gradeFilter={gradeFilter}
+              subjectFilter={subjectFilter}
+              availableGrades={availableGrades}
+              availableSubjects={availableSubjects}
+              onApply={(g, s) => {
+                setGradeFilter(g)
+                setSubjectFilter(s)
+              }}
+            />
+          )}
         </div>
-        <div className="relative w-full max-w-sm">
-          <SearchIcon className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title or tag…"
-            className="h-9 w-full rounded-full pl-9 text-sm"
-          />
-        </div>
+
+        {(gradeFilter || subjectFilter) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {gradeFilter && (
+              <FilterChip
+                label={`Grade ${gradeFilter}`}
+                onRemove={() => setGradeFilter(null)}
+              />
+            )}
+            {subjectFilter && (
+              <FilterChip
+                label={subjectFilter}
+                onRemove={() => setSubjectFilter(null)}
+              />
+            )}
+          </div>
+        )}
       </div>
 
-      {(availableSubjects.length > 0 || availableGrades.length > 0) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <FiltersPopover
-            gradeFilter={gradeFilter}
-            subjectFilter={subjectFilter}
-            availableGrades={availableGrades}
-            availableSubjects={availableSubjects}
-            onApply={(g, s) => {
-              setGradeFilter(g)
-              setSubjectFilter(s)
-            }}
-          />
-
-          {gradeFilter && (
-            <ActivePill
-              label={`Grade ${gradeFilter}`}
-              onClear={() => setGradeFilter(null)}
-            />
-          )}
-          {subjectFilter && (
-            <ActivePill
-              label={subjectFilter}
-              onClear={() => setSubjectFilter(null)}
-            />
-          )}
-        </div>
-      )}
-
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center py-24">
-          <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner className="size-6" />
         </div>
       ) : materials.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-24 text-center">
-          <UsersRoundIcon className="size-10 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">
-            No public materials match your search.
-          </p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-sidebar p-5">
+          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
+            <UsersRoundIcon className="size-6 text-muted-foreground" />
+          </div>
+          <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
+            <p className="text-base font-medium text-secondary-foreground">
+              No public materials found
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Try a different search, or check back once teachers publish
+              materials to the school.
+            </p>
+          </div>
         </div>
       ) : (
         <>
+          <div className="min-h-0 flex-1 overflow-auto overscroll-none rounded-lg border [&_[data-slot=table-container]]:overflow-visible">
+            <Table className="border-collapse">
+              <TableHeader className="sticky top-0 z-20 bg-sidebar shadow-[0_1px_0_0_var(--border)] [&_th]:h-10 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="min-w-56">Title</TableHead>
+                  <TableHead className="min-w-28">Class</TableHead>
+                  <TableHead className="min-w-40">Tags</TableHead>
+                  <TableHead className="min-w-28">Uploaded</TableHead>
+                  <TableHead className="min-w-40">Shared by</TableHead>
+                  <TableHead className="w-36 text-right">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {materials.map((m) => (
+                  <BankRow
+                    key={m.id}
+                    material={m}
+                    picking={pickingId === m.id}
+                    onPick={handlePick}
+                    myAssignments={assignments ?? []}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           <p className="text-xs text-muted-foreground">
             Showing {materials.length} of {total}
           </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {materials.map((m) => (
-              <BankCard
-                key={m.id}
-                material={m}
-                picking={pickingId === m.id}
-                onPick={handlePick}
-                myAssignments={assignments ?? []}
-              />
-            ))}
-          </div>
         </>
       )}
     </div>
@@ -264,55 +305,77 @@ function FiltersPopover({
 }) {
   const [open, setOpen] = useState(false)
   // Local draft state so the user can dial in Grade + Subject before
-  // committing — avoids a refetch on every dropdown change.
-  const [draftGrade,   setDraftGrade]   = useState<string | null>(gradeFilter)
+  // committing — avoids a refetch on every dropdown change. Drafts re-seed
+  // from the applied filters each time the popover opens.
+  const [draftGrade, setDraftGrade] = useState<string | null>(gradeFilter)
   const [draftSubject, setDraftSubject] = useState<string | null>(subjectFilter)
 
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
       setDraftGrade(gradeFilter)
       setDraftSubject(subjectFilter)
     }
-  }, [open, gradeFilter, subjectFilter])
+    setOpen(next)
+  }
 
   const activeCount = (gradeFilter ? 1 : 0) + (subjectFilter ? 1 : 0)
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
           size="sm"
           variant="outline"
-          className="h-8 gap-1.5 rounded-full text-xs"
+          className="h-9 rounded-full"
         >
           <SlidersHorizontalIcon className="size-3.5" />
           Filters
           {activeCount > 0 && (
-            <span className="ml-0.5 inline-flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+            <Badge
+              variant="secondary"
+              className="ml-1 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
+            >
               {activeCount}
-            </span>
+            </Badge>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-3">
-        <div className="flex flex-col gap-3">
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <p className="text-sm font-medium">Filters</p>
+          {activeCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setDraftGrade(null)
+                setDraftSubject(null)
+                onApply(null, null)
+                setOpen(false)
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col gap-4 p-4">
           {availableGrades.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Class
-              </label>
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs text-muted-foreground">Class</Label>
               <Select
                 value={draftGrade ?? "__all"}
                 onValueChange={(v) => setDraftGrade(v === "__all" ? null : v)}
               >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Select class" />
+                <SelectTrigger className="h-9 w-full text-sm">
+                  <SelectValue placeholder="All classes" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all">All classes</SelectItem>
                   {availableGrades.map((g) => (
-                    <SelectItem key={g} value={g}>Grade {g}</SelectItem>
+                    <SelectItem key={g} value={g}>
+                      Grade {g}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -320,46 +383,32 @@ function FiltersPopover({
           )}
 
           {availableSubjects.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Subject
-              </label>
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs text-muted-foreground">Subject</Label>
               <Select
                 value={draftSubject ?? "__all"}
                 onValueChange={(v) => setDraftSubject(v === "__all" ? null : v)}
               >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Select subject" />
+                <SelectTrigger className="h-9 w-full text-sm">
+                  <SelectValue placeholder="All subjects" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all">All subjects</SelectItem>
                   {availableSubjects.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
-          <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="flex items-center justify-end">
             <Button
               type="button"
               size="sm"
-              variant="ghost"
-              className="h-7 rounded-full text-xs"
-              onClick={() => {
-                setDraftGrade(null)
-                setDraftSubject(null)
-                onApply(null, null)
-                setOpen(false)
-              }}
-            >
-              Reset
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 rounded-full text-xs"
+              className="h-8 rounded-full text-xs"
               onClick={() => {
                 onApply(draftGrade, draftSubject)
                 setOpen(false)
@@ -374,29 +423,7 @@ function FiltersPopover({
   )
 }
 
-function ActivePill({
-  label,
-  onClear,
-}: {
-  label: string
-  onClear: () => void
-}) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-sidebar-accent px-2.5 py-1 text-xs font-medium text-sidebar-foreground">
-      {label}
-      <button
-        type="button"
-        onClick={onClear}
-        className="rounded-full p-0.5 hover:bg-foreground/10"
-        aria-label={`Clear ${label}`}
-      >
-        <XIcon className="size-3" />
-      </button>
-    </span>
-  )
-}
-
-function BankCard({
+function BankRow({
   material,
   picking,
   onPick,
@@ -411,54 +438,72 @@ function BankCard({
 
   const linkedCount = material.linked_class_subject_ids.length
   const remainingClasses = myAssignments.filter(
-    (a) => !material.linked_class_subject_ids.includes(a.class_subject_id),
+    (a) => !material.linked_class_subject_ids.includes(a.class_subject_id)
   )
   const uploaderName = material.uploader?.full_name ?? "Unknown"
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border p-4">
-      <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-2 flex-1 text-sm font-medium leading-snug">
+    <TableRow>
+      <TableCell>
+        <span className="block max-w-72 truncate text-sm font-medium text-secondary-foreground">
           {material.title}
-        </p>
-        {material.primary_class_label && (
-          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        </span>
+      </TableCell>
+      <TableCell>
+        {material.primary_class_label ? (
+          <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
             {material.primary_class_label}
           </span>
+        ) : (
+          <span className="text-xs text-muted-foreground/60">—</span>
         )}
-      </div>
-
-      {material.tags && material.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {material.tags.slice(0, 4).map((t) => (
-            <span
-              key={t}
-              className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-            >
-              {t}
-            </span>
-          ))}
-          {material.tags.length > 4 && (
-            <span className="text-[10px] text-muted-foreground/60">
-              +{material.tags.length - 4} more
-            </span>
-          )}
-        </div>
-      )}
-
-      <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Avatar size="sm">
+      </TableCell>
+      <TableCell>
+        {material.tags && material.tags.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1">
+            {material.tags.slice(0, 2).map((t) => (
+              <span
+                key={t}
+                className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+              >
+                {t}
+              </span>
+            ))}
+            {material.tags.length > 2 && (
+              <span
+                title={material.tags.slice(2).join(", ")}
+                className="text-[11px] text-muted-foreground/60"
+              >
+                +{material.tags.length - 2}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground/60">—</span>
+        )}
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground">
+        {dayjs(material.uploaded_at).format("MMM D, YYYY")}
+      </TableCell>
+      <TableCell>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Avatar className="size-5">
             {material.uploader?.profile_url ? (
-              <AvatarImage src={material.uploader.profile_url} alt={uploaderName} />
+              <AvatarImage
+                src={material.uploader.profile_url}
+                alt={uploaderName}
+              />
             ) : null}
-            <AvatarFallback>{initials(uploaderName)}</AvatarFallback>
+            <AvatarFallback className="text-[9px]">
+              {initials(uploaderName)}
+            </AvatarFallback>
           </Avatar>
           <span className="truncate text-xs text-muted-foreground">
             {uploaderName}
           </span>
         </div>
-
+      </TableCell>
+      <TableCell className="text-right">
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -489,7 +534,7 @@ function BankCard({
               </p>
             ) : (
               <div className="flex flex-col">
-                <p className="p-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <p className="p-2 text-[10px] tracking-wide text-muted-foreground uppercase">
                   Add to
                 </p>
                 {remainingClasses.map((a) => (
@@ -509,7 +554,7 @@ function BankCard({
             )}
           </PopoverContent>
         </Popover>
-      </div>
-    </div>
+      </TableCell>
+    </TableRow>
   )
 }

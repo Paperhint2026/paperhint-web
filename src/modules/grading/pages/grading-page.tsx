@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
   AlertTriangleIcon,
+  ArrowLeftIcon,
   CameraIcon,
   CheckCircle2Icon,
   ClipboardCheckIcon,
@@ -53,9 +54,10 @@ function compressForUpload(file: File): Promise<File> {
     img.onload = () => {
       URL.revokeObjectURL(url)
       const maxDim = 3200
-      const scale = Math.max(img.width, img.height) > maxDim
-        ? maxDim / Math.max(img.width, img.height)
-        : 1
+      const scale =
+        Math.max(img.width, img.height) > maxDim
+          ? maxDim / Math.max(img.width, img.height)
+          : 1
       const canvas = document.createElement("canvas")
       canvas.width = Math.round(img.width * scale)
       canvas.height = Math.round(img.height * scale)
@@ -64,13 +66,17 @@ function compressForUpload(file: File): Promise<File> {
       canvas.toBlob(
         (blob) => {
           if (blob && blob.size < file.size) {
-            resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }))
+            resolve(
+              new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                type: "image/jpeg",
+              })
+            )
           } else {
             resolve(file)
           }
         },
         "image/jpeg",
-        0.92,
+        0.92
       )
     }
     img.onerror = () => {
@@ -139,9 +145,11 @@ export function GradingPage() {
     setSubmissions([])
     try {
       const res = await apiClient.get<{ exams: Exam[] }>(
-        `/api/exams/class-subject/${csId}`,
+        `/api/exams/class-subject/${csId}`
       )
-      const onlyWithQuestions = (res.exams ?? []).filter((e) => e.question_count > 0)
+      const onlyWithQuestions = (res.exams ?? []).filter(
+        (e) => e.question_count > 0
+      )
       setExams(onlyWithQuestions)
     } catch {
       setExams([])
@@ -150,23 +158,30 @@ export function GradingPage() {
     }
   }, [])
 
-  const fetchStudentsAndSubmissions = useCallback(async (csId: string, examId: string) => {
-    setIsLoadingStudents(true)
-    setIsLoadingSubmissions(true)
-    try {
-      const [studentsRes, submissionsRes] = await Promise.all([
-        apiClient.get<{ students: Student[] }>(`/api/students/class-subject/${csId}`),
-        apiClient.get<{ submissions: Submission[] }>(`/api/grading/submissions/${examId}`),
-      ])
-      setStudents(studentsRes.students ?? [])
-      setSubmissions(submissionsRes.submissions ?? [])
-    } catch (err) {
-      console.error("Failed to fetch students/submissions:", err)
-    } finally {
-      setIsLoadingStudents(false)
-      setIsLoadingSubmissions(false)
-    }
-  }, [])
+  const fetchStudentsAndSubmissions = useCallback(
+    async (csId: string, examId: string) => {
+      setIsLoadingStudents(true)
+      setIsLoadingSubmissions(true)
+      try {
+        const [studentsRes, submissionsRes] = await Promise.all([
+          apiClient.get<{ students: Student[] }>(
+            `/api/students/class-subject/${csId}`
+          ),
+          apiClient.get<{ submissions: Submission[] }>(
+            `/api/grading/submissions/${examId}`
+          ),
+        ])
+        setStudents(studentsRes.students ?? [])
+        setSubmissions(submissionsRes.submissions ?? [])
+      } catch (err) {
+        console.error("Failed to fetch students/submissions:", err)
+      } finally {
+        setIsLoadingStudents(false)
+        setIsLoadingSubmissions(false)
+      }
+    },
+    []
+  )
 
   useEffect(() => {
     if (classSubjectId) fetchExams(classSubjectId)
@@ -184,19 +199,19 @@ export function GradingPage() {
     if (pollRef.current) clearInterval(pollRef.current)
 
     const hasPending = submissions.some(
-      (s) => s.status === "uploaded" || s.status === "processing",
+      (s) => s.status === "uploaded" || s.status === "processing"
     )
 
     if (hasPending && classSubjectId && selectedExamId) {
       pollRef.current = setInterval(async () => {
         try {
           const res = await apiClient.get<{ submissions: Submission[] }>(
-            `/api/grading/submissions/${selectedExamId}`,
+            `/api/grading/submissions/${selectedExamId}`
           )
           setSubmissions(res.submissions ?? [])
 
           const stillPending = (res.submissions ?? []).some(
-            (s) => s.status === "uploaded" || s.status === "processing",
+            (s) => s.status === "uploaded" || s.status === "processing"
           )
           if (!stillPending && pollRef.current) {
             clearInterval(pollRef.current)
@@ -269,7 +284,9 @@ export function GradingPage() {
     if (!deleteConfirm) return
     setDeletingId(deleteConfirm.submissionId)
     try {
-      await apiClient.delete(`/api/grading/submission/${deleteConfirm.submissionId}`)
+      await apiClient.delete(
+        `/api/grading/submission/${deleteConfirm.submissionId}`
+      )
       toast.success("Answer sheet removed")
       fetchStudentsAndSubmissions(classSubjectId ?? "", selectedExamId)
     } catch (err: unknown) {
@@ -337,25 +354,32 @@ export function GradingPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden p-4 md:p-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6">
       {/* Delete confirmation dialog */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+      <AlertDialog
+        open={!!deleteConfirm}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Answer Sheet</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the uploaded answer sheet for{" "}
-              <span className="font-semibold text-foreground">{deleteConfirm?.studentName}</span>?
-              This will remove the file and you can re-upload a new one.
+              <span className="font-semibold text-foreground">
+                {deleteConfirm?.studentName}
+              </span>
+              ? This will remove the file and you can re-upload a new one.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteSubmission}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             >
-              {deletingId ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : null}
+              {deletingId ? (
+                <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+              ) : null}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -370,20 +394,44 @@ export function GradingPage() {
         onSubmit={handleScanUpload}
       />
 
-      {/* Exam selector + summary — visible only when an exam is already
-          selected (the per-student view). When no exam is selected, the
-          ExamCardsGrid below handles discovery with its own search + filter
-          chips, so a redundant dropdown would just fight it for space. */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {selectedExamId ? (
-          <div className="flex items-center gap-3">
+      {/* Header — page title on the cards view; back button + exam switcher
+          once an exam is selected. The ExamCardsGrid handles its own search
+          and filter chips, so the cards view keeps just the title. */}
+      {!selectedExamId ? (
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Grading</h1>
+          <p className="text-sm text-muted-foreground">
+            Upload answer sheets per exam and let AI grade them — review
+            anything it flags.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedExamId("")}
+              className="h-8 shrink-0 gap-1.5 px-2 text-xs text-muted-foreground"
+            >
+              <ArrowLeftIcon className="size-3.5" />
+              All exams
+            </Button>
             <Select
               value={selectedExamId}
               onValueChange={setSelectedExamId}
               disabled={isLoadingExams || exams.length === 0}
             >
               <SelectTrigger className="w-64">
-                <SelectValue placeholder={isLoadingExams ? "Loading exams..." : exams.length === 0 ? "No exams available" : "Select an exam"} />
+                <SelectValue
+                  placeholder={
+                    isLoadingExams
+                      ? "Loading exams..."
+                      : exams.length === 0
+                        ? "No exams available"
+                        : "Select an exam"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {exams.map((exam) => (
@@ -395,24 +443,27 @@ export function GradingPage() {
             </Select>
             {selectedExam && (
               <span className="hidden text-xs text-muted-foreground sm:inline">
-                {selectedExam.total_marks} marks · {selectedExam.question_count} questions
+                {selectedExam.total_marks} marks · {selectedExam.question_count}{" "}
+                questions
               </span>
             )}
           </div>
-        ) : (
-          <div />
-        )}
 
-        {selectedExamId && !isLoadingList && students.length > 0 && (
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>{uploadedCount}/{students.length} uploaded</span>
-            <span className="text-emerald-600 dark:text-emerald-400">{gradedCount} graded</span>
-          </div>
-        )}
-      </div>
+          {!isLoadingList && students.length > 0 && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>
+                {uploadedCount}/{students.length} uploaded
+              </span>
+              <span className="text-emerald-600 dark:text-emerald-400">
+                {gradedCount} graded
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Student list */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div>
         {!selectedExamId ? (
           <ExamCardsGrid
             classSubjectId={classSubjectId ?? ""}
@@ -425,7 +476,9 @@ export function GradingPage() {
         ) : students.length === 0 ? (
           <div className="flex h-40 flex-col items-center justify-center gap-3">
             <UserIcon className="size-12 text-muted-foreground/30" />
-            <p className="text-sm text-muted-foreground">No students in this class</p>
+            <p className="text-sm text-muted-foreground">
+              No students in this class
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -434,7 +487,9 @@ export function GradingPage() {
               .map((student) => {
                 const submission = getSubmissionForStudent(student.id)
                 const isGraded = submission?.status === "graded"
-                const isProcessing = submission?.status === "uploaded" || submission?.status === "processing"
+                const isProcessing =
+                  submission?.status === "uploaded" ||
+                  submission?.status === "processing"
                 const isFailed = submission?.status === "failed"
                 const isUploading = uploadingSet.has(student.id)
 
@@ -449,7 +504,9 @@ export function GradingPage() {
                         {student.roll_number}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{student.full_name}</p>
+                        <p className="truncate text-sm font-medium">
+                          {student.full_name}
+                        </p>
                         {student.register_number && (
                           <p className="text-xs text-muted-foreground">
                             Reg: {student.register_number}
@@ -469,7 +526,8 @@ export function GradingPage() {
 
                           {selectedExam && (
                             <span className="rounded-lg bg-muted px-3 py-1 text-xs font-bold">
-                              {submission.total_final_marks}/{selectedExam.total_marks}
+                              {submission.total_final_marks}/
+                              {selectedExam.total_marks}
                             </span>
                           )}
 
@@ -479,7 +537,7 @@ export function GradingPage() {
                             className="text-xs"
                             onClick={() =>
                               navigate(
-                                `/class/${classSubjectId}/grading/${submission.id}/review`,
+                                `/class/${classSubjectId}/grading/${submission.id}/review`
                               )
                             }
                           >
@@ -491,7 +549,9 @@ export function GradingPage() {
                         <>
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                             <Loader2Icon className="size-3 animate-spin" />
-                            {submission.status === "processing" ? "AI Grading..." : "Uploaded"}
+                            {submission.status === "processing"
+                              ? "AI Grading..."
+                              : "Uploaded"}
                           </span>
 
                           <Button
@@ -545,7 +605,10 @@ export function GradingPage() {
                             variant="outline"
                             className="text-xs"
                             onClick={() =>
-                              setScanModal({ studentId: student.id, studentName: student.full_name })
+                              setScanModal({
+                                studentId: student.id,
+                                studentName: student.full_name,
+                              })
                             }
                           >
                             <CameraIcon className="mr-1 size-3.5" />
@@ -572,7 +635,10 @@ export function GradingPage() {
                             variant="outline"
                             disabled={isUploading}
                             onClick={() =>
-                              setScanModal({ studentId: student.id, studentName: student.full_name })
+                              setScanModal({
+                                studentId: student.id,
+                                studentName: student.full_name,
+                              })
                             }
                           >
                             <CameraIcon className="mr-1.5 size-3.5" />
