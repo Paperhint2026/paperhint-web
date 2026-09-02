@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
-import { CheckCircleIcon, Loader2Icon } from "lucide-react"
-
+import { CheckCircleIcon, CircleNotchIcon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -43,7 +42,7 @@ export function ResetPasswordPage() {
 
     if (!token) {
       setError(
-        "Invalid or missing access token. Please use the link from your email.",
+        "Invalid or missing access token. Please use the link from your email."
       )
       return
     }
@@ -87,7 +86,10 @@ export function ResetPasswordPage() {
               This password reset link is invalid or has expired. Please request
               a new one.
             </p>
-            <Button variant="outline" onClick={() => navigate("/forgot-password")}>
+            <Button
+              variant="outline"
+              onClick={() => navigate("/forgot-password")}
+            >
               Request New Link
             </Button>
           </div>
@@ -104,8 +106,8 @@ export function ResetPasswordPage() {
             <CheckCircleIcon className="size-12 text-green-500" />
             <h1 className="text-xl font-semibold">Password Reset!</h1>
             <p className="text-sm text-muted-foreground">
-              Your password has been reset successfully. You can now sign in with
-              your new password.
+              Your password has been reset successfully. You can now sign in
+              with your new password.
             </p>
             <Button className="w-full" onClick={() => navigate("/login")}>
               Go to Login
@@ -164,7 +166,7 @@ export function ResetPasswordPage() {
             className="w-full"
             disabled={isSubmitting}
           >
-            {isSubmitting && <Loader2Icon className="animate-spin" />}
+            {isSubmitting && <CircleNotchIcon className="animate-spin" />}
             Reset Password
           </Button>
         </form>

@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
-import { CheckCircleIcon, Loader2Icon } from "lucide-react"
-
+import { CheckCircleIcon, CircleNotchIcon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -42,7 +41,9 @@ export function SetPasswordPage() {
     }
 
     if (!token) {
-      setError("Invalid or missing access token. Please use the link from your invite email.")
+      setError(
+        "Invalid or missing access token. Please use the link from your invite email."
+      )
       return
     }
 
@@ -160,7 +161,7 @@ export function SetPasswordPage() {
             className="w-full"
             disabled={isSubmitting}
           >
-            {isSubmitting && <Loader2Icon className="animate-spin" />}
+            {isSubmitting && <CircleNotchIcon className="animate-spin" />}
             Set Password
           </Button>
         </form>

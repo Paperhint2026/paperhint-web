@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react"
 import { Dialog as DialogPrimitive } from "radix-ui"
-import {
-  Loader2Icon,
-  PlusIcon,
-  Trash2Icon,
-  XIcon,
-} from "lucide-react"
+import { CircleNotchIcon, PlusIcon, TrashIcon, XIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
@@ -150,7 +145,7 @@ export function BlueprintModal({ open, onClose, onSaved, initial }: BlueprintMod
             {/* Table header — desktop */}
             <div className="mb-1.5 hidden grid-cols-[1fr_1.5fr_1fr_1fr_0.8fr_28px] gap-2 px-1 sm:grid">
               {["Section", "Type", "Qty", "Marks", "Total", ""].map((h) => (
-                <span key={h} className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span key={h} className="text-[10px] font-semibold text-muted-foreground">
                   {h}
                 </span>
               ))}
@@ -222,7 +217,7 @@ export function BlueprintModal({ open, onClose, onSaved, initial }: BlueprintMod
                           onClick={() => removeSection(idx)}
                           className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                         >
-                          <Trash2Icon className="size-3.5" />
+                          <TrashIcon className="size-3.5" />
                         </button>
                       )}
                     </div>
@@ -244,7 +239,7 @@ export function BlueprintModal({ open, onClose, onSaved, initial }: BlueprintMod
               Cancel
             </Button>
             <Button className="flex-1" onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2Icon className="mr-1.5 size-4 animate-spin" />}
+              {isSaving && <CircleNotchIcon className="mr-1.5 size-4 animate-spin" />}
               Save Blueprint
             </Button>
           </div>

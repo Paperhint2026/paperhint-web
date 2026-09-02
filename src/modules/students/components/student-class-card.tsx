@@ -1,5 +1,4 @@
-import { UsersIcon } from "lucide-react"
-
+import { UsersIcon } from "@phosphor-icons/react"
 import { Spinner } from "@/components/ui/spinner"
 
 export interface ClassItem {

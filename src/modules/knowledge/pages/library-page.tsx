@@ -1,56 +1,69 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  ArrowsClockwiseIcon,
   BookOpenIcon,
+  ChalkboardIcon,
+  CheckCircleIcon,
   CheckIcon,
-  CircleAlertIcon,
-  CircleCheckIcon,
-  EyeIcon,
-  EyeOffIcon,
+  CircleNotchIcon,
+  DotsThreeIcon,
   FileIcon,
   FileTextIcon,
+  GlobeHemisphereWestIcon,
   ImageIcon,
-  Link2Icon,
-  Loader2Icon,
-  RefreshCwIcon,
-  SearchIcon,
-  Share2Icon,
-  SlidersHorizontalIcon,
-  Trash2Icon,
+  LinkSimpleIcon,
+  LockSimpleIcon,
+  ShareNetworkIcon,
+  TrashIcon,
   UploadIcon,
+  WarningCircleIcon,
   XIcon,
-} from "lucide-react"
+} from "@phosphor-icons/react"
 import dayjs from "dayjs"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
+import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { PageHeader } from "@/components/layout/page-header"
+import {
+  PageToolbar,
+  PageToolbarSkeleton,
+} from "@/components/shared/page-toolbar"
+import { countSummary } from "@/lib/format"
+import { timeAgo } from "@/lib/time"
+import { Sticker } from "@/components/shared/sticker"
+import { LoadingSwap } from "@/components/shared/loading-swap"
+import {
+  MaterialGroup,
+  MaterialList,
+  MaterialListSkeleton,
+  MaterialRow,
+} from "@/modules/knowledge/components/material-list"
 import {
   useTeacherAssignments,
   classLabel,
 } from "@/hooks/use-teacher-assignments"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Spinner } from "@/components/ui/spinner"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { FilterChip } from "@/components/shared/filter-controls"
+  FilterChip,
+  FilterChipGroup,
+  MultiSelectField,
+} from "@/components/shared/filter-controls"
 import { useHeaderActions } from "@/components/layout/header-actions-context"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -94,6 +107,14 @@ function getFileIcon(url: string) {
   if (lower.endsWith(".pdf")) return FileTextIcon
   if (/\.(jpe?g|png|webp|gif|svg)/.test(lower)) return ImageIcon
   return FileIcon
+}
+
+/** Short type word for the row's leading slot. */
+function fileKind(url: string) {
+  const lower = url.toLowerCase()
+  if (lower.endsWith(".pdf")) return "PDF"
+  if (/\.(jpe?g|png|webp|gif|svg)(?:[?#]|$)/.test(lower)) return "Image"
+  return "File"
 }
 
 function initials(name?: string | null) {
@@ -186,21 +207,33 @@ export function LibraryPage() {
 
   useEffect(() => {
     if (!canEdit) return
-    setHeaderActions(
+    const upload = (
       <Button
         size="lg"
-        className="rounded-full"
         onClick={() => setUploadOpen(true)}
         disabled={teacherOptionCount === 0}
-        title={
-          teacherOptionCount === 0
-            ? "You need to be assigned to a class-subject first"
-            : undefined
-        }
       >
         <UploadIcon className="size-3.5" />
         <span className="hidden sm:inline">Upload</span>
       </Button>
+    )
+    setHeaderActions(
+      teacherOptionCount === 0 ? (
+        // A disabled button swallows pointer events, so the tooltip hangs
+        // off a wrapper that still receives them.
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0} className="inline-flex rounded-md">
+              {upload}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            You need to be assigned to a class-subject first
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        upload
+      )
     )
     return () => setHeaderActions(null)
   }, [canEdit, teacherOptionCount, setHeaderActions])
@@ -249,12 +282,32 @@ export function LibraryPage() {
     })
   }, [materials, filterCsId, search])
 
+  // Rows grouped under the first class they are linked to; unlinked files
+  // gather at the end. Group order follows the class label.
+  const groupedMaterials = useMemo(() => {
+    const groups = new Map<string, { label: string; items: Material[] }>()
+    for (const m of filteredMaterials) {
+      const csId = m.linked_class_subject_ids[0]
+      const key = csId ?? "__none"
+      const label = csId ? csLabelFor(csId) : "Not in any class"
+      const g = groups.get(key) ?? { label, items: [] }
+      g.items.push(m)
+      groups.set(key, g)
+    }
+    return [...groups.entries()]
+      .sort(([ka, a], [kb, b]) =>
+        ka === "__none"
+          ? 1
+          : kb === "__none"
+            ? -1
+            : a.label.localeCompare(b.label)
+      )
+      .map(([key, g]) => ({ key, ...g }))
+  }, [filteredMaterials, csLabelFor])
+
   const allFilteredSelected =
     filteredMaterials.length > 0 &&
     filteredMaterials.every((m) => selectedIds.has(m.id))
-  const someFilteredSelected = filteredMaterials.some((m) =>
-    selectedIds.has(m.id)
-  )
 
   const toggleSelectAll = () => {
     setSelectedIds((prev) => {
@@ -484,368 +537,379 @@ export function LibraryPage() {
   if (!user) return null
 
   return (
-    <div className="flex h-full w-full flex-col gap-4 p-4 md:p-6">
-      {/* Toolbar — search + filter popover + active-filter chip */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1 sm:max-w-72">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search materials..."
-              className="h-9 rounded-full pl-9"
-            />
-          </div>
-
-          {filterChips.length > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 rounded-full"
-                >
-                  <SlidersHorizontalIcon className="size-3.5" />
-                  Filters
-                  {filterCsId && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-1 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
-                    >
-                      1
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-80 p-0">
-                <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                  <p className="text-sm font-medium">Filters</p>
-                  {filterCsId && (
-                    <button
-                      onClick={() => setFilterCsId(null)}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Clear all
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2 p-4">
-                  <Label className="text-xs text-muted-foreground">
-                    Class-subject
-                  </Label>
-                  <Select
-                    value={filterCsId ?? "__all"}
-                    onValueChange={(v) =>
-                      setFilterCsId(v === "__all" ? null : v)
-                    }
-                  >
-                    <SelectTrigger className="h-9 w-full text-sm">
-                      <SelectValue placeholder="All class-subjects" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all">
-                        All class-subjects ({materials.length})
-                      </SelectItem>
-                      {filterChips.map((c) => {
-                        const count = materials.filter((m) =>
-                          m.linked_class_subject_ids.includes(c.id)
-                        ).length
-                        return (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.label} ({count})
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
-
-        {filterCsId && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <FilterChip
-              label={csLabelFor(filterCsId)}
-              onRemove={() => setFilterCsId(null)}
-            />
-          </div>
-        )}
-      </div>
-
-      {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="size-6" />
-        </div>
-      ) : filteredMaterials.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-sidebar p-5">
-          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
-            <BookOpenIcon className="size-6 text-muted-foreground" />
-          </div>
-          <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
-            <p className="text-base font-medium text-secondary-foreground">
-              {materials.length === 0
-                ? canEdit
-                  ? "Your library is empty"
-                  : "No materials uploaded yet"
-                : "No materials match your filters"}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {materials.length === 0
-                ? canEdit
-                  ? "Upload a file and tag it to your class-subjects — it appears in every tagged class."
-                  : "Materials shared by teachers will show up here."
-                : "Try clearing the search or filters above."}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-auto overscroll-none rounded-lg border [&_[data-slot=table-container]]:overflow-visible">
-          <Table className="border-collapse">
-            <TableHeader className="sticky top-0 z-20 bg-sidebar shadow-[0_1px_0_0_var(--border)] [&_th]:h-10 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
-              <TableRow className="hover:bg-transparent">
-                {canEdit && (
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={
-                        allFilteredSelected
-                          ? true
-                          : someFilteredSelected
-                            ? "indeterminate"
-                            : false
-                      }
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all materials"
-                    />
-                  </TableHead>
-                )}
-                <TableHead className="min-w-56">Title</TableHead>
-                <TableHead className="min-w-40">Classes</TableHead>
-                <TableHead className="min-w-32">Tags</TableHead>
-                <TableHead className="min-w-28">Uploaded</TableHead>
-                {!canEdit && (
-                  <TableHead className="min-w-40">Uploaded by</TableHead>
-                )}
-                <TableHead className="min-w-28">Status</TableHead>
-                {canEdit && <TableHead className="w-24">Visibility</TableHead>}
-                {canEdit && (
-                  <TableHead className="w-20 text-right">Actions</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMaterials.map((m) => {
-                const Icon = getFileIcon(m.file_url)
-                const teacher = teachersMap[m.teacher_id]
-                const extraClasses = m.linked_class_subject_ids.slice(2)
-                return (
-                  <TableRow
-                    key={m.id}
-                    data-state={selectedIds.has(m.id) ? "selected" : undefined}
-                  >
-                    {canEdit && (
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(m.id)}
-                          onCheckedChange={() => toggleSelected(m.id)}
-                          aria-label={`Select ${m.title}`}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background">
-                          <Icon className="size-3.5 text-muted-foreground" />
-                        </div>
-                        <span className="max-w-72 truncate text-sm font-medium text-secondary-foreground">
-                          {m.title}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1">
-                        {m.linked_class_subject_ids.length > 0 ? (
-                          <>
-                            {m.linked_class_subject_ids
-                              .slice(0, 2)
-                              .map((csId) => (
-                                <span
-                                  key={csId}
-                                  className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-accent-foreground"
-                                >
-                                  {csLabelFor(csId)}
-                                </span>
-                              ))}
-                            {extraClasses.length > 0 && (
-                              <span
-                                title={extraClasses
-                                  .map((csId) => csLabelFor(csId))
-                                  .join(", ")}
-                                className="text-[11px] text-muted-foreground/60"
-                              >
-                                +{extraClasses.length}
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                            Unlinked
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {m.tags && m.tags.length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-1">
-                          {m.tags.slice(0, 2).map((tag) => (
-                            <span
-                              key={tag}
-                              className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {m.tags.length > 2 && (
-                            <span
-                              title={m.tags.slice(2).join(", ")}
-                              className="text-[11px] text-muted-foreground/60"
-                            >
-                              +{m.tags.length - 2}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/60">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {dayjs(m.uploaded_at).format("MMM D, YYYY")}
-                    </TableCell>
-                    {!canEdit && (
-                      <TableCell>
-                        {teacher ? (
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <Avatar className="size-5">
-                              {teacher.profile_url ? (
-                                <AvatarImage
-                                  src={teacher.profile_url}
-                                  alt={teacher.full_name}
-                                />
-                              ) : null}
-                              <AvatarFallback className="text-[9px]">
-                                {initials(teacher.full_name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="truncate text-xs text-muted-foreground">
-                              {teacher.full_name}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/60">
-                            —
-                          </span>
-                        )}
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      {m.processed ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                          <CircleCheckIcon className="size-3.5" />
-                          Analyzed
-                        </span>
-                      ) : processingIds.has(m.id) ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400">
-                          <Loader2Icon className="size-3.5 animate-spin" />
-                          Processing
-                        </span>
-                      ) : canEdit ? (
-                        <button
-                          onClick={() => retryProcessing(m.id)}
-                          disabled={retryingIds.has(m.id)}
-                          title="Analysis failed — click to retry"
-                          className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 transition-colors hover:text-amber-700 disabled:opacity-70 dark:text-amber-400 dark:hover:text-amber-300"
-                        >
-                          {retryingIds.has(m.id) ? (
-                            <>
-                              <Loader2Icon className="size-3.5 animate-spin" />
-                              Retrying
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCwIcon className="size-3.5" />
-                              Retry
-                            </>
-                          )}
-                        </button>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                          <CircleAlertIcon className="size-3.5" />
-                          Not analyzed
-                        </span>
-                      )}
-                    </TableCell>
-                    {canEdit && (
-                      <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => toggleVisibility(m)}
-                          disabled={togglingIds.has(m.id)}
-                          title={
-                            m.visibility === "private"
-                              ? "Private — click to publish to the school bank"
-                              : "Public in the school bank — click to make private"
-                          }
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-50",
-                            m.visibility === "private"
-                              ? "bg-muted text-muted-foreground hover:bg-muted/70"
-                              : "bg-primary/10 text-primary hover:bg-primary/20"
-                          )}
-                        >
-                          {togglingIds.has(m.id)
-                            ? "…"
-                            : m.visibility === "private"
-                              ? "Private"
-                              : "Public"}
-                        </button>
-                      </TableCell>
-                    )}
-                    {canEdit && (
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-0.5">
-                          <button
-                            onClick={() => setEditLinksFor(m)}
-                            title="Share to other class-subjects"
-                            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          >
-                            <Link2Icon className="size-3.5" />
-                          </button>
-                          <button
-                            onClick={() => requestDelete(m)}
-                            disabled={deletingIds.has(m.id)}
-                            title="Delete material"
-                            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-destructive disabled:opacity-50"
-                          >
-                            {deletingIds.has(m.id) ? (
-                              <Loader2Icon className="size-3.5 animate-spin" />
-                            ) : (
-                              <Trash2Icon className="size-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "@container flex min-h-full flex-col gap-5 pb-12"
       )}
+    >
+      <PageHeader
+        icon={BookOpenIcon}
+        title="Knowledge Library"
+        description="Textbooks and notes the question generator draws from."
+      >
+        {isLoading && <PageToolbarSkeleton />}
+        {!isLoading && materials.length > 0 && (
+          <PageToolbar
+            className="animate-in duration-300 fade-in-0"
+            search={{
+              value: search,
+              onChange: setSearch,
+              placeholder: "Search by title or tag…",
+            }}
+            summary={countSummary(
+              filteredMaterials.length,
+              materials.length,
+              "material",
+              Boolean(filterCsId) || search.trim().length > 0
+            )}
+            filters={
+              filterChips.length > 0
+                ? {
+                    activeCount: filterCsId ? 1 : 0,
+                    onClearAll: () => setFilterCsId(null),
+                    resultLabel: `${filteredMaterials.length} of ${materials.length} materials`,
+                    children: (
+                      <MultiSelectField
+                        icon={ChalkboardIcon}
+                        label="Class"
+                        placeholder="Any class"
+                        options={filterChips.map((c) => ({
+                          value: c.id,
+                          label: c.label,
+                        }))}
+                        selected={filterCsId ? [filterCsId] : []}
+                        onToggle={(v) =>
+                          setFilterCsId((cur) => (cur === v ? null : v))
+                        }
+                        onClear={() => setFilterCsId(null)}
+                        searchable={filterChips.length > 8}
+                      />
+                    ),
+                  }
+                : undefined
+            }
+            chips={
+              filterCsId ? (
+                <FilterChipGroup icon={ChalkboardIcon} label="Class">
+                  <FilterChip
+                    label={csLabelFor(filterCsId)}
+                    onRemove={() => setFilterCsId(null)}
+                  />
+                </FilterChipGroup>
+              ) : null
+            }
+          />
+        )}
+      </PageHeader>
+
+      <LoadingSwap
+        loading={isLoading}
+        skeleton={<MaterialListSkeleton />}
+        className="flex-1"
+      >
+        {filteredMaterials.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+            <Sticker
+              name={materials.length === 0 ? "classroom" : "lost"}
+              size={materials.length === 0 ? 200 : 120}
+            />
+            <div className="flex max-w-[380px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                {materials.length === 0
+                  ? canEdit
+                    ? "Your library is empty"
+                    : "Nothing here yet"
+                  : "Nothing matches that"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {materials.length === 0
+                  ? canEdit
+                    ? "Upload a textbook or notes and tag them to your classes. The question generator draws from whatever lives here."
+                    : "Materials teachers upload will show up here."
+                  : "Try a different word, or clear the class filter."}
+              </p>
+            </div>
+            {materials.length === 0 && canEdit ? (
+              <Button
+                onClick={() => setUploadOpen(true)}
+                disabled={teacherOptionCount === 0}
+              >
+                <UploadIcon className="size-3.5" />
+                Upload a file
+              </Button>
+            ) : materials.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearch("")
+                  setFilterCsId(null)
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <MaterialList
+            meta={
+              <>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className="transition-colors hover:text-foreground"
+                  >
+                    {allFilteredSelected ? "Clear selection" : "Select all"}
+                  </button>
+                )}
+                <span className="tabular-nums">
+                  {selectedIds.size > 0
+                    ? `${selectedIds.size} of ${filteredMaterials.length} selected`
+                    : `${filteredMaterials.length} ${filteredMaterials.length === 1 ? "material" : "materials"}`}
+                </span>
+                <span className="ml-auto">Newest first</span>
+              </>
+            }
+          >
+            {groupedMaterials.map((group) => (
+              <MaterialGroup
+                key={group.key}
+                icon={ChalkboardIcon}
+                label={group.label}
+                count={group.items.length}
+              >
+                {group.items.map((m) => {
+                  const Icon = getFileIcon(m.file_url)
+                  const teacher = teachersMap[m.teacher_id]
+                  const extraClasses = m.linked_class_subject_ids.slice(1)
+                  const isSelected = selectedIds.has(m.id)
+                  const subtitle = [
+                    extraClasses.length > 0
+                      ? `also in ${extraClasses.map(csLabelFor).join(", ")}`
+                      : null,
+                    (m.tags ?? []).join(", ") || null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                  return (
+                    <MaterialRow
+                      key={m.id}
+                      icon={Icon}
+                      iconTitle={fileKind(m.file_url)}
+                      title={m.title}
+                      subtitle={subtitle || undefined}
+                      onOpen={() =>
+                        window.open(m.file_url, "_blank", "noopener")
+                      }
+                      select={
+                        canEdit
+                          ? {
+                              checked: isSelected,
+                              onChange: () => toggleSelected(m.id),
+                              label: `Select ${m.title}`,
+                            }
+                          : undefined
+                      }
+                      right={
+                        <>
+                          {/* Status */}
+                          <span className="flex w-24 items-center gap-1.5">
+                            {m.processed ? (
+                              <>
+                                <CheckCircleIcon
+                                  weight="fill"
+                                  className="size-4 text-emerald-500"
+                                />
+                                Analyzed
+                              </>
+                            ) : processingIds.has(m.id) ? (
+                              <>
+                                <CircleNotchIcon className="size-4 animate-spin text-violet-500" />
+                                Processing
+                              </>
+                            ) : canEdit ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    onClick={() => retryProcessing(m.id)}
+                                    disabled={retryingIds.has(m.id)}
+                                    className="flex items-center gap-1.5 text-amber-600 transition-colors hover:text-amber-700 disabled:opacity-70 dark:text-amber-400"
+                                  >
+                                    {retryingIds.has(m.id) ? (
+                                      <CircleNotchIcon className="size-4 animate-spin" />
+                                    ) : (
+                                      <ArrowsClockwiseIcon className="size-4" />
+                                    )}
+                                    {retryingIds.has(m.id)
+                                      ? "Retrying"
+                                      : "Retry"}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Analysis failed — click to retry
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <>
+                                <WarningCircleIcon
+                                  weight="fill"
+                                  className="size-4 text-amber-500"
+                                />
+                                Not analyzed
+                              </>
+                            )}
+                          </span>
+
+                          {/* Visibility */}
+                          {canEdit ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleVisibility(m)}
+                                  disabled={togglingIds.has(m.id)}
+                                  className={cn(
+                                    "flex w-16 items-center gap-1.5 transition-colors disabled:opacity-50",
+                                    m.visibility === "private"
+                                      ? "hover:text-foreground"
+                                      : "text-sky-600 hover:text-sky-700 dark:text-sky-400"
+                                  )}
+                                >
+                                  {m.visibility === "private" ? (
+                                    <LockSimpleIcon className="size-4" />
+                                  ) : (
+                                    <GlobeHemisphereWestIcon className="size-4" />
+                                  )}
+                                  {togglingIds.has(m.id)
+                                    ? "…"
+                                    : m.visibility === "private"
+                                      ? "Private"
+                                      : "Public"}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {m.visibility === "private"
+                                  ? "Private — click to publish to the shared library"
+                                  : "Public in the shared library — click to make private"}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span
+                              className={cn(
+                                "flex w-16 items-center gap-1.5",
+                                m.visibility !== "private" &&
+                                  "text-sky-600 dark:text-sky-400"
+                              )}
+                            >
+                              {m.visibility === "private" ? (
+                                <LockSimpleIcon className="size-4" />
+                              ) : (
+                                <GlobeHemisphereWestIcon className="size-4" />
+                              )}
+                              {m.visibility === "private"
+                                ? "Private"
+                                : "Public"}
+                            </span>
+                          )}
+
+                          {/* Uploader (viewers only — teachers know it's theirs) */}
+                          {!canEdit && teacher && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Avatar className="size-5">
+                                  {teacher.profile_url ? (
+                                    <AvatarImage
+                                      src={teacher.profile_url}
+                                      alt={teacher.full_name}
+                                    />
+                                  ) : null}
+                                  <AvatarFallback className="text-[8px]">
+                                    {initials(teacher.full_name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {teacher.full_name}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {/* Age */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="w-14 text-right tabular-nums">
+                                {timeAgo(m.uploaded_at)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {dayjs(m.uploaded_at).format("D MMM YYYY")}
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Menu */}
+                          {canEdit && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label="More"
+                                  className="-mr-1 text-muted-foreground"
+                                >
+                                  <DotsThreeIcon
+                                    weight="bold"
+                                    className="size-4"
+                                  />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem
+                                  onSelect={() => setEditLinksFor(m)}
+                                >
+                                  <LinkSimpleIcon className="size-3.5" />
+                                  Share to classes…
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => toggleVisibility(m)}
+                                >
+                                  {m.visibility === "private" ? (
+                                    <>
+                                      <GlobeHemisphereWestIcon className="size-3.5" />
+                                      Make public
+                                    </>
+                                  ) : (
+                                    <>
+                                      <LockSimpleIcon className="size-3.5" />
+                                      Make private
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={deletingIds.has(m.id)}
+                                  onSelect={() => requestDelete(m)}
+                                >
+                                  <TrashIcon className="size-3.5" />
+                                  Remove
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </>
+                      }
+                    />
+                  )
+                })}
+              </MaterialGroup>
+            ))}
+          </MaterialList>
+        )}
+      </LoadingSwap>
 
       <UploadDialog
         open={uploadOpen}
@@ -899,47 +963,54 @@ export function LibraryPage() {
       />
 
       {selectedIds.size > 0 && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-          <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-full border bg-background/95 px-3 py-2 shadow-lg backdrop-blur">
-            <span className="pr-2 pl-1 text-sm font-medium">
-              {selectedIds.size} selected
+        /* Sticky inside the page rather than fixed to the viewport, so it
+           centres on the content column, not on the window behind the sidebar. */
+        <div className="sticky bottom-4 z-40 mx-auto mt-2 w-fit max-w-full animate-in duration-200 fade-in-0 slide-in-from-bottom-2">
+          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-background/95 p-1.5 shadow-lg backdrop-blur">
+            <span className="flex items-center gap-2 pr-2 pl-2.5 text-sm">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-medium text-primary-foreground tabular-nums">
+                {selectedIds.size}
+              </span>
+              selected
             </span>
+
+            <Separator orientation="vertical" className="mx-1 h-5" />
 
             <Button
               size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 rounded-full text-xs"
+              variant="ghost"
+              className="h-8 gap-1.5 text-xs"
               onClick={() => bulkSetVisibility("public")}
               disabled={bulkBusy}
             >
-              <EyeIcon className="size-3.5" />
-              Make Public
+              <GlobeHemisphereWestIcon className="size-3.5" />
+              Make public
             </Button>
 
             <Button
               size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 rounded-full text-xs"
+              variant="ghost"
+              className="h-8 gap-1.5 text-xs"
               onClick={() => bulkSetVisibility("private")}
               disabled={bulkBusy}
             >
-              <EyeOffIcon className="size-3.5" />
-              Make Private
+              <LockSimpleIcon className="size-3.5" />
+              Make private
             </Button>
 
             <Popover open={bulkPickerOpen} onOpenChange={setBulkPickerOpen}>
               <PopoverTrigger asChild>
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 rounded-full text-xs"
+                  variant="ghost"
+                  className="h-8 gap-1.5 text-xs"
                   disabled={bulkBusy}
                 >
-                  <Share2Icon className="size-3.5" />
+                  <ShareNetworkIcon className="size-3.5" />
                   Share to…
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="center" className="w-64 p-2">
+              <PopoverContent align="center" side="top" className="w-64 p-2">
                 <BulkSharePicker
                   assignments={assignments ?? []}
                   onCancel={() => setBulkPickerOpen(false)}
@@ -951,26 +1022,25 @@ export function LibraryPage() {
 
             <Button
               size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 rounded-full text-xs text-destructive hover:text-destructive"
+              variant="ghost"
+              className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={() => setBulkDeleteOpen(true)}
               disabled={bulkBusy}
             >
-              <Trash2Icon className="size-3.5" />
+              <TrashIcon className="size-3.5" />
               Remove
             </Button>
 
-            <Separator orientation="vertical" className="h-5" />
+            <Separator orientation="vertical" className="mx-1 h-5" />
 
             <Button
-              size="sm"
+              size="icon-sm"
               variant="ghost"
-              className="h-8 gap-1.5 rounded-full text-xs"
+              aria-label="Clear selection"
               onClick={clearSelection}
               disabled={bulkBusy}
             >
               <XIcon className="size-3.5" />
-              Cancel
             </Button>
           </div>
         </div>
@@ -1040,6 +1110,12 @@ interface UploadDialogProps {
   onComplete: (materials: Material[]) => void
 }
 
+function formatBytes(n: number) {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function UploadDialog({
   open,
   onOpenChange,
@@ -1049,42 +1125,66 @@ function UploadDialog({
   const [selectedCs, setSelectedCs] = useState<string[]>([])
   const [files, setFiles] = useState<{ file: File; title: string }[]>([])
   const [uploading, setUploading] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) {
       setSelectedCs([])
       setFiles([])
+      setDragging(false)
     }
   }, [open])
 
-  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = e.target.files
+  const addFiles = (list: FileList | File[] | null) => {
     if (!list) return
-
     const newEntries: { file: File; title: string }[] = []
-    const skipped: string[] = []
+    const tooBig: string[] = []
+    const wrongType: string[] = []
 
     for (const file of Array.from(list)) {
+      const ok =
+        file.type === "application/pdf" || file.type.startsWith("image/")
+      if (!ok) {
+        wrongType.push(file.name)
+        continue
+      }
       if (file.size > MAX_FILE_SIZE) {
-        skipped.push(file.name)
+        tooBig.push(file.name)
         continue
       }
       newEntries.push({ file, title: file.name.replace(/\.[^/.]+$/, "") })
     }
 
-    if (skipped.length > 0) {
-      toast.error(`Skipped ${skipped.length} file(s) over 50MB`)
-    }
+    if (tooBig.length > 0)
+      toast.error(
+        tooBig.length === 1
+          ? `${tooBig[0]} is over 50 MB and was skipped`
+          : `${tooBig.length} files over 50 MB were skipped`
+      )
+    if (wrongType.length > 0)
+      toast.error(
+        wrongType.length === 1
+          ? `${wrongType[0]} isn't a PDF or image`
+          : `${wrongType.length} files weren't PDFs or images`
+      )
 
-    setFiles((prev) => [...prev, ...newEntries])
+    if (newEntries.length > 0) setFiles((prev) => [...prev, ...newEntries])
     if (inputRef.current) inputRef.current.value = ""
   }
 
-  const canUpload =
-    selectedCs.length > 0 &&
-    files.length > 0 &&
-    files.every((f) => f.title.trim().length > 0)
+  const missingTitle = files.some((f) => f.title.trim().length === 0)
+  const canUpload = selectedCs.length > 0 && files.length > 0 && !missingTitle
+
+  // Why the button is off, in words, so nobody has to guess.
+  const blocker =
+    files.length === 0
+      ? "Add at least one file"
+      : selectedCs.length === 0
+        ? "Pick at least one class"
+        : missingTitle
+          ? "Every file needs a title"
+          : null
 
   const handleUpload = async () => {
     if (!canUpload) return
@@ -1119,10 +1219,14 @@ function UploadDialog({
       const uploaded: Material[] = []
       for (const r of json.results) {
         if ("material" in r) uploaded.push(r.material)
-        else toast.error(`Failed: ${r.title} — ${r.error}`)
+        else toast.error(`${r.title} failed: ${r.error}`)
       }
       if (uploaded.length > 0)
-        toast.success(`${uploaded.length} material(s) uploaded`)
+        toast.success(
+          uploaded.length === 1
+            ? "1 file uploaded. Analysis has started."
+            : `${uploaded.length} files uploaded. Analysis has started.`
+        )
       onComplete(uploaded)
       onOpenChange(false)
     } catch (err) {
@@ -1134,111 +1238,190 @@ function UploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 sm:max-w-xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>Upload materials</DialogTitle>
           <DialogDescription>
-            Pick the class-subjects where these files should appear. The first
-            one you pick is the primary upload context.
+            Add textbooks, chapters, or notes. Each file is analysed so Ask Hint
+            and the question generator can draw from it.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 overflow-y-auto px-6 py-4">
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Class-subjects ({selectedCs.length} selected)
-            </p>
+        <div className="flex flex-col gap-6 overflow-y-auto px-6 pb-6">
+          {/* Step 1 — files */}
+          <section className="flex flex-col gap-2.5">
+            <div className="flex items-baseline justify-between">
+              <p className="text-xs font-medium text-secondary-foreground">
+                <span className="mr-1.5 text-muted-foreground">1</span>
+                Files
+              </p>
+              {files.length > 0 && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {files.length} {files.length === 1 ? "file" : "files"}
+                </span>
+              )}
+            </div>
+
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept=".pdf,image/*"
+              onChange={(e) => addFiles(e.target.files)}
+              className="hidden"
+            />
+
+            {/* Drop zone */}
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault()
+                if (!dragging) setDragging(true)
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragging(false)
+                addFiles(e.dataTransfer.files)
+              }}
+              disabled={uploading}
+              className={cn(
+                "flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                files.length === 0 ? "py-8" : "py-4",
+                dragging
+                  ? "border-primary bg-primary/5"
+                  : "border-border bg-sidebar hover:border-foreground/25"
+              )}
+            >
+              {files.length === 0 && <Sticker name="point" size={56} />}
+              <span className="text-sm text-foreground">
+                <span className="font-medium">
+                  {dragging ? "Drop to add" : "Drop files here"}
+                </span>
+                {!dragging && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    or click to browse
+                  </span>
+                )}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                PDF or images · up to 50 MB each
+              </span>
+            </button>
+
+            {files.length > 0 && (
+              <ul className="flex flex-col gap-2">
+                {files.map((entry, idx) => {
+                  const Icon = getFileIcon(entry.file.name)
+                  const empty = entry.title.trim().length === 0
+                  return (
+                    <li
+                      key={`${entry.file.name}-${idx}`}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+                    >
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-sidebar">
+                        <Icon className="size-4 text-muted-foreground" />
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <Input
+                          value={entry.title}
+                          onChange={(e) =>
+                            setFiles((prev) =>
+                              prev.map((f, i) =>
+                                i === idx ? { ...f, title: e.target.value } : f
+                              )
+                            )
+                          }
+                          placeholder="Give this file a title"
+                          aria-label="Title"
+                          aria-invalid={empty || undefined}
+                          className={cn(
+                            "h-7 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0",
+                            empty && "placeholder:text-destructive/70"
+                          )}
+                        />
+                        <span className="truncate text-[11px] text-muted-foreground">
+                          {entry.file.name} · {formatBytes(entry.file.size)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Remove ${entry.file.name}`}
+                        onClick={() =>
+                          setFiles((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        disabled={uploading}
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                      >
+                        <XIcon className="size-3.5" />
+                      </Button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+
+          {/* Step 2 — classes */}
+          <section className="flex flex-col gap-2.5">
+            <div className="flex items-baseline justify-between">
+              <p className="text-xs font-medium text-secondary-foreground">
+                <span className="mr-1.5 text-muted-foreground">2</span>
+                Which classes should see {files.length === 1 ? "it" : "them"}?
+              </p>
+              {selectedCs.length > 0 && (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {selectedCs.length} of {options.length}
+                </span>
+              )}
+            </div>
             <ClassSubjectMultiSelect
               options={options}
               value={selectedCs}
               onChange={setSelectedCs}
-              emptyLabel="You are not yet assigned to any class-subjects."
+              disabled={uploading}
+              firstLabel="Primary"
+              placeholder="Choose one or more classes…"
+              emptyLabel="You aren't assigned to a class yet, so there's nowhere to upload to."
             />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Files ({files.length})
+            {options.length > 1 && (
+              <p className="text-xs text-muted-foreground">
+                The first class you tick keeps the file. The others get a link
+                to it, so there is only ever one copy.
               </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => inputRef.current?.click()}
-                disabled={uploading}
-              >
-                <UploadIcon className="size-3.5" />
-                Add files
-              </Button>
-              <input
-                ref={inputRef}
-                type="file"
-                multiple
-                accept=".pdf,image/*"
-                onChange={handleFiles}
-                className="hidden"
-              />
-            </div>
-
-            {files.length === 0 ? (
-              <div className="rounded-md border border-dashed bg-muted/30 px-3 py-6 text-center text-xs text-muted-foreground">
-                No files selected. Supports PDF and images up to 50 MB.
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {files.map((entry, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 rounded-md border bg-background px-2 py-1.5"
-                  >
-                    <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <Input
-                        value={entry.title}
-                        onChange={(e) =>
-                          setFiles((prev) =>
-                            prev.map((f, i) =>
-                              i === idx ? { ...f, title: e.target.value } : f
-                            )
-                          )
-                        }
-                        placeholder="File title"
-                        className="h-6 border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
-                      />
-                      <p className="truncate text-[9px] text-muted-foreground">
-                        {entry.file.name}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() =>
-                        setFiles((prev) => prev.filter((_, i) => i !== idx))
-                      }
-                      disabled={uploading}
-                      className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
-                    >
-                      <XIcon className="size-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
             )}
-          </div>
+          </section>
         </div>
 
-        <Separator />
-
-        <DialogFooter className="gap-2 px-6 py-4">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={uploading}
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleUpload} disabled={!canUpload || uploading}>
-            {uploading && <Loader2Icon className="size-3.5 animate-spin" />}
-            Upload
-          </Button>
+        <DialogFooter className="flex-row items-center border-t border-border bg-sidebar px-6 py-3 sm:justify-between">
+          <span className="text-xs text-muted-foreground">
+            {blocker ??
+              `${files.length} ${files.length === 1 ? "file" : "files"} → ${selectedCs.length} ${selectedCs.length === 1 ? "class" : "classes"}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              disabled={uploading}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleUpload} disabled={!canUpload || uploading}>
+              {uploading ? (
+                <CircleNotchIcon className="size-3.5 animate-spin" />
+              ) : (
+                <UploadIcon className="size-3.5" />
+              )}
+              {uploading
+                ? "Uploading…"
+                : files.length > 1
+                  ? `Upload ${files.length} files`
+                  : "Upload"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1285,7 +1468,7 @@ function BulkSharePicker({
 
   return (
     <div className="flex flex-col">
-      <p className="p-2 text-[10px] tracking-wide text-muted-foreground uppercase">
+      <p className="p-2 text-[10px] text-muted-foreground">
         Add every selected material to
       </p>
       <div className="max-h-64 overflow-y-auto">
@@ -1321,7 +1504,7 @@ function BulkSharePicker({
         <Button
           size="sm"
           variant="ghost"
-          className="h-7 rounded-full text-xs"
+          className="h-7 text-xs"
           onClick={onCancel}
           disabled={busy}
         >
@@ -1329,7 +1512,7 @@ function BulkSharePicker({
         </Button>
         <Button
           size="sm"
-          className="h-7 rounded-full text-xs"
+          className="h-7 text-xs"
           disabled={checked.size === 0 || busy}
           onClick={() => onApply(Array.from(checked))}
         >

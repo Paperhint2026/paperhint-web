@@ -1,20 +1,35 @@
 import { useEffect, useMemo, useState } from "react"
 import {
-  AlertTriangleIcon,
-  ChevronRightIcon,
-  ClipboardCheckIcon,
-  SearchIcon,
-  TrendingDownIcon,
-  TrendingUpIcon,
+  ArrowRightIcon,
+  CheckCircleIcon,
+  CircleNotchIcon,
+  ClipboardTextIcon,
+  HourglassIcon,
+  MagnifyingGlassIcon,
+  TrendDownIcon,
+  TrendUpIcon,
   TrophyIcon,
   UploadIcon,
-} from "lucide-react"
+  WarningIcon,
+  type Icon,
+} from "@phosphor-icons/react"
+import { useNavigate } from "react-router-dom"
+import dayjs from "dayjs"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { Input } from "@/components/ui/input"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import { LoadingSwap } from "@/components/shared/loading-swap"
+import { Sticker } from "@/components/shared/sticker"
+import { tameCaps } from "@/lib/format"
 
 // ── Types ─────────────────────────────────────────────────────────────────
 // Matches the response shape of GET /api/grading/class-subject/:id/exam-cards.
@@ -69,11 +84,6 @@ type Props = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleDateString("en-IN", { month: "short", day: "numeric" })
-}
-
 // Classify a card into a filter bucket. "Done" requires every enrolled
 // student to have a graded submission AND no flagged questions — the same
 // definition the backend uses in `totals.done`.
@@ -92,6 +102,7 @@ function classify(card: ExamCard, totalStudents: number): Filter {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
+  const navigate = useNavigate()
   // Loading is derived: the response is stamped with the class-subject it
   // was fetched for, so switching classes shows the skeleton without a
   // synchronous setState inside the effect.
@@ -151,109 +162,206 @@ export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-9 w-full" />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Skeleton className="h-56" />
-          <Skeleton className="h-56" />
-          <Skeleton className="h-56" />
-          <Skeleton className="h-56" />
-        </div>
-      </div>
+      <LoadingSwap loading skeleton={<ExamCardsSkeleton />} className="flex-1">
+        {null}
+      </LoadingSwap>
     )
   }
 
   if (!data || data.exams.length === 0) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-lg border border-dashed">
-        <ClipboardCheckIcon className="size-12 text-muted-foreground/30" />
-        <p className="text-sm text-muted-foreground">No exams yet</p>
-        <p className="text-xs text-muted-foreground">
-          Create one from the <span className="font-medium">Exams</span> tab.
-        </p>
-      </div>
+      <LoadingSwap
+        loading={false}
+        skeleton={<ExamCardsSkeleton />}
+        className="flex-1"
+      >
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+          <Sticker name="idea" size={96} />
+          <div className="flex max-w-[380px] flex-col items-center gap-1 text-center">
+            <p className="text-base font-medium text-secondary-foreground">
+              Nothing to grade yet
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Grading starts once a paper exists. Build one in Exams, then come
+              back here to upload the answer sheets.
+            </p>
+          </div>
+          <Button onClick={() => navigate(`/class/${classSubjectId}/exams`)}>
+            Go to Exams
+            <ArrowRightIcon className="size-3.5" />
+          </Button>
+        </div>
+      </LoadingSwap>
     )
   }
 
+  const chips = [
+    {
+      key: "all",
+      label: "All",
+      count: data.totals.exams,
+      icon: ClipboardTextIcon,
+    },
+    {
+      key: "needs-review",
+      label: "Needs review",
+      count: data.totals.needs_review,
+      icon: WarningIcon,
+    },
+    {
+      key: "in-progress",
+      label: "In progress",
+      count: data.totals.in_progress,
+      icon: HourglassIcon,
+    },
+    {
+      key: "done",
+      label: "Done",
+      count: data.totals.done,
+      icon: CheckCircleIcon,
+    },
+  ] as { key: Filter | "all"; label: string; count: number; icon: Icon }[]
+
   return (
-    <div className="space-y-3">
-      {/* Toolbar: filter chips (with counts) + search */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {(
-            [
-              { key: "all", label: "All", count: data.totals.exams },
-              {
-                key: "needs-review",
-                label: "Needs review",
-                count: data.totals.needs_review,
-              },
-              {
-                key: "in-progress",
-                label: "In progress",
-                count: data.totals.in_progress,
-              },
-              { key: "done", label: "Done", count: data.totals.done },
-            ] as { key: Filter; label: string; count: number }[]
-          ).map((chip) => {
-            const isActive = filter === chip.key
-            return (
-              <button
-                key={chip.key}
-                onClick={() => setFilter(chip.key)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ${
-                  isActive
-                    ? "border-foreground/20 bg-muted font-medium text-foreground"
-                    : "border-border text-muted-foreground hover:bg-muted/50"
-                }`}
-              >
-                {chip.label}
-                <span
-                  className={`rounded-full px-1.5 py-px text-[10px] font-medium tabular-nums ${
+    <LoadingSwap
+      loading={false}
+      skeleton={<ExamCardsSkeleton />}
+      className="flex-1"
+    >
+      <div className="flex flex-col gap-4">
+        {/* Toolbar: filter pills (with counts) + search */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-1.5">
+            {chips.map((chip) => {
+              const isActive = filter === chip.key
+              const warn = chip.key === "needs-review" && chip.count > 0
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setFilter(chip.key)}
+                  aria-pressed={isActive}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors",
                     isActive
-                      ? "bg-background text-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border bg-background text-secondary-foreground hover:bg-muted"
+                  )}
                 >
-                  {chip.count}
-                </span>
-              </button>
-            )
-          })}
+                  <chip.icon
+                    className={cn(
+                      "size-3.5",
+                      warn && !isActive && "text-amber-500"
+                    )}
+                  />
+                  {chip.label}
+                  <span
+                    className={cn(
+                      "tabular-nums",
+                      isActive ? "text-primary/70" : "text-muted-foreground"
+                    )}
+                  >
+                    {chip.count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="relative w-full sm:max-w-64">
+            <MagnifyingGlassIcon
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search papers…"
+              className="h-9 pl-9"
+              aria-label="Search exams by name"
+            />
+          </div>
         </div>
-        <div className="relative w-full sm:max-w-72">
-          <SearchIcon
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search exams…"
-            className="h-9 rounded-full pl-9"
-            aria-label="Search exams by name"
-          />
+
+        {/* Card grid */}
+        {filteredExams.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <Sticker name="lost" size={96} />
+            <p className="text-sm text-muted-foreground">
+              No paper matches this filter.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
+            {filteredExams.map((card) => (
+              <ExamCardView
+                key={card.id}
+                card={card}
+                totalStudents={totalStudents}
+                onOpen={() => onSelectExam(card.id)}
+                onOpenFlagged={() =>
+                  onSelectExam(card.id, { filter: "flagged" })
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </LoadingSwap>
+  )
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────
+
+/** One exam card at rest: calendar tile, name and facts, status pill, the
+ *  progress bar with its caption, and the two-metric footer. */
+function ExamCardSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
+      <div className="flex items-start gap-3">
+        <Skeleton className="size-10 shrink-0 rounded-lg" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+        <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Skeleton className="h-1.5 rounded-full" />
+        <div className="flex justify-between">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-12" />
         </div>
       </div>
+      <div className="mt-auto grid grid-cols-2 gap-3 border-t border-border pt-3">
+        {[0, 1].map((i) => (
+          <div key={i} className="flex flex-col gap-1.5">
+            <Skeleton className="h-2.5 w-14" />
+            <Skeleton className="h-5 w-16" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-      {/* Card grid */}
-      {filteredExams.length === 0 ? (
-        <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-          No exams match this filter.
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {filteredExams.map((card) => (
-            <ExamCardView
-              key={card.id}
-              card={card}
-              totalStudents={totalStudents}
-              onOpen={() => onSelectExam(card.id)}
-              onOpenFlagged={() => onSelectExam(card.id, { filter: "flagged" })}
-            />
+/** The grid while exam cards load: filter pills and search in the toolbar
+ *  slots, then a full row-set of cards in the same responsive grid. */
+function ExamCardsSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {["w-16", "w-28", "w-28", "w-20"].map((w, i) => (
+            <Skeleton key={i} className={cn("h-8 rounded-full", w)} />
           ))}
         </div>
-      )}
+        <Skeleton className="h-9 w-full sm:max-w-64" />
+      </div>
+      <div className="grid gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <ExamCardSkeleton key={i} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -272,6 +380,7 @@ function ExamCardView({
   onOpenFlagged: () => void
 }) {
   const { submissions, marks, review } = card
+  const when = dayjs(card.created_at)
 
   // Progress bar denominator is total enrolled students, not just students
   // who uploaded — a class of 26 with 20 graded and 0 pending should still
@@ -286,10 +395,8 @@ function ExamCardView({
     submissions.graded === totalStudents &&
     review.submissions_needing_review === 0
   const isEmpty = submissions.total === 0
-  // "Remaining" folds together not-started, uploaded/processing, and failed —
-  // a teacher opening the card sees per-student detail there.
+  const needsReview = review.submissions_needing_review > 0
   const remaining = Math.max(0, totalStudents - submissions.graded)
-
   const showFailing = marks.failing_count != null
 
   return (
@@ -303,106 +410,161 @@ function ExamCardView({
           onOpen()
         }
       }}
-      className="group flex cursor-pointer flex-col gap-2.5 rounded-xl border bg-card p-4 transition-colors hover:border-foreground/20"
+      className={cn(
+        "group flex cursor-pointer flex-col gap-3 rounded-xl border bg-background p-4 transition-all outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring",
+        needsReview
+          ? "border-amber-300/70 dark:border-amber-700/60"
+          : "border-border"
+      )}
     >
-      {/* Head */}
-      <div className="flex items-center gap-1.5">
-        <p className="min-w-0 truncate text-sm font-medium">{card.exam_name}</p>
-        <ChevronRightIcon
-          className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
-          aria-hidden="true"
-        />
-        {isDone && (
-          <span className="ml-auto shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+      {/* Head: calendar tile, name, status */}
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 flex-col items-center justify-center rounded-lg border border-border bg-sidebar leading-none">
+          <span className="text-sm font-semibold text-foreground tabular-nums">
+            {when.format("D")}
+          </span>
+          <span className="text-[9px] tracking-wider text-muted-foreground uppercase">
+            {when.format("MMM")}
+          </span>
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p className="truncate text-sm font-medium text-foreground">
+            {tameCaps(card.exam_name)}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {card.questions_count}{" "}
+            {card.questions_count === 1 ? "question" : "questions"} ·{" "}
+            {card.total_marks} marks
+            {card.pass_marks != null ? ` · pass ${card.pass_marks}` : ""}
+          </p>
+        </div>
+        {isDone ? (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+            <CheckCircleIcon weight="fill" className="size-3" />
             Done
+          </span>
+        ) : isEmpty ? (
+          <span className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+            <UploadIcon className="size-3" />
+            No sheets
+          </span>
+        ) : needsReview ? (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+            <WarningIcon weight="fill" className="size-3" />
+            Review
+          </span>
+        ) : (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
+            <HourglassIcon className="size-3" />
+            In progress
           </span>
         )}
       </div>
 
-      <p className="-mt-1.5 text-xs text-muted-foreground">
-        {formatDate(card.created_at)} · {card.questions_count} question
-        {card.questions_count === 1 ? "" : "s"} · {card.total_marks} marks
-        {card.pass_marks == null && !isEmpty ? " · no pass mark" : ""}
-      </p>
-
       {/* Progress */}
-      <div>
+      <div className="flex flex-col gap-1.5">
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div
-            className={`h-full transition-all ${isDone ? "bg-emerald-500" : "bg-blue-500"}`}
+            className={cn(
+              "h-full rounded-full transition-all",
+              isDone
+                ? "bg-primary"
+                : needsReview
+                  ? "bg-amber-500"
+                  : "bg-primary/60"
+            )}
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
+        <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums">
           <span>
-            {submissions.graded} of {totalStudents} graded
+            <span className="font-medium text-foreground">
+              {submissions.graded}
+            </span>{" "}
+            of {totalStudents} graded
           </span>
-          {!isDone && remaining > 0 && <span>{remaining} pending</span>}
+          {!isDone && remaining > 0 && <span>{remaining} to go</span>}
         </div>
       </div>
 
-      {/* Metrics (only when at least one submission is graded) */}
-      {submissions.graded > 0 && marks.average != null && (
-        <div
-          className={`grid gap-3 border-t pt-2.5 ${
-            showFailing ? "grid-cols-3" : "grid-cols-2"
-          }`}
-        >
-          <Metric
-            icon={<TrendingUpIcon className="size-3" />}
-            label="Average"
-            value={String(marks.average)}
-            suffix={`/ ${card.total_marks}`}
-          />
-          <Metric
-            icon={<TrophyIcon className="size-3" />}
-            label="Top score"
-            value={marks.top ? String(marks.top.marks) : "—"}
-            suffix={marks.top ? `/ ${card.total_marks}` : undefined}
-            sub={marks.top?.student_name ?? undefined}
-          />
-          {showFailing && (
+      {/* Footer — always the same two-line block, anchored to the bottom so
+          cards in a row line up: metrics once anything is graded, a progress
+          note while Hint is working, a nudge when nothing is uploaded. */}
+      <div className="mt-auto border-t border-border pt-3">
+        {submissions.graded > 0 && marks.average != null ? (
+          <div
+            className={cn(
+              "grid gap-3",
+              showFailing ? "grid-cols-3" : "grid-cols-2"
+            )}
+          >
             <Metric
-              icon={<TrendingDownIcon className="size-3" />}
-              label="Failing"
-              value={String(marks.failing_count)}
-              tone={marks.failing_count! > 0 ? "danger" : "default"}
+              icon={<TrendUpIcon className="size-3" />}
+              label="Average"
+              value={String(marks.average)}
+              suffix={`/ ${card.total_marks}`}
             />
-          )}
-        </div>
-      )}
-
-      {/* Empty state (no submissions yet) */}
-      {isEmpty && (
-        <div className="mt-1 flex flex-col items-center justify-center gap-1 border-t py-3 text-center">
-          <UploadIcon className="size-4 text-muted-foreground/50" />
-          <p className="text-xs text-muted-foreground">
-            No sheets uploaded yet
-          </p>
-          <p className="text-[11px] text-muted-foreground/70 italic">
-            Open the exam to upload per student
-          </p>
-        </div>
-      )}
+            <Metric
+              icon={<TrophyIcon className="size-3" />}
+              label="Top score"
+              value={marks.top ? String(marks.top.marks) : "—"}
+              suffix={marks.top ? `/ ${card.total_marks}` : undefined}
+              sub={marks.top?.student_name ?? undefined}
+            />
+            {showFailing && (
+              <Metric
+                icon={<TrendDownIcon className="size-3" />}
+                label="Below pass"
+                value={String(marks.failing_count)}
+                tone={marks.failing_count! > 0 ? "danger" : "default"}
+              />
+            )}
+          </div>
+        ) : isEmpty ? (
+          <FooterNote
+            icon={<UploadIcon className="size-3.5" />}
+            title="No sheets uploaded yet"
+            body="Averages and top scores appear once Hint grades a sheet."
+          />
+        ) : (
+          <FooterNote
+            icon={
+              <CircleNotchIcon className="size-3.5 animate-spin text-violet-500" />
+            }
+            title={`Hint is grading ${submissions.pending} ${
+              submissions.pending === 1 ? "sheet" : "sheets"
+            }`}
+            body={
+              submissions.failed > 0
+                ? `${submissions.failed} ${
+                    submissions.failed === 1 ? "sheet" : "sheets"
+                  } failed and need a re-upload.`
+                : "Scores show here as soon as the first one is done."
+            }
+          />
+        )}
+      </div>
 
       {/* Review alert (only when flagged) — inner click deep-links to the
           flagged filter, stopping propagation so it doesn't double-trigger
           the card click. */}
-      {review.submissions_needing_review > 0 && (
+      {needsReview && (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation()
             onOpenFlagged()
           }}
-          className="flex items-center gap-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-left text-xs text-amber-900 transition-colors hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60"
+          className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 transition-colors hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60"
         >
-          <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
-          <span>
-            {review.submissions_needing_review} sheet
-            {review.submissions_needing_review === 1 ? "" : "s"} need review ·{" "}
-            {review.total_flagged_questions} question
-            {review.total_flagged_questions === 1 ? "" : "s"} flagged
+          <span className="flex items-center gap-2">
+            <WarningIcon weight="fill" className="size-3.5 shrink-0" />
+            {review.submissions_needing_review}{" "}
+            {review.submissions_needing_review === 1 ? "sheet" : "sheets"} need
+            your eye · {review.total_flagged_questions}{" "}
+            {review.total_flagged_questions === 1 ? "question" : "questions"}
           </span>
+          <ArrowRightIcon className="size-3.5 shrink-0" />
         </button>
       )}
     </div>
@@ -425,29 +587,57 @@ function Metric({
   tone?: "default" | "danger"
 }) {
   return (
-    <div className="min-w-0">
+    <div className="flex min-w-0 flex-col gap-1">
       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
         {icon}
         {label}
       </div>
-      <div
-        className={cn(
-          "mt-0.5 text-sm leading-tight font-semibold tabular-nums",
-          tone === "danger" && "text-red-600 dark:text-red-400"
-        )}
-      >
-        {value}
+      <div className="flex min-w-0 items-baseline gap-1 text-sm leading-tight tabular-nums">
+        <span
+          className={cn(
+            "font-semibold text-foreground",
+            tone === "danger" && "text-red-600 dark:text-red-400"
+          )}
+        >
+          {value}
+        </span>
         {suffix && (
-          <span className="ml-0.5 text-xs font-normal text-muted-foreground">
-            {suffix}
-          </span>
+          <span className="text-xs text-muted-foreground">{suffix}</span>
+        )}
+        {sub && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+                · {sub}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{sub}</TooltipContent>
+          </Tooltip>
         )}
       </div>
-      {sub && (
-        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-          {sub}
-        </div>
-      )}
+    </div>
+  )
+}
+
+/** The footer's non-metric states: an icon, a firm line and a soft one. */
+function FooterNote({
+  icon,
+  title,
+  body,
+}: {
+  icon: React.ReactNode
+  title: string
+  body: string
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-sidebar text-muted-foreground ring-1 ring-border/60">
+        {icon}
+      </span>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <p className="text-xs font-medium text-secondary-foreground">{title}</p>
+        <p className="truncate text-[11px] text-muted-foreground">{body}</p>
+      </div>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { RouterProvider } from "react-router-dom"
 import "./index.css"
 import { store } from "@/store"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AppBootSplash } from "@/components/shared/app-boot-splash"
 import { Toaster } from "@/components/ui/sonner"
 import { router } from "@/routes"
 
@@ -20,7 +21,10 @@ createRoot(document.getElementById("root")!).render(
       <ThemeProvider>
         <RouterProvider router={router} />
         <Toaster richColors position="top-right" />
+        {/* Cold-start splash. Sits above the router so the app mounts and
+            settles underneath it, then the splash lifts away to reveal it. */}
+        <AppBootSplash />
       </ThemeProvider>
     </Provider>
-  </StrictMode>,
+  </StrictMode>
 )

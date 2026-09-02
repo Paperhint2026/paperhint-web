@@ -1,9 +1,8 @@
-import { Fragment, useState } from "react"
-import { Link, Outlet, useLocation, useParams } from "react-router-dom"
-import { SparklesIcon } from "lucide-react"
-
+import { useEffect, useState } from "react"
+import { Outlet, useParams } from "react-router-dom"
+import { SparkleIcon } from "@phosphor-icons/react"
+import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
-import { getPageTitleFromPath } from "@/lib/get-page-title"
 import {
   useTeacherAssignments,
   classLabel,
@@ -12,61 +11,58 @@ import { useClassAiChat } from "@/hooks/use-class-ai-chat"
 import { Button } from "@/components/ui/button"
 import { ClassAiChatSheet } from "@/components/class-ai-chat/class-ai-chat-sheet"
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { AppSidebar } from "@/components/layout/app-sidebar"
 import {
-  HeaderActionsProvider,
-  useHeaderActions,
-} from "@/components/layout/header-actions-context"
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { PAGE_GUTTER } from "@/components/layout/page-container"
+import { HeaderActionsProvider } from "@/components/layout/header-actions-context"
+import { PageTransition } from "@/components/layout/page-transition"
+import {
+  HelpDialogProvider,
+  useHelpDialog,
+} from "@/components/help/help-dialog-context"
+import { HelpSupportDialog } from "@/components/help/help-support-dialog"
 
 function AppLayoutInner() {
-  const location = useLocation()
-  const { classSubjectId, grade } = useParams()
+  const { classSubjectId } = useParams()
   const { user } = useAuth()
   const { assignments } = useTeacherAssignments()
-  const { headerActions } = useHeaderActions()
+  const { isMobile } = useSidebar()
   const [aiChatOpen, setAiChatOpen] = useState(false)
+  const help = useHelpDialog()
+
+  // `?` opens help from anywhere, except while typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "?" || e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target
+      if (
+        t instanceof HTMLElement &&
+        (t.isContentEditable ||
+          t.closest("input, textarea, select, [contenteditable='true']"))
+      )
+        return
+      e.preventDefault()
+      help.open()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [help])
   // Lifted chat state — survives sheet close, resets on classSubjectId change.
   const classAiChat = useClassAiChat(classSubjectId ?? null)
 
-  const rawTitle = getPageTitleFromPath(location.pathname)
+  const isClassScoped = Boolean(classSubjectId) && user?.role === "teacher"
 
-  // Label of the section inside a class-subject, derived from the pathname.
-  // null on the class home (/class/:csId) itself. Deeper pages (questions,
-  // review, PDF builder…) fall through to their specific page title.
-  const classSubLabel = (() => {
-    if (!classSubjectId) return null
-    const rest = location.pathname.split(`/class/${classSubjectId}`)[1] ?? ""
-    const parts = rest.split("/").filter(Boolean)
-    if (parts.length === 0) return null
-    if (parts.length > 1) return rawTitle
-    switch (parts[0]) {
-      case "knowledge":
-        return "Knowledge"
-      case "exams":
-        return "Exams"
-      case "grading":
-        return "Grading"
-      case "students":
-        return "Students"
-      default:
-        return rawTitle
-    }
-  })()
-
+  // Only still needed to title the class-scoped AI chat sheet.
   const classTitle = (() => {
     if (!classSubjectId) return null
     const assignment = assignments.find(
@@ -75,101 +71,65 @@ function AppLayoutInner() {
     return assignment ? classLabel(assignment) : null
   })()
 
-  // Build breadcrumb segments: { label, href? }
-  // href present = clickable link; absent = current page (non-clickable)
-  const segments: { label: string; href?: string }[] = (() => {
-    if (location.pathname === "/" && user?.full_name) {
-      return [{ label: `Welcome, ${user.full_name.split(" ")[0]}` }]
-    }
-    if (classTitle) {
-      // /class/:csId → Classes › Class Name
-      // /class/:csId/<section> → Classes › Class Name › Section
-      if (classSubLabel) {
-        return [
-          { label: "Classes", href: "/classes" },
-          { label: classTitle, href: `/class/${classSubjectId}` },
-          { label: classSubLabel },
-        ]
-      }
-      return [{ label: "Classes", href: "/classes" }, { label: classTitle }]
-    }
-    if (grade) {
-      // /classes/:grade/overview → Classes › Grade X
-      return [
-        { label: "Classes", href: "/classes" },
-        { label: `Grade ${grade}` },
-      ]
-    }
-    return [{ label: rawTitle }]
-  })()
-
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-14 shrink-0 items-center justify-between border-b px-3 sm:px-4">
-            <div className="flex min-h-0 min-w-0 items-center gap-2 self-stretch">
-              <SidebarTrigger className="shrink-0" />
-              <Separator
-                orientation="vertical"
-                className="mx-1 w-px shrink-0 self-stretch"
-              />
-              <Breadcrumb className="min-w-0">
-                <BreadcrumbList className="flex-nowrap gap-1.5 sm:gap-1.5">
-                  {segments.map((seg, i) => {
-                    const isLast = i === segments.length - 1
-                    return (
-                      <Fragment key={seg.label}>
-                        <BreadcrumbItem>
-                          {!isLast && seg.href ? (
-                            <BreadcrumbLink asChild>
-                              <Link
-                                to={seg.href}
-                                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                              >
-                                {seg.label}
-                              </Link>
-                            </BreadcrumbLink>
-                          ) : (
-                            <BreadcrumbPage className="line-clamp-1 text-sm font-medium text-foreground">
-                              {seg.label}
-                            </BreadcrumbPage>
-                          )}
-                        </BreadcrumbItem>
-                        {!isLast && <BreadcrumbSeparator />}
-                      </Fragment>
-                    )
-                  })}
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
-
-            <div className="ml-auto flex items-center gap-2 pl-2">
-              {classSubjectId && user?.role === "teacher" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAiChatOpen(true)}
-                  className="gap-1.5"
-                  title="Ask AI about this class"
-                >
-                  <SparklesIcon className="size-3.5 text-primary" />
-                  <span className="hidden sm:inline">Ask AI</span>
-                </Button>
-              )}
-              {/* Page-level CTA slot — populated by each page via useHeaderActions() */}
-              {headerActions}
-            </div>
-          </header>
-
-          <div className="relative min-h-0 flex-1">
-            <div className="absolute inset-0 overflow-x-hidden overflow-y-auto">
-              <Outlet />
+    <>
+      <AppSidebar />
+      <SidebarInset>
+        {/* No chrome bar. These float inside the page's top padding so they
+            cost no vertical space and stay aligned with the page gutter. */}
+        {isMobile ? (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 pt-4">
+            <div className={cn(PAGE_GUTTER, "flex items-center gap-2")}>
+              {isMobile ? (
+                <SidebarTrigger className="pointer-events-auto -ml-1 shrink-0" />
+              ) : null}
             </div>
           </div>
-        </SidebarInset>
-      </SidebarProvider>
+        ) : null}
+
+        <div className="relative min-h-0 flex-1">
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
+        </div>
+
+        {/* Ask Hint for this class — a floating pill in the corner, so it is
+            always one click away and never collides with a page's own header.
+            A corner pill reads as an app-wide control, so the class name rides
+            along on it to say this chat is scoped to the class being viewed. */}
+        {isClassScoped ? (
+          <div className="pointer-events-none absolute right-6 bottom-6 z-30">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="lg"
+                  onClick={() => setAiChatOpen(true)}
+                  className="pointer-events-auto max-w-[min(20rem,calc(100vw-3rem))] gap-2 rounded-full pr-5 pl-4 shadow-lg shadow-primary/20 transition-transform hover:-translate-y-0.5"
+                >
+                  <SparkleIcon weight="fill" className="size-4 shrink-0" />
+                  <span className="shrink-0">
+                    Ask <span className="font-serif italic">hint</span>
+                  </span>
+                  {classTitle ? (
+                    <>
+                      <span
+                        aria-hidden
+                        className="h-3.5 w-px shrink-0 bg-primary-foreground/30"
+                      />
+                      <span className="truncate text-primary-foreground/80">
+                        {classTitle}
+                      </span>
+                    </>
+                  ) : null}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                Ask Hint about {classTitle ?? "this class"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        ) : null}
+      </SidebarInset>
 
       <ClassAiChatSheet
         open={aiChatOpen}
@@ -177,14 +137,24 @@ function AppLayoutInner() {
         classLabel={classTitle ?? undefined}
         chat={classAiChat}
       />
-    </TooltipProvider>
+
+      <HelpSupportDialog />
+    </>
   )
 }
 
 export function AppLayout() {
   return (
     <HeaderActionsProvider>
-      <AppLayoutInner />
+      <TooltipProvider>
+        {/* Provider sits above AppLayoutInner so the header can read the
+            sidebar's collapsed state via useSidebar(). */}
+        <SidebarProvider>
+          <HelpDialogProvider>
+            <AppLayoutInner />
+          </HelpDialogProvider>
+        </SidebarProvider>
+      </TooltipProvider>
     </HeaderActionsProvider>
   )
 }

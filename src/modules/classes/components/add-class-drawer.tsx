@@ -1,14 +1,13 @@
 import { useState } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
-  ChevronDownIcon,
-  Loader2Icon,
+  CaretDownIcon,
+  CircleNotchIcon,
   PlusIcon,
-  SettingsIcon,
+  GearIcon,
   TrashIcon,
   XIcon,
-} from "lucide-react"
-
+} from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -83,7 +82,7 @@ export function AddClassDrawer({
   const isMobile = useIsMobile()
   const [form, setForm] = useState<ClassFormData>({ ...emptyForm })
   const [expandedSections, setExpandedSections] = useState<Set<number>>(
-    new Set([0]),
+    new Set([0])
   )
   const [electiveModalSection, setElectiveModalSection] = useState<
     number | null
@@ -113,9 +112,7 @@ export function AddClassDrawer({
   const addSection = () => {
     setForm((prev) => {
       const lastName = prev.sections[prev.sections.length - 1]?.name
-      const nextChar = String.fromCharCode(
-        (lastName?.charCodeAt(0) ?? 64) + 1,
-      )
+      const nextChar = String.fromCharCode((lastName?.charCodeAt(0) ?? 64) + 1)
       return {
         ...prev,
         sections: [
@@ -187,7 +184,7 @@ export function AddClassDrawer({
 
   const handleSaveElectives = (
     sectionIndex: number,
-    groups: ElectiveGroup[],
+    groups: ElectiveGroup[]
   ) => {
     setForm((prev) => {
       const updated = [...prev.sections]
@@ -207,13 +204,13 @@ export function AddClassDrawer({
     form.sections.every(
       (s) =>
         s.name.trim() !== "" &&
-        (s.subjects.length > 0 || s.electives.length > 0),
+        (s.subjects.length > 0 || s.electives.length > 0)
     ) &&
     form.academicYear.trim() !== "" &&
     form.sections.every((s) =>
       s.electives.every(
-        (g) => g.groupName.trim() !== "" && g.subjectIds.length >= 2,
-      ),
+        (g) => g.groupName.trim() !== "" && g.subjectIds.length >= 2
+      )
     )
 
   const handleSave = () => {
@@ -307,10 +304,10 @@ export function AddClassDrawer({
                             className="shrink-0"
                             onClick={() => toggleAccordion(index)}
                           >
-                            <ChevronDownIcon
+                            <CaretDownIcon
                               className={cn(
                                 "size-4 text-muted-foreground transition-transform",
-                                !isExpanded && "-rotate-90",
+                                !isExpanded && "-rotate-90"
                               )}
                             />
                           </button>
@@ -326,8 +323,7 @@ export function AddClassDrawer({
                           />
                           <span className="text-xs text-muted-foreground">
                             ({section.subjects.length} core
-                            {electiveCount > 0 &&
-                              `, ${electiveCount} elective`}
+                            {electiveCount > 0 && `, ${electiveCount} elective`}
                             )
                           </span>
                           <div className="flex-1" />
@@ -351,10 +347,11 @@ export function AddClassDrawer({
                               <div className="flex flex-wrap gap-1.5">
                                 {availableSubjects.map((subject) => {
                                   const selected = section.subjects.includes(
-                                    subject.value,
+                                    subject.value
                                   )
-                                  const usedInElective =
-                                    electiveSubjectIds.has(subject.value)
+                                  const usedInElective = electiveSubjectIds.has(
+                                    subject.value
+                                  )
                                   return (
                                     <button
                                       key={subject.value}
@@ -363,15 +360,15 @@ export function AddClassDrawer({
                                       onClick={() =>
                                         toggleSectionSubject(
                                           index,
-                                          subject.value,
+                                          subject.value
                                         )
                                       }
                                       className={
                                         usedInElective
-                                          ? "inline-flex items-center rounded-full border border-dashed px-2.5 py-1 text-xs font-medium text-muted-foreground/40 line-through"
+                                          ? "inline-flex items-center rounded-md border border-dashed px-2.5 py-1 text-xs font-medium text-muted-foreground/40 line-through"
                                           : selected
-                                            ? "inline-flex items-center rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors"
-                                            : "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                                            ? "inline-flex items-center rounded-md border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors"
+                                            : "inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
                                       }
                                     >
                                       {subject.label}
@@ -400,11 +397,9 @@ export function AddClassDrawer({
                                   variant="outline"
                                   size="sm"
                                   className="h-7 text-xs"
-                                  onClick={() =>
-                                    setElectiveModalSection(index)
-                                  }
+                                  onClick={() => setElectiveModalSection(index)}
                                 >
-                                  <SettingsIcon className="size-3" />
+                                  <GearIcon className="size-3" />
                                   {electiveCount > 0
                                     ? `Configure (${electiveCount})`
                                     : "Add Electives"}
@@ -424,10 +419,9 @@ export function AddClassDrawer({
                                         </span>
                                         <div className="flex flex-wrap gap-1">
                                           {group.subjectIds.map((sid) => {
-                                            const subj =
-                                              availableSubjects.find(
-                                                (s) => s.value === sid,
-                                              )
+                                            const subj = availableSubjects.find(
+                                              (s) => s.value === sid
+                                            )
                                             return (
                                               <span
                                                 key={sid}
@@ -489,7 +483,7 @@ export function AddClassDrawer({
               disabled={!isFormValid || isSaving}
               onClick={handleSave}
             >
-              {isSaving && <Loader2Icon className="animate-spin" />}
+              {isSaving && <CircleNotchIcon className="animate-spin" />}
               {isSaving ? "Creating..." : "Add Class Room"}
             </Button>
             <Button
@@ -514,9 +508,7 @@ export function AddClassDrawer({
           availableSubjects={availableSubjects}
           coreSubjectIds={form.sections[electiveModalSection].subjects}
           initialGroups={form.sections[electiveModalSection].electives}
-          onSave={(groups) =>
-            handleSaveElectives(electiveModalSection, groups)
-          }
+          onSave={(groups) => handleSaveElectives(electiveModalSection, groups)}
         />
       )}
     </>

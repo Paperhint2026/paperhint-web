@@ -1,6 +1,5 @@
 import { useState } from "react"
-import { PlusIcon, TrashIcon, XIcon } from "lucide-react"
-
+import { PlusIcon, TrashIcon, XIcon } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -42,7 +41,7 @@ export function ElectiveConfigModal({
   const [groups, setGroups] = useState<ElectiveGroup[]>(() =>
     initialGroups.length > 0
       ? initialGroups.map((g) => ({ ...g, subjectIds: [...g.subjectIds] }))
-      : [{ groupName: "", subjectIds: [] }],
+      : [{ groupName: "", subjectIds: [] }]
   )
 
   const addGroup = () => {
@@ -78,7 +77,7 @@ export function ElectiveConfigModal({
 
   const isSubjectDisabledForGroup = (
     groupIndex: number,
-    subjectId: string,
+    subjectId: string
   ): boolean => {
     if (coreSubjectIds.includes(subjectId)) return true
     for (let i = 0; i < groups.length; i++) {
@@ -90,13 +89,11 @@ export function ElectiveConfigModal({
 
   const isValid =
     groups.length === 0 ||
-    groups.every(
-      (g) => g.groupName.trim() !== "" && g.subjectIds.length >= 2,
-    )
+    groups.every((g) => g.groupName.trim() !== "" && g.subjectIds.length >= 2)
 
   const handleSave = () => {
     const filtered = groups.filter(
-      (g) => g.groupName.trim() !== "" && g.subjectIds.length >= 2,
+      (g) => g.groupName.trim() !== "" && g.subjectIds.length >= 2
     )
     onSave(filtered)
     onOpenChange(false)
@@ -119,8 +116,9 @@ export function ElectiveConfigModal({
                 Elective Subjects — Section {sectionName}
               </DialogTitle>
               <DialogDescription>
-                Configure elective groups. Each group needs a name and at least 2
-                subject options. Students will pick one subject from each group.
+                Configure elective groups. Each group needs a name and at least
+                2 subject options. Students will pick one subject from each
+                group.
               </DialogDescription>
             </div>
             <button
@@ -174,7 +172,7 @@ export function ElectiveConfigModal({
                       const selected = group.subjectIds.includes(subject.value)
                       const disabled = isSubjectDisabledForGroup(
                         groupIndex,
-                        subject.value,
+                        subject.value
                       )
                       return (
                         <button
@@ -186,10 +184,10 @@ export function ElectiveConfigModal({
                           }
                           className={
                             disabled
-                              ? "inline-flex items-center rounded-full border border-dashed px-2.5 py-1 text-xs font-medium text-muted-foreground/40 line-through"
+                              ? "inline-flex items-center rounded-md border border-dashed px-2.5 py-1 text-xs font-medium text-muted-foreground/40 line-through"
                               : selected
-                                ? "inline-flex items-center rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors"
-                                : "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                                ? "inline-flex items-center rounded-md border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors"
+                                : "inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
                           }
                         >
                           {subject.label}

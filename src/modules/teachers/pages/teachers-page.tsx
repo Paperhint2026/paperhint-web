@@ -1,17 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ContactRoundIcon, Loader2Icon, PlusIcon, SearchIcon, SlidersHorizontalIcon, Trash2Icon } from "lucide-react"
+import {
+  BriefcaseIcon,
+  CircleNotchIcon,
+  IdentificationBadgeIcon,
+  IdentificationCardIcon,
+  PlusIcon,
+  PulseIcon,
+  TrashIcon,
+} from "@phosphor-icons/react"
 import { useHeaderActions } from "@/components/layout/header-actions-context"
 import dayjs from "dayjs"
 
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
-import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { PageHeader } from "@/components/layout/page-header"
+import {
+  FilterPill,
+  PageToolbar,
+  PageToolbarSkeleton,
+} from "@/components/shared/page-toolbar"
+import { countSummary } from "@/lib/format"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Spinner } from "@/components/ui/spinner"
+import { Skeleton } from "@/components/ui/skeleton"
+import { LoadingSwap } from "@/components/shared/loading-swap"
+import { Sticker } from "@/components/shared/sticker"
 import {
   FilterChip,
+  FilterChipGroup,
+  FilterFieldHeader,
   MultiSelectField,
   toggleArrayValue,
 } from "@/components/shared/filter-controls"
@@ -36,6 +54,42 @@ import {
   type ExistingAssignment,
   type TeacherFormData,
 } from "@/modules/teachers/components/add-teacher-drawer"
+
+/** The staff grid before the list arrives: the same columns and card shape
+ *  as TeacherCard — photo beside a two-line identity, then three record rows
+ *  under the dashed rule — so the page settles in place instead of jumping. */
+function TeacherGridSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @min-[60rem]:grid-cols-3 @min-[78rem]:grid-cols-4"
+    >
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div
+          key={i}
+          className="relative flex flex-col rounded-xl border border-border bg-background"
+        >
+          <Skeleton className="absolute top-2.5 right-2.5 h-5 w-14 rounded-full" />
+          <div className="flex items-center gap-3.5 px-4 py-4">
+            <Skeleton className="size-12 rounded-lg" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 pr-16">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 border-t border-dashed border-border px-4 py-3">
+            {[0.4, 0.3, 0.55].map((w, j) => (
+              <div key={j} className="flex items-center justify-between gap-3">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3" style={{ width: `${w * 100}%` }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 interface Department {
   id: string
@@ -82,7 +136,9 @@ export function TeachersPage() {
   const [editTeacherId, setEditTeacherId] = useState<string | null>(null)
 
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null)
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(
+    null
+  )
 
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -111,7 +167,7 @@ export function TeachersPage() {
     let list = teachers
     if (selectedDepartments.length > 0) {
       list = list.filter(
-        (t) => t.department_id && selectedDepartments.includes(t.department_id),
+        (t) => t.department_id && selectedDepartments.includes(t.department_id)
       )
     }
     if (selectedStatuses.length > 0) {
@@ -119,7 +175,7 @@ export function TeachersPage() {
     }
     if (selectedDesignations.length > 0) {
       list = list.filter(
-        (t) => t.designation && selectedDesignations.includes(t.designation),
+        (t) => t.designation && selectedDesignations.includes(t.designation)
       )
     }
     if (search.trim()) {
@@ -128,11 +184,17 @@ export function TeachersPage() {
         (t) =>
           t.full_name.toLowerCase().includes(q) ||
           t.email.toLowerCase().includes(q) ||
-          t.designation?.toLowerCase().includes(q),
+          t.designation?.toLowerCase().includes(q)
       )
     }
     return list
-  }, [teachers, selectedDepartments, selectedStatuses, selectedDesignations, search])
+  }, [
+    teachers,
+    selectedDepartments,
+    selectedStatuses,
+    selectedDesignations,
+    search,
+  ])
 
   const departmentMap = new Map(departments.map((d) => [d.id, d.name]))
 
@@ -151,7 +213,7 @@ export function TeachersPage() {
     setError("")
     try {
       const res = await apiClient.get<{ teachers: Teacher[] }>(
-        "/api/auth/teachers",
+        "/api/auth/teachers"
       )
       setTeachers(res.teachers ?? [])
     } catch (err) {
@@ -167,7 +229,7 @@ export function TeachersPage() {
     try {
       const [deptRes, classRes] = await Promise.all([
         apiClient.get<{ departments: Department[] }>(
-          "/api/schools/departments",
+          "/api/schools/departments"
         ),
         apiClient.get<{ classes: ClassItem[] }>("/api/classes"),
       ])
@@ -195,7 +257,6 @@ export function TeachersPage() {
       <Button
         size="lg"
         disabled={!isFormDataReady}
-        className="rounded-full"
         onClick={() => {
           setEditData(null)
           setEditTeacherId(null)
@@ -210,10 +271,10 @@ export function TeachersPage() {
   }, [isAdmin, isFormDataReady, setHeaderActions])
 
   const fetchSubjectsForClass = async (
-    classId: string,
+    classId: string
   ): Promise<ClassSubjectOption[]> => {
     const res = await apiClient.get<ClassByIdResponse>(
-      `/api/classes/${classId}`,
+      `/api/classes/${classId}`
     )
     return (res.subjects ?? []).map((s) => ({
       subjectId: s.id,
@@ -271,10 +332,7 @@ export function TeachersPage() {
     }
   }
 
-  const handleDisassociate = async (
-    tId: string,
-    classSubjectId: string,
-  ) => {
+  const handleDisassociate = async (tId: string, classSubjectId: string) => {
     await apiClient.post("/api/teacher-assignments/unassign", {
       teacher_id: tId,
       class_subject_id: classSubjectId,
@@ -316,16 +374,16 @@ export function TeachersPage() {
         const res = await apiClient.post<{
           message: string
           teacher: { id: string }
-      }>("/api/auth/create-teacher", {
-        email: data.email,
-        full_name: data.fullName,
-        department_id: data.departmentId,
-        designation: data.designation || undefined,
-        date_of_joining: data.dateOfJoining
-          ? dayjs(data.dateOfJoining).valueOf()
-          : undefined,
-        phone_number: data.phone || undefined,
-      })
+        }>("/api/auth/create-teacher", {
+          email: data.email,
+          full_name: data.fullName,
+          department_id: data.departmentId,
+          designation: data.designation || undefined,
+          date_of_joining: data.dateOfJoining
+            ? dayjs(data.dateOfJoining).valueOf()
+            : undefined,
+          phone_number: data.phone || undefined,
+        })
         teacherId = res.teacher.id
 
         if (data.pendingProfileFile) {
@@ -343,13 +401,16 @@ export function TeachersPage() {
               body: formData,
             })
           } catch (err) {
-            console.error("Failed to upload profile image for new teacher:", err)
+            console.error(
+              "Failed to upload profile image for new teacher:",
+              err
+            )
           }
         }
       }
 
       const newAssignments = data.classSubjects.filter(
-        (entry) => entry.classId && entry.classSubjectId,
+        (entry) => entry.classId && entry.classSubjectId
       )
 
       if (newAssignments.length > 0) {
@@ -358,8 +419,8 @@ export function TeachersPage() {
             apiClient.post("/api/teacher-assignments", {
               teacher_id: teacherId,
               class_subject_id: entry.classSubjectId,
-            }),
-          ),
+            })
+          )
         )
       }
 
@@ -385,232 +446,242 @@ export function TeachersPage() {
     setSelectedDesignations([])
   }
 
-  const renderStatusPill = (value: string) => {
-    const selected = selectedStatuses.includes(value)
-    return (
-      <button
-        key={value}
-        type="button"
-        onClick={() => toggleArrayValue(setSelectedStatuses, value)}
-        className={
-          "rounded-full border px-2.5 py-1 text-xs transition-colors " +
-          (selected
-            ? "border-primary bg-primary text-primary-foreground"
-            : "border-border bg-background text-secondary-foreground hover:bg-muted")
-        }
-      >
-        {STATUS_LABEL[value]}
-      </button>
-    )
-  }
-
   const hasAnyFilter = activeCount > 0 || search.trim().length > 0
 
   return (
-    <div className="flex min-h-full w-full flex-col gap-4 p-4 md:p-6">
-      {/* Filters — search + popover + active-filter chips */}
-      {!isLoading && !error && teachers.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <div className="relative min-w-0 flex-1 sm:max-w-72">
-              <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search teachers..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 rounded-full pl-9"
-              />
-            </div>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 rounded-full">
-                  <SlidersHorizontalIcon className="size-3.5" />
-                  Filters
-                  {activeCount > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-1 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
-                    >
-                      {activeCount}
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-80 p-0">
-                <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                  <p className="text-sm font-medium">Filters</p>
-                  {activeCount > 0 && (
-                    <button
-                      onClick={clearAllFilters}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Clear all
-                    </button>
-                  )}
-                </div>
-                <div className="flex max-h-[60vh] flex-col gap-4 overflow-auto p-4">
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "@container flex min-h-full flex-col gap-5 pb-12"
+      )}
+    >
+      <PageHeader
+        icon={IdentificationCardIcon}
+        title="Teachers"
+        description="Staff in your school and what they teach."
+      >
+        {/* Filters — search + popover + active-filter chips */}
+        {isLoading && <PageToolbarSkeleton />}
+        {!isLoading && !error && teachers.length > 0 && (
+          <PageToolbar
+            className="animate-in duration-300 fade-in-0"
+            search={{
+              value: search,
+              onChange: setSearch,
+              placeholder: "Search by name or email…",
+            }}
+            summary={countSummary(
+              filteredTeachers.length,
+              teachers.length,
+              "teacher",
+              hasAnyFilter
+            )}
+            filters={{
+              activeCount,
+              onClearAll: clearAllFilters,
+              resultLabel: `${filteredTeachers.length} of ${teachers.length} teachers`,
+              children: (
+                <>
                   <MultiSelectField
+                    icon={BriefcaseIcon}
                     label="Department"
                     placeholder={
                       departmentOptions.length === 0
-                        ? "No departments available"
-                        : "All Departments"
+                        ? "No departments yet"
+                        : "Any department"
                     }
                     options={departmentOptions}
                     selected={selectedDepartments}
-                    onToggle={(v) => toggleArrayValue(setSelectedDepartments, v)}
+                    onToggle={(v) =>
+                      toggleArrayValue(setSelectedDepartments, v)
+                    }
                     onClear={() => setSelectedDepartments([])}
                     searchable={departmentOptions.length > 8}
                   />
                   <MultiSelectField
+                    icon={IdentificationBadgeIcon}
                     label="Designation"
                     placeholder={
                       designationOptions.length === 0
-                        ? "No designations available"
-                        : "All Designations"
+                        ? "No designations yet"
+                        : "Any designation"
                     }
                     options={designationOptions}
                     selected={selectedDesignations}
-                    onToggle={(v) => toggleArrayValue(setSelectedDesignations, v)}
+                    onToggle={(v) =>
+                      toggleArrayValue(setSelectedDesignations, v)
+                    }
                     onClear={() => setSelectedDesignations([])}
                     searchable={designationOptions.length > 8}
                   />
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">Status</p>
-                      {selectedStatuses.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStatuses([])}
-                          className="text-[10px] text-muted-foreground hover:text-foreground"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
+                    <FilterFieldHeader
+                      icon={PulseIcon}
+                      label="Status"
+                      count={selectedStatuses.length}
+                      onClear={() => setSelectedStatuses([])}
+                    />
                     <div className="flex flex-wrap gap-1.5">
-                      {STATUS_OPTIONS.map((s) => renderStatusPill(s))}
+                      {STATUS_OPTIONS.map((st) => (
+                        <FilterPill
+                          key={st}
+                          label={STATUS_LABEL[st]}
+                          selected={selectedStatuses.includes(st)}
+                          onToggle={() =>
+                            toggleArrayValue(setSelectedStatuses, st)
+                          }
+                        />
+                      ))}
                     </div>
                   </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {activeCount > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {selectedDepartments.map((d) => (
-                <FilterChip
-                  key={`dept-${d}`}
-                  label={departmentMap.get(d) ?? d}
-                  onRemove={() => toggleArrayValue(setSelectedDepartments, d)}
-                />
-              ))}
-              {selectedDesignations.map((d) => (
-                <FilterChip
-                  key={`desig-${d}`}
-                  label={d}
-                  onRemove={() => toggleArrayValue(setSelectedDesignations, d)}
-                />
-              ))}
-              {selectedStatuses.map((s) => (
-                <FilterChip
-                  key={`status-${s}`}
-                  label={STATUS_LABEL[s] ?? s}
-                  onRemove={() => toggleArrayValue(setSelectedStatuses, s)}
-                />
-              ))}
-              <button
-                onClick={clearAllFilters}
-                className="ml-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+                </>
+              ),
+            }}
+            chips={
+              <>
+                {selectedDepartments.length > 0 && (
+                  <FilterChipGroup icon={BriefcaseIcon} label="Department">
+                    {selectedDepartments.map((d) => (
+                      <FilterChip
+                        key={`dept-${d}`}
+                        label={departmentMap.get(d) ?? d}
+                        onRemove={() =>
+                          toggleArrayValue(setSelectedDepartments, d)
+                        }
+                      />
+                    ))}
+                  </FilterChipGroup>
+                )}
+                {selectedDesignations.length > 0 && (
+                  <FilterChipGroup
+                    icon={IdentificationBadgeIcon}
+                    label="Designation"
+                  >
+                    {selectedDesignations.map((d) => (
+                      <FilterChip
+                        key={`desig-${d}`}
+                        label={d}
+                        onRemove={() =>
+                          toggleArrayValue(setSelectedDesignations, d)
+                        }
+                      />
+                    ))}
+                  </FilterChipGroup>
+                )}
+                {selectedStatuses.length > 0 && (
+                  <FilterChipGroup icon={PulseIcon} label="Status">
+                    {selectedStatuses.map((st) => (
+                      <FilterChip
+                        key={`status-${st}`}
+                        label={STATUS_LABEL[st] ?? st}
+                        onRemove={() =>
+                          toggleArrayValue(setSelectedStatuses, st)
+                        }
+                      />
+                    ))}
+                  </FilterChipGroup>
+                )}
+              </>
+            }
+          />
+        )}
+      </PageHeader>
 
       {/* Body */}
-      {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="size-6" />
-        </div>
-      ) : error ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-sidebar p-5">
-          <p className="text-sm text-destructive">{error}</p>
-          <Button variant="outline" onClick={fetchTeachers}>
-            Retry
-          </Button>
-        </div>
-      ) : teachers.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-sidebar p-5">
-          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
-            <ContactRoundIcon className="size-6 text-muted-foreground" />
-          </div>
-          <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
-            <p className="text-base font-medium text-secondary-foreground">
-              No teachers have been added
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {isAdmin
-                ? "Easily add teachers to your system and assign them to classes and subjects."
-                : "No teachers have been added to your school yet."}
-            </p>
-          </div>
-        </div>
-      ) : filteredTeachers.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg bg-sidebar p-5">
-          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
-            <ContactRoundIcon className="size-6 text-muted-foreground" />
-          </div>
-          <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
-            <p className="text-base font-medium text-secondary-foreground">
-              No teachers match your filters
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Try removing a filter or clearing the search.
-            </p>
-          </div>
-          {hasAnyFilter && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearch("")
-                clearAllFilters()
-              }}
-            >
-              Clear filters
+      <LoadingSwap
+        loading={isLoading}
+        skeleton={<TeacherGridSkeleton />}
+        className="flex-1"
+      >
+        {error ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+            <Sticker name="worried" size={88} />
+            <div className="flex max-w-[360px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                Couldn't load the staff list
+              </p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+            <Button variant="outline" onClick={fetchTeachers}>
+              Try again
             </Button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredTeachers.map((teacher) => (
-            <TeacherCard
-              key={teacher.id}
-              teacher={teacher}
-              departmentName={
-                teacher.department_id
-                  ? departmentMap.get(teacher.department_id)
-                  : undefined
-              }
-              onView={(id) => { setSelectedTeacherId(id); setDetailDrawerOpen(true) }}
-              onEdit={isAdmin ? handleEditTeacher : undefined}
-              onDelete={
-                isAdmin
-                  ? (id) => {
-                      const t = teachers.find((x) => x.id === id) ?? null
-                      setTeacherToDelete(t)
-                    }
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
+          </div>
+        ) : teachers.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-5 p-5">
+            <Sticker name="classroom" size={220} />
+            <div className="flex max-w-[380px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                The staff room is empty
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {isAdmin
+                  ? "Add your first teacher and they'll show up here, ready to be assigned classes and subjects."
+                  : "No teachers have joined your school yet. Check back once your admin adds them."}
+              </p>
+            </div>
+            {isAdmin && (
+              <Button onClick={() => setDrawerOpen(true)}>
+                <PlusIcon className="size-3.5" />
+                Add a teacher
+              </Button>
+            )}
+          </div>
+        ) : filteredTeachers.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+            <Sticker name="lost" size={120} />
+            <div className="flex max-w-[360px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                Nobody matches that
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {search.trim()
+                  ? `No teacher named "${search.trim()}" with these filters. Try a shorter name or loosen a filter.`
+                  : "No teacher fits every filter at once. Try dropping one."}
+              </p>
+            </div>
+            {hasAnyFilter && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearch("")
+                  clearAllFilters()
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @min-[60rem]:grid-cols-3 @min-[78rem]:grid-cols-4">
+            {filteredTeachers.map((teacher) => (
+              <TeacherCard
+                key={teacher.id}
+                teacher={teacher}
+                departmentName={
+                  teacher.department_id
+                    ? departmentMap.get(teacher.department_id)
+                    : undefined
+                }
+                onView={(id) => {
+                  setSelectedTeacherId(id)
+                  setDetailDrawerOpen(true)
+                }}
+                onEdit={isAdmin ? handleEditTeacher : undefined}
+                onDelete={
+                  isAdmin
+                    ? (id) => {
+                        const t = teachers.find((x) => x.id === id) ?? null
+                        setTeacherToDelete(t)
+                      }
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        )}
+      </LoadingSwap>
 
       {isAdmin && (
         <AddTeacherDrawer
@@ -660,12 +731,12 @@ export function TeachersPage() {
             >
               {isDeleting ? (
                 <>
-                  <Loader2Icon className="size-3.5 animate-spin" />
+                  <CircleNotchIcon className="size-3.5 animate-spin" />
                   Deleting…
                 </>
               ) : (
                 <>
-                  <Trash2Icon className="size-3.5" />
+                  <TrashIcon className="size-3.5" />
                   Delete
                 </>
               )}

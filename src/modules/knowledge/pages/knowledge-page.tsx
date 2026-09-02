@@ -2,19 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import {
   BookOpenIcon,
+  CheckCircleIcon,
+  DotsThreeIcon,
   FileIcon,
   FileTextIcon,
   ImageIcon,
-  Link2Icon,
-  Loader2Icon,
-  RefreshCwIcon,
-  SparklesIcon,
-  Trash2Icon,
+  LinkSimpleIcon,
+  CircleNotchIcon,
+  ArrowsClockwiseIcon,
+  TrashIcon,
   UploadIcon,
-  Users2Icon,
+  UsersIcon,
   XIcon,
-} from "lucide-react"
-
+} from "@phosphor-icons/react"
 import dayjs from "dayjs"
 import { toast } from "sonner"
 
@@ -26,15 +26,29 @@ import {
   classLabel,
 } from "@/hooks/use-teacher-assignments"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { ClassPageHeader } from "@/components/layout/class-page-header"
+import { Sticker } from "@/components/shared/sticker"
+import { LoadingSwap } from "@/components/shared/loading-swap"
+import { timeAgo } from "@/lib/time"
+import {
+  MaterialList,
+  MaterialListSkeleton,
+  MaterialRow,
+} from "@/modules/knowledge/components/material-list"
+import { Input } from "@/components/ui/input"
 import {
   Popover,
   PopoverContent,
@@ -418,39 +432,35 @@ export function KnowledgePage() {
   ).length
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6">
-      {/* ── Header — what this page is, plus the primary action ── */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">
-            Knowledge
-            {materials.length > 0 && (
-              <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-                ({materials.length})
-              </span>
-            )}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Textbooks and notes the AI uses to generate and grade exams. PDF or
-            images, up to 50 MB each.
-          </p>
-        </div>
-        {canEdit && (
-          <Button
-            size="sm"
-            disabled={isUploading}
-            className="gap-1.5"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {isUploading ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <UploadIcon className="size-3.5" />
-            )}
-            {isUploading ? "Processing..." : "Add sources"}
-          </Button>
-        )}
-      </div>
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "@container flex min-h-full flex-col gap-5 pb-12"
+      )}
+    >
+      <ClassPageHeader
+        icon={BookOpenIcon}
+        title="Knowledge"
+        count={materials.length || undefined}
+        description="What Hint reads to write papers and answer questions for this class."
+        actions={
+          canEdit ? (
+            <Button
+              size="lg"
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {isUploading ? (
+                <CircleNotchIcon className="size-3.5 animate-spin" />
+              ) : (
+                <UploadIcon className="size-3.5" />
+              )}
+              {isUploading ? "Processing…" : "Add sources"}
+            </Button>
+          ) : null
+        }
+      />
 
       {canEdit && (
         <input
@@ -466,7 +476,7 @@ export function KnowledgePage() {
       {/* ── Failed-analysis strip ── */}
       {canEdit && failedCount > 0 && !isUploading && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/40 dark:bg-amber-950/40">
-          <RefreshCwIcon
+          <ArrowsClockwiseIcon
             className={cn(
               "size-4 shrink-0 text-amber-600 dark:text-amber-400",
               retryingIds.size > 0 && "animate-spin"
@@ -528,7 +538,7 @@ export function KnowledgePage() {
                     type="button"
                     className="inline-flex items-center gap-1.5 rounded-md border border-dashed px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50"
                   >
-                    <Users2Icon className="size-3.5" />
+                    <UsersIcon className="size-3.5" />
                     {extraClassSubjectIds.length > 0
                       ? `Also adding to ${extraClassSubjectIds.length} other class${extraClassSubjectIds.length === 1 ? "" : "es"}`
                       : "Also add to other classes"}
@@ -579,171 +589,160 @@ export function KnowledgePage() {
       )}
 
       {/* ── Sources ── */}
-      {isLoadingMaterials ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : materials.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-14 text-center">
-          <BookOpenIcon className="size-10 text-muted-foreground/25" />
-          <div>
-            <p className="text-sm font-medium text-secondary-foreground">
-              No sources yet
-            </p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {canEdit
-                ? "Upload a textbook or notes — the AI reads them to build exams for this class."
-                : "No materials uploaded for this class-subject yet."}
-            </p>
+      <LoadingSwap
+        loading={isLoadingMaterials}
+        skeleton={<MaterialListSkeleton grouped={false} rows={6} />}
+        className="flex-1"
+      >
+        {materials.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+            <Sticker name="point" size={120} />
+            <div className="flex max-w-[380px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                Nothing for Hint to read yet
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {canEdit
+                  ? "Upload the textbook or your notes. Every paper and answer for this class starts here. PDF or images, up to 50 MB each."
+                  : "No sources have been added for this class yet."}
+              </p>
+            </div>
+            {canEdit && (
+              <Button onClick={() => fileInputRef.current?.click()}>
+                <UploadIcon className="size-3.5" />
+                Add sources
+              </Button>
+            )}
           </div>
-          {canEdit && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <UploadIcon className="size-3.5" />
-              Add sources
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-sidebar hover:bg-sidebar">
-                <TableHead className="pl-4">Source</TableHead>
-                <TableHead className="hidden md:table-cell">Topics</TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  Shared with
-                </TableHead>
-                <TableHead className="hidden whitespace-nowrap sm:table-cell">
-                  Added
-                </TableHead>
-                <TableHead>Status</TableHead>
-                {canEdit && <TableHead className="w-20" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        ) : (
+          <MaterialList
+            meta={
+              <>
+                <span className="tabular-nums">
+                  {materials.length}{" "}
+                  {materials.length === 1 ? "source" : "sources"}
+                </span>
+                <span className="ml-auto">Newest first</span>
+              </>
+            }
+          >
+            <div className="-mx-3 flex flex-col">
               {materials.map((m) => {
                 const Icon = getFileIcon(m.file_url)
                 const otherLinks = m.linked_class_subject_ids.filter(
                   (id) => id !== classSubjectId
                 )
                 const tags = m.tags ?? []
+                const subtitle = [
+                  otherLinks.length > 0
+                    ? `also in ${otherLinks.map(primaryLabel).join(", ")}`
+                    : null,
+                  tags.join(", ") || null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+                const busy = processingIds.has(m.id) || retryingIds.has(m.id)
                 return (
-                  <TableRow key={m.id} className="group">
-                    <TableCell className="max-w-64 pl-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                          <Icon className="size-4 text-muted-foreground" />
-                        </div>
-                        <p className="truncate text-sm font-medium">
-                          {m.title}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden max-w-64 md:table-cell">
-                      {tags.length > 0 ? (
-                        <p
-                          title={tags.join(", ")}
-                          className="truncate text-xs text-muted-foreground"
-                        >
-                          {tags.slice(0, 3).join(", ")}
-                          {tags.length > 3 && (
-                            <span className="text-muted-foreground/60">
-                              {" "}
-                              +{tags.length - 3} more
+                  <MaterialRow
+                    key={m.id}
+                    icon={Icon}
+                    iconTitle={
+                      m.file_url.toLowerCase().endsWith(".pdf") ? "PDF" : "File"
+                    }
+                    title={m.title}
+                    subtitle={subtitle || undefined}
+                    onOpen={() => window.open(m.file_url, "_blank", "noopener")}
+                    right={
+                      <>
+                        <span className="flex w-24 items-center gap-1.5">
+                          {m.processed ? (
+                            <>
+                              <CheckCircleIcon
+                                weight="fill"
+                                className="size-4 text-emerald-500"
+                              />
+                              Ready
+                            </>
+                          ) : busy ? (
+                            <>
+                              <CircleNotchIcon className="size-4 animate-spin text-violet-500" />
+                              Analyzing
+                            </>
+                          ) : canEdit ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => retryProcessing(m.id)}
+                                  className="flex items-center gap-1.5 text-amber-600 transition-colors hover:text-amber-700 dark:text-amber-400"
+                                >
+                                  <ArrowsClockwiseIcon className="size-4" />
+                                  Retry
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Analysis failed — click to retry
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              Not ready
                             </span>
                           )}
-                        </p>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/40">
-                          —
                         </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden max-w-52 lg:table-cell">
-                      {otherLinks.length > 0 ? (
-                        <p
-                          title={otherLinks.map(primaryLabel).join(", ")}
-                          className="truncate text-xs text-muted-foreground"
-                        >
-                          {otherLinks.slice(0, 2).map(primaryLabel).join(", ")}
-                          {otherLinks.length > 2 && (
-                            <span className="text-muted-foreground/60">
-                              {" "}
-                              +{otherLinks.length - 2} more
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="w-14 text-right tabular-nums">
+                              {timeAgo(m.uploaded_at)}
                             </span>
-                          )}
-                        </p>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/40">
-                          Only this class
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden text-xs whitespace-nowrap text-muted-foreground sm:table-cell">
-                      {dayjs(m.uploaded_at).format("MMM D, YYYY")}
-                    </TableCell>
-                    <TableCell>
-                      {m.processed ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-emerald-700 dark:text-emerald-400">
-                          <SparklesIcon className="size-3" />
-                          Ready
-                        </span>
-                      ) : processingIds.has(m.id) || retryingIds.has(m.id) ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-blue-700 dark:text-blue-400">
-                          <Loader2Icon className="size-3 animate-spin" />
-                          Analyzing
-                        </span>
-                      ) : canEdit ? (
-                        <button
-                          onClick={() => retryProcessing(m.id)}
-                          className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-amber-700 transition-colors hover:bg-amber-500/25 dark:text-amber-400"
-                        >
-                          <RefreshCwIcon className="size-3" />
-                          Retry
-                        </button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/40">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-                    {canEdit && (
-                      <TableCell className="pr-3">
-                        <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button
-                            onClick={() => setEditLinksFor(m)}
-                            title="Share to other class-subjects"
-                            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          >
-                            <Link2Icon className="size-3.5" />
-                          </button>
-                          <button
-                            onClick={() => requestDeleteMaterial(m)}
-                            disabled={deletingIds.has(m.id)}
-                            title="Remove from this class"
-                            className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                          >
-                            {deletingIds.has(m.id) ? (
-                              <Loader2Icon className="size-3.5 animate-spin" />
-                            ) : (
-                              <Trash2Icon className="size-3.5" />
-                            )}
-                          </button>
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {dayjs(m.uploaded_at).format("D MMM YYYY")}
+                          </TooltipContent>
+                        </Tooltip>
+                        {canEdit && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="More"
+                                className="-mr-1 text-muted-foreground"
+                              >
+                                <DotsThreeIcon
+                                  weight="bold"
+                                  className="size-4"
+                                />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem
+                                onSelect={() => setEditLinksFor(m)}
+                              >
+                                <LinkSimpleIcon className="size-3.5" />
+                                Share to classes…
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                disabled={deletingIds.has(m.id)}
+                                onSelect={() => requestDeleteMaterial(m)}
+                              >
+                                <TrashIcon className="size-3.5" />
+                                Remove from this class
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </>
+                    }
+                  />
                 )
               })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+            </div>
+          </MaterialList>
+        )}
+      </LoadingSwap>
 
       <MaterialLinksDialog
         open={!!editLinksFor}

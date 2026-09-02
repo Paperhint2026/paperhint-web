@@ -8,14 +8,14 @@ import {
   BuildingIcon,
   CalendarIcon,
   GraduationCapIcon,
-  MailIcon,
+  EnvelopeIcon,
   PhoneIcon,
-} from "lucide-react"
-
+} from "@phosphor-icons/react"
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Spinner } from "@/components/ui/spinner"
+import { Skeleton } from "@/components/ui/skeleton"
+import { LoadingSwap } from "@/components/shared/loading-swap"
 
 interface ClassInfo {
   id: string
@@ -120,7 +120,7 @@ export function TeacherOverviewPage() {
     setError("")
     try {
       const res = await apiClient.get<{ teacher: TeacherOverview }>(
-        `/api/auth/teacher/${id}/overview`,
+        `/api/auth/teacher/${id}/overview`
       )
       setTeacher(res.teacher)
     } catch (err) {
@@ -134,27 +134,7 @@ export function TeacherOverviewPage() {
     fetchOverview()
   }, [fetchOverview])
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-full w-full items-center justify-center">
-        <Spinner className="size-6" />
-      </div>
-    )
-  }
-
-  if (error || !teacher) {
-    return (
-      <div className="flex min-h-full w-full flex-col items-center justify-center gap-4">
-        <p className="text-sm text-destructive">{error || "Teacher not found"}</p>
-        <Button variant="outline" onClick={() => navigate("/teachers")}>
-          <ArrowLeftIcon className="size-4" />
-          Back to Teachers
-        </Button>
-      </div>
-    )
-  }
-
-  const assignmentsByClass = teacher.assignments.reduce<
+  const assignmentsByClass = (teacher?.assignments ?? []).reduce<
     Record<string, { classInfo: ClassInfo; subjects: SubjectInfo[] }>
   >((acc, a) => {
     const key = a.class.id
@@ -166,187 +146,282 @@ export function TeacherOverviewPage() {
   }, {})
 
   return (
-    <div className="flex min-h-full w-full flex-col">
-      {/* Back button */}
-      <div className="px-4 pt-3 sm:px-6 sm:pt-4">
-        <button
-          className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          onClick={() => navigate("/teachers")}
-        >
-          <ArrowLeftIcon className="size-5" />
-        </button>
-      </div>
-
-      {/* Profile Card */}
-      <div className="mx-auto w-full max-w-4xl px-4 pt-3 sm:px-6">
-        <div className="relative overflow-hidden rounded-2xl">
-
-          {/* Status tag */}
-          {teacher.status && (
-            <span
-              className={`absolute right-4 top-4 z-20 rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize text-white ${STATUS_COLORS[teacher.status] ?? "bg-slate-500"}`}
+    <LoadingSwap
+      loading={isLoading}
+      skeleton={<OverviewSkeleton />}
+      className="min-h-full"
+    >
+      {error || !teacher ? (
+        <div className="flex min-h-full w-full flex-col items-center justify-center gap-4">
+          <p className="text-sm text-destructive">
+            {error || "Teacher not found"}
+          </p>
+          <Button variant="outline" onClick={() => navigate("/teachers")}>
+            <ArrowLeftIcon className="size-4" />
+            Back to Teachers
+          </Button>
+        </div>
+      ) : (
+        <div className="flex min-h-full w-full flex-col">
+          {/* Back button */}
+          <div className="px-4 pt-3 sm:px-6 sm:pt-4">
+            <button
+              className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => navigate("/teachers")}
             >
-              {teacher.status === "inactive" ? "In-Active" : teacher.status}
-            </span>
-          )}
+              <ArrowLeftIcon className="size-5" />
+            </button>
+          </div>
 
-          {/* Background gradient - department based */}
-          <div className={`absolute inset-0 bg-gradient-to-r ${getGradient(teacher.department_id).bg}`} />
-          <div
-            className="absolute inset-0 opacity-20"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)",
-              backgroundSize: "10px 10px",
-            }}
-          />
+          {/* Profile Card */}
+          <div className="mx-auto w-full max-w-4xl px-4 pt-3 sm:px-6">
+            <div className="relative overflow-hidden rounded-2xl">
+              {/* Status tag */}
+              {teacher.status && (
+                <span
+                  className={`absolute top-4 right-4 z-20 rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white capitalize ${STATUS_COLORS[teacher.status] ?? "bg-slate-500"}`}
+                >
+                  {teacher.status === "inactive" ? "In-Active" : teacher.status}
+                </span>
+              )}
 
-          {/* Content */}
-          <div className="relative flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:items-center sm:gap-6 sm:p-8 sm:text-left">
-            {/* Profile photo with department-tinted border */}
-            <div className="relative shrink-0">
-              <div className={`absolute -inset-1.5 rounded-xl bg-gradient-to-br ${getGradient(teacher.department_id).border}`} />
-              <div className="relative size-24 overflow-hidden rounded-lg sm:size-28">
-                {teacher.profile_url ? (
-                  <img
-                    src={teacher.profile_url}
-                    alt={teacher.full_name}
-                    className="size-full object-cover"
+              {/* Background gradient - department based */}
+              <div
+                className={`absolute inset-0 bg-gradient-to-r ${getGradient(teacher.department_id).bg}`}
+              />
+              <div
+                className="absolute inset-0 opacity-20"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)",
+                  backgroundSize: "10px 10px",
+                }}
+              />
+
+              {/* Content */}
+              <div className="relative flex flex-col items-center gap-4 p-6 text-center sm:flex-row sm:items-center sm:gap-6 sm:p-8 sm:text-left">
+                {/* Profile photo with department-tinted border */}
+                <div className="relative shrink-0">
+                  <div
+                    className={`absolute -inset-1.5 rounded-xl bg-gradient-to-br ${getGradient(teacher.department_id).border}`}
                   />
-                ) : (
-                  <div className="flex size-full items-center justify-center bg-white/10 text-2xl font-bold text-white/40 sm:text-3xl">
-                    {getInitials(teacher.full_name)}
+                  <div className="relative size-24 overflow-hidden rounded-lg sm:size-28">
+                    {teacher.profile_url ? (
+                      <img
+                        src={teacher.profile_url}
+                        alt={teacher.full_name}
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center bg-white/10 text-2xl font-bold text-white/40 sm:text-3xl">
+                        {getInitials(teacher.full_name)}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+
+                {/* Info */}
+                <div className="flex flex-1 flex-col gap-2">
+                  <h1 className="text-xl font-bold text-white sm:text-2xl">
+                    {teacher.full_name}
+                  </h1>
+                  {(teacher.designation || teacher.department_name) && (
+                    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-start">
+                      {teacher.designation && (
+                        <p className="text-sm font-medium text-white/60">
+                          {teacher.designation}
+                        </p>
+                      )}
+                      {teacher.designation && teacher.department_name && (
+                        <span className="text-white/30">·</span>
+                      )}
+                      {teacher.department_name && (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-white/60">
+                          <BuildingIcon className="size-3.5" />
+                          {teacher.department_name}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-white/50 sm:justify-start sm:text-sm">
+                    <span className="inline-flex items-center gap-1.5">
+                      <EnvelopeIcon className="size-3.5" />
+                      <span className="break-all">{teacher.email}</span>
+                    </span>
+                    {teacher.phone_number && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <PhoneIcon className="size-3.5" />
+                        {teacher.phone_number}
+                      </span>
+                    )}
+                    {teacher.date_of_joining && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <CalendarIcon className="size-3.5" />
+                        Joined{" "}
+                        {dayjs(teacher.date_of_joining).format("MMM DD, YYYY")}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
 
-            {/* Info */}
-            <div className="flex flex-1 flex-col gap-2">
-              <h1 className="text-xl font-bold text-white sm:text-2xl">
-                {teacher.full_name}
-              </h1>
-              {(teacher.designation || teacher.department_name) && (
-                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-start">
-                  {teacher.designation && (
-                    <p className="text-sm font-medium text-white/60">
-                      {teacher.designation}
-                    </p>
-                  )}
-                  {teacher.designation && teacher.department_name && (
-                    <span className="text-white/30">·</span>
-                  )}
-                  {teacher.department_name && (
-                    <span className="inline-flex items-center gap-1.5 text-sm text-white/60">
-                      <BuildingIcon className="size-3.5" />
-                      {teacher.department_name}
-                    </span>
+          {/* Stats & Content */}
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+            {/* Stat cards */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <StatCard
+                icon={GraduationCapIcon}
+                label="Classes"
+                value={teacher.total_classes}
+                color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              />
+              <StatCard
+                icon={BookOpenIcon}
+                label="Subjects"
+                value={teacher.total_subjects}
+                color="bg-sky-500/10 text-sky-600 dark:text-sky-400"
+              />
+            </div>
+
+            <Separator />
+
+            {/* Assignments grouped by class */}
+            <div className="flex flex-col gap-4">
+              <h2 className="flex items-center gap-2 text-base font-medium text-secondary-foreground">
+                <BriefcaseIcon className="size-4" />
+                Class &amp; Subject Assignments
+              </h2>
+
+              {Object.keys(assignmentsByClass).length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-10">
+                  <p className="text-sm text-muted-foreground">
+                    No assignments yet
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {Object.values(assignmentsByClass).map(
+                    ({ classInfo, subjects }) => (
+                      <div
+                        key={classInfo.id}
+                        className="flex flex-col gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/30"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="flex size-9 items-center justify-center rounded-lg bg-indigo-500/10">
+                              <GraduationCapIcon className="size-4 text-indigo-600 dark:text-indigo-400" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-secondary-foreground">
+                                Grade {classInfo.grade} - Section{" "}
+                                {classInfo.section}
+                              </p>
+                              {classInfo.academic_year && (
+                                <p className="text-xs text-muted-foreground">
+                                  {classInfo.academic_year}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            {subjects.length}{" "}
+                            {subjects.length === 1 ? "subject" : "subjects"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {subjects.map((sub) => (
+                            <span
+                              key={sub.id}
+                              className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-secondary-foreground"
+                            >
+                              <BookOpenIcon className="size-3 text-muted-foreground" />
+                              {sub.subject_name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )
                   )}
                 </div>
               )}
-              <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-white/50 sm:justify-start sm:text-sm">
-                <span className="inline-flex items-center gap-1.5">
-                  <MailIcon className="size-3.5" />
-                  <span className="break-all">{teacher.email}</span>
-                </span>
-                {teacher.phone_number && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <PhoneIcon className="size-3.5" />
-                    {teacher.phone_number}
-                  </span>
-                )}
-                {teacher.date_of_joining && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <CalendarIcon className="size-3.5" />
-                    Joined{" "}
-                    {dayjs(teacher.date_of_joining).format("MMM DD, YYYY")}
-                  </span>
-                )}
-              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </LoadingSwap>
+  )
+}
+
+/** The overview before the teacher arrives: back control, the profile band
+ *  with its photo and name, the two stat cards, then the assignment grid. */
+function OverviewSkeleton() {
+  return (
+    <div aria-hidden className="flex min-h-full w-full flex-col">
+      <div className="px-4 pt-3 sm:px-6 sm:pt-4">
+        <Skeleton className="size-9 rounded-full" />
+      </div>
+
+      <div className="mx-auto w-full max-w-4xl px-4 pt-3 sm:px-6">
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-muted/40 p-6 text-center sm:flex-row sm:gap-6 sm:p-8">
+          <Skeleton className="size-24 shrink-0 rounded-lg sm:size-28" />
+          <div className="flex w-full flex-1 flex-col items-center gap-2.5 sm:items-start">
+            <Skeleton className="h-7 w-56" />
+            <Skeleton className="h-4 w-40" />
+            <div className="mt-1 flex flex-wrap justify-center gap-4 sm:justify-start">
+              <Skeleton className="h-3.5 w-44" />
+              <Skeleton className="h-3.5 w-28" />
+              <Skeleton className="h-3.5 w-36" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stats & Content */}
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        {/* Stat cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <StatCard
-            icon={GraduationCapIcon}
-            label="Classes"
-            value={teacher.total_classes}
-            color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-          />
-          <StatCard
-            icon={BookOpenIcon}
-            label="Subjects"
-            value={teacher.total_subjects}
-            color="bg-sky-500/10 text-sky-600 dark:text-sky-400"
-          />
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-4 rounded-lg border bg-background p-4"
+            >
+              <Skeleton className="size-11 shrink-0 rounded-lg" />
+              <div className="flex flex-col gap-1.5">
+                <Skeleton className="h-7 w-10" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+          ))}
         </div>
 
         <Separator />
 
-        {/* Assignments grouped by class */}
         <div className="flex flex-col gap-4">
-          <h2 className="flex items-center gap-2 text-base font-medium text-secondary-foreground">
-            <BriefcaseIcon className="size-4" />
-            Class &amp; Subject Assignments
-          </h2>
-
-          {Object.keys(assignmentsByClass).length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-10">
-              <p className="text-sm text-muted-foreground">
-                No assignments yet
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {Object.values(assignmentsByClass).map(
-                ({ classInfo, subjects }) => (
-                  <div
-                    key={classInfo.id}
-                    className="flex flex-col gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/30"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="flex size-9 items-center justify-center rounded-lg bg-indigo-500/10">
-                          <GraduationCapIcon className="size-4 text-indigo-600 dark:text-indigo-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-secondary-foreground">
-                            Grade {classInfo.grade} - Section{" "}
-                            {classInfo.section}
-                          </p>
-                          {classInfo.academic_year && (
-                            <p className="text-xs text-muted-foreground">
-                              {classInfo.academic_year}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        {subjects.length}{" "}
-                        {subjects.length === 1 ? "subject" : "subjects"}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {subjects.map((sub) => (
-                        <span
-                          key={sub.id}
-                          className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-secondary-foreground"
-                        >
-                          <BookOpenIcon className="size-3 text-muted-foreground" />
-                          {sub.subject_name}
-                        </span>
-                      ))}
+          <Skeleton className="h-5 w-56" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex flex-col gap-3 rounded-lg border bg-background p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="size-9 rounded-lg" />
+                    <div className="flex flex-col gap-1.5">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="h-3 w-16" />
                     </div>
                   </div>
-                ),
-              )}
-            </div>
-          )}
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

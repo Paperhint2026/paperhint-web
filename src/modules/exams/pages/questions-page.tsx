@@ -3,16 +3,16 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CheckIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  EditIcon,
+  CaretDownIcon,
+  CaretRightIcon,
+  PencilSimpleIcon,
   LockIcon,
-  FileOutputIcon,
-  Loader2Icon,
+  ExportIcon,
+  CircleNotchIcon,
   PlusIcon,
-  Trash2Icon,
+  TrashIcon,
   XIcon,
-} from "lucide-react"
+} from "@phosphor-icons/react"
 import "katex/dist/katex.min.css"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
@@ -25,6 +25,8 @@ import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { LoadingSwap } from "@/components/shared/loading-swap"
 import { QuestionMediaEditor } from "@/modules/exams/components/question-media-editor"
 import {
   AlertDialog,
@@ -54,15 +56,75 @@ interface Exam {
   id: string
   exam_name: string
   total_marks: number
-  blueprint: { section: string; type: string; num_questions: number; marks_per_question: number }[]
+  blueprint: {
+    section: string
+    type: string
+    num_questions: number
+    marks_per_question: number
+  }[]
   chapters_selected: string[]
   // Server-computed: true once ANY student submission for this exam has
   // reached the graded status. See exams.controller.js -> isExamLockedForEditing.
   locked_for_editing?: boolean
 }
 
+/** The page while it loads, in the same frame as the loaded page. */
+function QuestionsSkeleton() {
+  return (
+    <div aria-hidden className="flex h-full flex-col overflow-hidden">
+      {/* Header: back, exam name over its facts, the two actions */}
+      <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:px-6 sm:py-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+          <Skeleton className="size-7 shrink-0 rounded-md" />
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Skeleton className="h-5 w-56 max-w-full" />
+            <Skeleton className="h-3 w-40" />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Skeleton className="h-8 flex-1 sm:w-28 sm:flex-none" />
+          <Skeleton className="h-8 flex-1 sm:w-20 sm:flex-none" />
+        </div>
+      </div>
+      {/* Paper: two collapsible sections with their question rows */}
+      <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 sm:px-6 sm:py-5">
+        <div className="mx-auto max-w-3xl space-y-6">
+          {[3, 2].map((rows, s) => (
+            <div key={s} className="rounded-xl border">
+              <div className="flex items-center justify-between rounded-t-xl bg-muted/50 px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="size-4 rounded" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-5 w-14 rounded-md" />
+                </div>
+                <Skeleton className="h-3 w-32" />
+              </div>
+              <div className="divide-y">
+                {Array.from({ length: rows }).map((_, i) => (
+                  <div key={i} className="flex flex-col gap-2 px-5 py-4">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-8" />
+                      <Skeleton className="h-4 w-12 rounded" />
+                      <Skeleton className="ml-auto h-4 w-16" />
+                    </div>
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function QuestionsPage() {
-  const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
+  const { classSubjectId, examId } = useParams<{
+    classSubjectId: string
+    examId: string
+  }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const editQueryId = searchParams.get("edit")
   const navigate = useNavigate()
@@ -72,7 +134,9 @@ export function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set()
+  )
 
   // Edit state
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null)
@@ -106,7 +170,7 @@ export function QuestionsPage() {
     setIsLoading(true)
     try {
       const res = await apiClient.get<{ exam: Exam; questions: Question[] }>(
-        `/api/exams/${examId}`,
+        `/api/exams/${examId}`
       )
       setExam(res.exam)
       setQuestions(res.questions ?? [])
@@ -125,12 +189,15 @@ export function QuestionsPage() {
     fetchExam()
   }, [fetchExam])
 
-  const sectionGroups = questions.reduce<Record<string, Question[]>>((acc, q) => {
-    const sec = q.section || "Other"
-    if (!acc[sec]) acc[sec] = []
-    acc[sec].push(q)
-    return acc
-  }, {})
+  const sectionGroups = questions.reduce<Record<string, Question[]>>(
+    (acc, q) => {
+      const sec = q.section || "Other"
+      if (!acc[sec]) acc[sec] = []
+      acc[sec].push(q)
+      return acc
+    },
+    {}
+  )
 
   const sortedSections = Object.keys(sectionGroups).sort()
 
@@ -213,7 +280,9 @@ export function QuestionsPage() {
     if (!deleteQuestion) return
     setIsDeletingQuestion(true)
     try {
-      await apiClient.delete(`/api/exams/${examId}/questions/${deleteQuestion.id}`)
+      await apiClient.delete(
+        `/api/exams/${examId}/questions/${deleteQuestion.id}`
+      )
       toast.success("Question deleted")
       setDeleteQuestion(null)
       fetchExam()
@@ -229,9 +298,12 @@ export function QuestionsPage() {
     setIsAddingQuestion(true)
     try {
       const sectionQuestions = sectionGroups[section] || []
-      const lastNum = sectionQuestions.length > 0
-        ? Math.max(...sectionQuestions.map((q) => parseInt(q.question_number) || 0))
-        : 0
+      const lastNum =
+        sectionQuestions.length > 0
+          ? Math.max(
+              ...sectionQuestions.map((q) => parseInt(q.question_number) || 0)
+            )
+          : 0
 
       await apiClient.post(`/api/exams/${examId}/questions`, {
         question_text: newQuestionText.trim(),
@@ -261,410 +333,472 @@ export function QuestionsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
-      </div>
+      <LoadingSwap loading skeleton={<QuestionsSkeleton />} className="h-full">
+        {null}
+      </LoadingSwap>
     )
   }
 
   if (!exam) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">Exam not found</p>
-        <Button variant="outline" onClick={() => navigate(backUrl)}>
-          Back to Exams
-        </Button>
-      </div>
+      <LoadingSwap
+        loading={false}
+        skeleton={<QuestionsSkeleton />}
+        className="h-full"
+      >
+        <div className="flex h-full flex-col items-center justify-center gap-4">
+          <p className="text-muted-foreground">Exam not found</p>
+          <Button variant="outline" onClick={() => navigate(backUrl)}>
+            Back to Exams
+          </Button>
+        </div>
+      </LoadingSwap>
     )
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:px-6 sm:py-4">
-        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
-          <button
-            onClick={() => navigate(backUrl)}
-            className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <ArrowLeftIcon className="size-4" />
-          </button>
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold sm:text-lg">{exam.exam_name}</h1>
-            <p className="truncate text-xs text-muted-foreground">
-              {questions.length} questions · {exam.total_marks} marks
-              {exam.chapters_selected?.length > 0 && (
-                <> · {exam.chapters_selected.join(", ")}</>
-              )}
-            </p>
+    <LoadingSwap
+      loading={false}
+      skeleton={<QuestionsSkeleton />}
+      className="h-full"
+    >
+      <div className="flex h-full flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:px-6 sm:py-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+            <button
+              onClick={() => navigate(backUrl)}
+              className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ArrowLeftIcon className="size-4" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold sm:text-lg">
+                {exam.exam_name}
+              </h1>
+              <p className="truncate text-xs text-muted-foreground">
+                {questions.length} questions · {exam.total_marks} marks
+                {exam.chapters_selected?.length > 0 && (
+                  <> · {exam.chapters_selected.join(", ")}</>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 text-xs sm:flex-none sm:text-sm"
+              onClick={() => setShowAnswerKeys(!showAnswerKeys)}
+            >
+              {showAnswerKeys ? "Hide Answers" : "Show Answers"}
+            </Button>
+            <Button
+              size="sm"
+              className="flex-1 text-xs sm:flex-none sm:text-sm"
+              onClick={() =>
+                navigate(`/class/${classSubjectId}/exams/${examId}/pdf-builder`)
+              }
+            >
+              <ExportIcon className="mr-1.5 size-4" />
+              PDF
+            </Button>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 text-xs sm:flex-none sm:text-sm"
-            onClick={() => setShowAnswerKeys(!showAnswerKeys)}
-          >
-            {showAnswerKeys ? "Hide Answers" : "Show Answers"}
-          </Button>
-          <Button
-            size="sm"
-            className="flex-1 text-xs sm:flex-none sm:text-sm"
-            onClick={() =>
-              navigate(`/class/${classSubjectId}/exams/${examId}/pdf-builder`)
-            }
-          >
-            <FileOutputIcon className="mr-1.5 size-4" />
-            PDF
-          </Button>
-        </div>
-      </div>
 
-      {/* Question Paper */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-        <div className="mx-auto max-w-3xl space-y-6">
-          {exam?.locked_for_editing && (
-            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-950/30">
-              <LockIcon className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
-              <div className="text-sm">
-                <p className="font-medium text-amber-900 dark:text-amber-200">
-                  Editing locked
-                </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-amber-800/90 dark:text-amber-300/90">
-                  Grading has started for this exam, so questions can no longer be added, edited, or removed. Editing a question after marks are awarded would silently invalidate them. To reopen editing, delete the graded submissions from the grading page.
-                </p>
+        {/* Question Paper */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          <div className="mx-auto max-w-3xl space-y-6">
+            {exam?.locked_for_editing && (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800/50 dark:bg-amber-950/30">
+                <LockIcon
+                  className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400"
+                  aria-hidden="true"
+                />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-900 dark:text-amber-200">
+                    Editing locked
+                  </p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-amber-800/90 dark:text-amber-300/90">
+                    Grading has started for this exam, so questions can no
+                    longer be added, edited, or removed. Editing a question
+                    after marks are awarded would silently invalidate them. To
+                    reopen editing, delete the graded submissions from the
+                    grading page.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {sortedSections.map((section) => {
-            const sectionQuestions = sectionGroups[section]
-            const bp = getBlueprintForSection(section)
-            const isExpanded = expandedSections.has(section)
-            const sectionMarks = sectionQuestions.reduce((sum, q) => sum + (q.marks || 0), 0)
+            {sortedSections.map((section) => {
+              const sectionQuestions = sectionGroups[section]
+              const bp = getBlueprintForSection(section)
+              const isExpanded = expandedSections.has(section)
+              const sectionMarks = sectionQuestions.reduce(
+                (sum, q) => sum + (q.marks || 0),
+                0
+              )
 
-            return (
-              <div key={section} className="rounded-xl border">
-                {/* Section header */}
-                <button
-                  onClick={() => toggleSection(section)}
-                  className="flex w-full items-center justify-between rounded-t-xl bg-muted/50 px-5 py-3.5 text-left transition-colors hover:bg-muted/70"
-                >
-                  <div className="flex items-center gap-3">
-                    {isExpanded ? (
-                      <ChevronDownIcon className="size-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRightIcon className="size-4 text-muted-foreground" />
-                    )}
-                    <h2 className="text-sm font-semibold">Section {section}</h2>
-                    {bp && (
-                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                        {bp.type}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {sectionQuestions.length} questions · {sectionMarks} marks
-                  </span>
-                </button>
+              return (
+                <div key={section} className="rounded-xl border">
+                  {/* Section header */}
+                  <button
+                    onClick={() => toggleSection(section)}
+                    className="flex w-full items-center justify-between rounded-t-xl bg-muted/50 px-5 py-3.5 text-left transition-colors hover:bg-muted/70"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isExpanded ? (
+                        <CaretDownIcon className="size-4 text-muted-foreground" />
+                      ) : (
+                        <CaretRightIcon className="size-4 text-muted-foreground" />
+                      )}
+                      <h2 className="text-sm font-semibold">
+                        Section {section}
+                      </h2>
+                      {bp && (
+                        <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                          {bp.type}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {sectionQuestions.length} questions · {sectionMarks} marks
+                    </span>
+                  </button>
 
-                {/* Questions */}
-                {isExpanded && (
-                  <div className="divide-y">
-                    {sectionQuestions
-                      .sort((a, b) => a.question_order - b.question_order)
-                      .map((q) => (
-                        <div
-                          key={q.id}
-                          id={`question-${q.id}`}
-                          className={cn(
-                            "group relative px-5 py-4 transition-colors",
-                            // Highlight the whole row while it is being
-                            // edited — a soft accent tint + a real ring so
-                            // the teacher can't lose the active question
-                            // when they scroll around the page.
-                            // Background-only highlight while editing — no ring, no
-                            // rounded corners. The tint fills the row edge-to-edge so it
-                            // reads as part of the section's flush layout.
-                            editingQuestion === q.id && "bg-primary/[0.06]"
-                          )}
-                        >
-                          {editingQuestion === q.id ? (
-                            /* Edit mode */
-                            <div className="space-y-3">
-                              {/* Sticky header so the teacher always sees which
+                  {/* Questions */}
+                  {isExpanded && (
+                    <div className="divide-y">
+                      {sectionQuestions
+                        .sort((a, b) => a.question_order - b.question_order)
+                        .map((q) => (
+                          <div
+                            key={q.id}
+                            id={`question-${q.id}`}
+                            className={cn(
+                              "group relative px-5 py-4 transition-colors",
+                              // Highlight the whole row while it is being
+                              // edited — a soft accent tint + a real ring so
+                              // the teacher can't lose the active question
+                              // when they scroll around the page.
+                              // Background-only highlight while editing — no ring, no
+                              // rounded corners. The tint fills the row edge-to-edge so it
+                              // reads as part of the section's flush layout.
+                              editingQuestion === q.id && "bg-primary/[0.06]"
+                            )}
+                          >
+                            {editingQuestion === q.id ? (
+                              /* Edit mode */
+                              <div className="space-y-3">
+                                {/* Sticky header so the teacher always sees which
                                   question this form belongs to, even when the
                                   question text is long enough to scroll. */}
-                              <div className="flex flex-wrap items-center gap-2 border-b pb-2 text-sm">
-                                <span className="font-semibold">
-                                  Editing Q{q.question_number}
-                                </span>
-                                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                  {q.marks} {q.marks === 1 ? "mark" : "marks"}
-                                </span>
-                                {q.type && (
-                                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
-                                    {q.type}
+                                <div className="flex flex-wrap items-center gap-2 border-b pb-2 text-sm">
+                                  <span className="font-semibold">
+                                    Editing Q{q.question_number}
                                   </span>
-                                )}
-                                {q.section && (
-                                  <span className="ml-auto text-[11px] text-muted-foreground">
-                                    Section {q.section}
+                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                    {q.marks} {q.marks === 1 ? "mark" : "marks"}
                                   </span>
-                                )}
-                              </div>
-                              <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-muted-foreground">
-                                  Question Text
-                                </label>
-                                <QuestionMediaEditor
-                                  value={editText}
-                                  onChange={setEditText}
-                                  examId={examId ?? ""}
-                                  questionId={q.id}
-                                  rows={4}
-                                />
-                              </div>
-
-                              {editOptions.length > 0 && (
+                                  {q.type && (
+                                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                                      {q.type}
+                                    </span>
+                                  )}
+                                  {q.section && (
+                                    <span className="ml-auto text-[11px] text-muted-foreground">
+                                      Section {q.section}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="space-y-1.5">
                                   <label className="text-xs font-medium text-muted-foreground">
-                                    Options
+                                    Question Text
                                   </label>
-                                  {editOptions.map((opt, i) => (
+                                  <QuestionMediaEditor
+                                    value={editText}
+                                    onChange={setEditText}
+                                    examId={examId ?? ""}
+                                    questionId={q.id}
+                                    rows={4}
+                                  />
+                                </div>
+
+                                {editOptions.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-medium text-muted-foreground">
+                                      Options
+                                    </label>
+                                    {editOptions.map((opt, i) => (
+                                      <Input
+                                        key={i}
+                                        value={opt}
+                                        onChange={(e) => {
+                                          const updated = [...editOptions]
+                                          updated[i] = e.target.value
+                                          setEditOptions(updated)
+                                        }}
+                                        className="h-8 text-xs"
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-medium text-muted-foreground">
+                                      Marks
+                                    </label>
                                     <Input
-                                      key={i}
-                                      value={opt}
-                                      onChange={(e) => {
-                                        const updated = [...editOptions]
-                                        updated[i] = e.target.value
-                                        setEditOptions(updated)
-                                      }}
+                                      type="number"
+                                      min={1}
+                                      value={editMarks}
+                                      onChange={(e) =>
+                                        setEditMarks(Number(e.target.value))
+                                      }
                                       className="h-8 text-xs"
                                     />
-                                  ))}
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-medium text-muted-foreground">
+                                      Answer Key
+                                    </label>
+                                    <textarea
+                                      value={editAnswerKey}
+                                      onChange={(e) =>
+                                        setEditAnswerKey(e.target.value)
+                                      }
+                                      rows={2}
+                                      className="w-full rounded-lg border bg-background px-3 py-2 text-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    />
+                                  </div>
                                 </div>
-                              )}
 
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-medium text-muted-foreground">
-                                    Marks
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    value={editMarks}
-                                    onChange={(e) => setEditMarks(Number(e.target.value))}
-                                    className="h-8 text-xs"
-                                  />
-                                </div>
-                                <div className="space-y-1.5">
-                                  <label className="text-xs font-medium text-muted-foreground">
-                                    Answer Key
-                                  </label>
-                                  <textarea
-                                    value={editAnswerKey}
-                                    onChange={(e) => setEditAnswerKey(e.target.value)}
-                                    rows={2}
-                                    className="w-full rounded-lg border bg-background px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  />
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={cancelEdit}
+                                  >
+                                    <XIcon className="mr-1 size-3" /> Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => saveEdit(q)}
+                                    disabled={isSavingQuestion}
+                                  >
+                                    {isSavingQuestion ? (
+                                      <CircleNotchIcon className="mr-1 size-3 animate-spin" />
+                                    ) : (
+                                      <CheckIcon className="mr-1 size-3" />
+                                    )}
+                                    Save
+                                  </Button>
                                 </div>
                               </div>
-
-                              <div className="flex justify-end gap-2">
-                                <Button variant="outline" size="sm" onClick={cancelEdit}>
-                                  <XIcon className="mr-1 size-3" /> Cancel
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => saveEdit(q)}
-                                  disabled={isSavingQuestion}
-                                >
-                                  {isSavingQuestion ? (
-                                    <Loader2Icon className="mr-1 size-3 animate-spin" />
-                                  ) : (
-                                    <CheckIcon className="mr-1 size-3" />
-                                  )}
-                                  Save
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            /* View mode */
-                            <>
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <span className="font-semibold text-foreground">
-                                      Q{q.question_number}.
-                                    </span>
-                                    <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
-                                      {q.marks} {q.marks === 1 ? "mark" : "marks"}
-                                    </span>
-                                    {q.type && (
-                                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
-                                        {q.type}
+                            ) : (
+                              /* View mode */
+                              <>
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <span className="font-semibold text-foreground">
+                                        Q{q.question_number}.
                                       </span>
+                                      <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
+                                        {q.marks}{" "}
+                                        {q.marks === 1 ? "mark" : "marks"}
+                                      </span>
+                                      {q.type && (
+                                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
+                                          {q.type}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div
+                                      data-selectable
+                                      className="mt-2 text-sm leading-relaxed"
+                                    >
+                                      <ReactMarkdown
+                                        remarkPlugins={[remarkMath, remarkGfm]}
+                                        rehypePlugins={[rehypeRaw, rehypeKatex]}
+                                      >
+                                        {q.question_text}
+                                      </ReactMarkdown>
+                                    </div>
+
+                                    {q.options && q.options.length > 0 && (
+                                      <div className="mt-2 grid grid-cols-2 gap-1.5">
+                                        {q.options.map((opt, i) => (
+                                          <span
+                                            key={i}
+                                            className="rounded-md bg-muted/50 px-3 py-1.5 text-xs"
+                                          >
+                                            {opt}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {showAnswerKeys && q.answer_key && (
+                                      <div className="mt-3 rounded-lg border border-green-200 bg-green-50/50 px-4 py-2.5 dark:border-green-900 dark:bg-green-950/20">
+                                        <p className="mb-1 text-[10px] font-semibold text-green-600 dark:text-green-400">
+                                          Answer Key
+                                        </p>
+                                        <p className="text-xs leading-relaxed text-green-700 dark:text-green-300">
+                                          {q.answer_key}
+                                        </p>
+                                      </div>
                                     )}
                                   </div>
-                                  <div className="mt-2 text-sm leading-relaxed">
-                                    <ReactMarkdown
-                                      remarkPlugins={[remarkMath, remarkGfm]}
-                                      rehypePlugins={[rehypeRaw, rehypeKatex]}
-                                    >
-                                      {q.question_text}
-                                    </ReactMarkdown>
-                                  </div>
 
-                                  {q.options && q.options.length > 0 && (
-                                    <div className="mt-2 grid grid-cols-2 gap-1.5">
-                                      {q.options.map((opt, i) => (
-                                        <span
-                                          key={i}
-                                          className="rounded-md bg-muted/50 px-3 py-1.5 text-xs"
-                                        >
-                                          {opt}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {showAnswerKeys && q.answer_key && (
-                                    <div className="mt-3 rounded-lg border border-green-200 bg-green-50/50 px-4 py-2.5 dark:border-green-900 dark:bg-green-950/20">
-                                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-green-600 dark:text-green-400">
-                                        Answer Key
-                                      </p>
-                                      <p className="text-xs leading-relaxed text-green-700 dark:text-green-300">
-                                        {q.answer_key}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Action buttons — hidden once the exam is
+                                  {/* Action buttons — hidden once the exam is
                                     locked for editing (a submission has been
                                     graded). Server also 409s these routes
                                     with code: "exam_locked_for_editing". */}
-                                {!exam?.locked_for_editing && (
-                                  <div className="flex shrink-0 gap-1">
-                                    <button
-                                      onClick={() => startEdit(q)}
-                                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                    >
-                                      <EditIcon className="size-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => setDeleteQuestion(q)}
-                                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                    >
-                                      <Trash2Icon className="size-3.5" />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
+                                  {!exam?.locked_for_editing && (
+                                    <div className="flex shrink-0 gap-1">
+                                      <button
+                                        onClick={() => startEdit(q)}
+                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                      >
+                                        <PencilSimpleIcon className="size-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => setDeleteQuestion(q)}
+                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                      >
+                                        <TrashIcon className="size-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
 
-                    {/* Add question to section */}
-                    {addingToSection === section ? (
-                      <div className="space-y-3 border-t bg-muted/10 px-5 py-4">
-                        <textarea
-                          value={newQuestionText}
-                          onChange={(e) => setNewQuestionText(e.target.value)}
-                          placeholder="Enter question text..."
-                          rows={3}
-                          className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-medium text-muted-foreground">Type</label>
-                            <Input
-                              value={newQuestionType}
-                              onChange={(e) => setNewQuestionType(e.target.value)}
-                              placeholder={bp?.type || "MCQ"}
-                              className="h-8 text-xs"
-                            />
+                      {/* Add question to section */}
+                      {addingToSection === section ? (
+                        <div className="space-y-3 border-t bg-muted/10 px-5 py-4">
+                          <textarea
+                            value={newQuestionText}
+                            onChange={(e) => setNewQuestionText(e.target.value)}
+                            placeholder="Enter question text..."
+                            rows={3}
+                            className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          />
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-medium text-muted-foreground">
+                                Type
+                              </label>
+                              <Input
+                                value={newQuestionType}
+                                onChange={(e) =>
+                                  setNewQuestionType(e.target.value)
+                                }
+                                placeholder={bp?.type || "MCQ"}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-medium text-muted-foreground">
+                                Marks
+                              </label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={newQuestionMarks}
+                                onChange={(e) =>
+                                  setNewQuestionMarks(Number(e.target.value))
+                                }
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-medium text-muted-foreground">
+                                Answer Key
+                              </label>
+                              <Input
+                                value={newAnswerKey}
+                                onChange={(e) =>
+                                  setNewAnswerKey(e.target.value)
+                                }
+                                placeholder="Answer..."
+                                className="h-8 text-xs"
+                              />
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-medium text-muted-foreground">Marks</label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={newQuestionMarks}
-                              onChange={(e) => setNewQuestionMarks(Number(e.target.value))}
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-medium text-muted-foreground">Answer Key</label>
-                            <Input
-                              value={newAnswerKey}
-                              onChange={(e) => setNewAnswerKey(e.target.value)}
-                              placeholder="Answer..."
-                              className="h-8 text-xs"
-                            />
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setAddingToSection(null)
+                                setNewQuestionText("")
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleAddQuestion(section)}
+                              disabled={isAddingQuestion}
+                            >
+                              {isAddingQuestion && (
+                                <CircleNotchIcon className="mr-1 size-3 animate-spin" />
+                              )}
+                              Add Question
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => { setAddingToSection(null); setNewQuestionText("") }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddQuestion(section)}
-                            disabled={isAddingQuestion}
-                          >
-                            {isAddingQuestion && <Loader2Icon className="mr-1 size-3 animate-spin" />}
-                            Add Question
-                          </Button>
-                        </div>
-                      </div>
-                    ) : !exam?.locked_for_editing ? (
-                      <button
-                        onClick={() => {
-                          setAddingToSection(section)
-                          setNewQuestionMarks(bp?.marks_per_question || 1)
-                          setNewQuestionType(bp?.type || "")
-                        }}
-                        className="flex w-full items-center justify-center gap-1.5 border-t px-5 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
-                      >
-                        <PlusIcon className="size-3.5" />
-                        Add Question
-                      </button>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+                      ) : !exam?.locked_for_editing ? (
+                        <button
+                          onClick={() => {
+                            setAddingToSection(section)
+                            setNewQuestionMarks(bp?.marks_per_question || 1)
+                            setNewQuestionType(bp?.type || "")
+                          }}
+                          className="flex w-full items-center justify-center gap-1.5 border-t px-5 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
+                        >
+                          <PlusIcon className="size-3.5" />
+                          Add Question
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
 
-      {/* Delete question confirmation */}
-      <AlertDialog open={!!deleteQuestion} onOpenChange={() => setDeleteQuestion(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Question</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete Q{deleteQuestion?.question_number}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteQuestion} disabled={isDeletingQuestion}>
-              {isDeletingQuestion ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        {/* Delete question confirmation */}
+        <AlertDialog
+          open={!!deleteQuestion}
+          onOpenChange={() => setDeleteQuestion(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Question</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete Q
+                {deleteQuestion?.question_number}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteQuestion}
+                disabled={isDeletingQuestion}
+              >
+                {isDeletingQuestion ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </LoadingSwap>
   )
 }

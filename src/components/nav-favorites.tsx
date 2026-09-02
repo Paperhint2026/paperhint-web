@@ -16,8 +16,13 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { MoreHorizontalIcon, StarOffIcon, LinkIcon, ArrowUpRightIcon, Trash2Icon } from "lucide-react"
-
+import {
+  DotsThreeIcon,
+  StarIcon,
+  LinkIcon,
+  ArrowUpRightIcon,
+  TrashIcon,
+} from "@phosphor-icons/react"
 export function NavFavorites({
   favorites,
 }: {
@@ -36,7 +41,7 @@ export function NavFavorites({
         {favorites.map((item) => (
           <SidebarMenuItem key={item.name}>
             <SidebarMenuButton asChild>
-              <a href={item.url} title={item.name}>
+              <a href={item.url}>
                 <span>{item.emoji}</span>
                 <span>{item.name}</span>
               </a>
@@ -47,8 +52,7 @@ export function NavFavorites({
                   showOnHover
                   className="aria-expanded:bg-muted"
                 >
-                  <MoreHorizontalIcon
-                  />
+                  <DotsThreeIcon />
                   <span className="sr-only">More</span>
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
@@ -58,7 +62,7 @@ export function NavFavorites({
                 align={isMobile ? "end" : "start"}
               >
                 <DropdownMenuItem>
-                  <StarOffIcon className="text-muted-foreground" />
+                  <StarIcon className="text-muted-foreground" />
                   <span>Remove from Favorites</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -72,7 +76,7 @@ export function NavFavorites({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <Trash2Icon className="text-muted-foreground" />
+                  <TrashIcon className="text-muted-foreground" />
                   <span>Delete</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -81,8 +85,7 @@ export function NavFavorites({
         ))}
         <SidebarMenuItem>
           <SidebarMenuButton className="text-sidebar-foreground/70">
-            <MoreHorizontalIcon
-            />
+            <DotsThreeIcon />
             <span>More</span>
           </SidebarMenuButton>
         </SidebarMenuItem>

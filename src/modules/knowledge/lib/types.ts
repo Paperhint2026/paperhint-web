@@ -28,10 +28,11 @@ export interface TeacherLite {
 
 export function formatClassSubjectLabel(
   cs: ClassSubjectLabel | undefined | null,
-  fallback = "Unknown class",
+  fallback = "Unknown class"
 ): string {
   if (!cs) return fallback
-  const classPart = cs.grade != null && cs.section ? `${cs.grade}${cs.section}` : ""
+  const classPart =
+    cs.grade != null && cs.section ? `${cs.grade}${cs.section}` : ""
   const subjectPart = cs.subject_name || ""
   if (classPart && subjectPart) return `${classPart} — ${subjectPart}`
   return classPart || subjectPart || fallback

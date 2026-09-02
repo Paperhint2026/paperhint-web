@@ -1,44 +1,48 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { differenceInYears, format } from "date-fns"
+import { differenceInYears } from "date-fns"
 import {
-  DropletIcon,
+  ArrowsSplitIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
+  ChalkboardIcon,
+  CircleNotchIcon,
+  DotsThreeIcon,
+  DropIcon,
+  GenderIntersexIcon,
   GraduationCapIcon,
-  Loader2Icon,
-  MoreHorizontalIcon,
+  HashIcon,
+  IdentificationBadgeIcon,
   PencilIcon,
   PhoneIcon,
   PlusIcon,
-  SearchIcon,
-  SlidersHorizontalIcon,
-  Trash2Icon,
-} from "lucide-react"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Badge } from "@/components/ui/badge"
+  TrashIcon,
+} from "@phosphor-icons/react"
 import {
   FilterChip,
+  FilterChipGroup,
+  FilterFieldHeader,
   MultiSelectField,
   toggleArrayValue,
 } from "@/components/shared/filter-controls"
-import { useHeaderActions } from "@/components/layout/header-actions-context"
-import { Field, FieldLabel } from "@/components/ui/field"
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+  FilterPill,
+  PageToolbar,
+  PageToolbarSkeleton,
+} from "@/components/shared/page-toolbar"
+import { countSummary } from "@/lib/format"
+import { useHeaderActions } from "@/components/layout/header-actions-context"
 
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
+import { cn } from "@/lib/utils"
+import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Spinner } from "@/components/ui/spinner"
+import { Skeleton } from "@/components/ui/skeleton"
+import { LoadingSwap } from "@/components/shared/loading-swap"
+import { Sticker } from "@/components/shared/sticker"
+import { GroupedList, ListGroup } from "@/components/shared/list-group"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Select,
   SelectContent,
@@ -46,14 +50,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { type ClassItem } from "@/modules/students/components/student-class-card"
 import {
   AddStudentDrawer,
@@ -80,23 +76,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { type Student } from "@/modules/students/components/student-table"
 
-const AVATAR_COLORS = [
-  "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-  "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-  "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-  "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300",
-  "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-  "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
-]
-
-const GENDER_BADGE: Record<string, string> = {
-  Male: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800",
-  Female:
-    "bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/60 dark:text-pink-300 dark:border-pink-800",
-  Other:
-    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+/* Desk colour follows the student, not the grade: the lightest tint of blue
+   for boys, rose for girls, the paper ground when gender is not recorded. */
+const GENDER_WASH: Record<string, string> = {
+  Male: "bg-sky-100 dark:bg-sky-950/40",
+  Female: "bg-rose-100 dark:bg-rose-950/40",
+  default: "bg-muted",
 }
 
 function getInitials(name: string) {
@@ -106,11 +91,6 @@ function getInitials(name: string) {
     .join("")
     .toUpperCase()
     .slice(0, 2)
-}
-
-function getAvatarColor(name: string) {
-  const sum = name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[sum % AVATAR_COLORS.length]
 }
 
 interface StudentWithClass extends Omit<
@@ -128,6 +108,59 @@ interface ClassesResponse {
 
 interface StudentsResponse {
   students: Student[]
+}
+
+/** One desk in the seating chart, unfilled: the tinted band with a roll
+ *  number, the avatar hanging off it, two identity lines, then the record
+ *  rows under the dashed rule. Same grid as the loaded roster. */
+function DeskSkeleton() {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-background">
+      <div className="flex h-8 items-start justify-between bg-muted/60 px-3 pt-1.5">
+        <Skeleton className="h-3 w-5 bg-background/70" />
+        <Skeleton className="h-3 w-7 bg-background/70" />
+      </div>
+      <div className="-mt-4 flex justify-center">
+        <Skeleton className="size-10 rounded-full ring-4 ring-background" />
+      </div>
+      <div className="flex flex-col items-center gap-1.5 px-3 pt-2">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3 w-1/3" />
+      </div>
+      <div className="mt-3 flex flex-col gap-2 border-t border-dashed border-border px-4 py-3">
+        {[0.45, 0.35, 0.5].map((w, i) => (
+          <div key={i} className="flex items-center justify-between gap-3">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3" style={{ width: `${w * 100}%` }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The roster before it loads: two section groups, each a pill heading over
+ *  a seating-chart grid, so the page keeps its shape while students arrive. */
+function RosterSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col">
+      {[8, 4].map((desks, g) => (
+        <section
+          key={g}
+          className="flex flex-col border-t border-border py-5 first-of-type:border-t-0 first-of-type:pt-0"
+        >
+          <header className="flex items-center pb-2">
+            <Skeleton className="h-6 w-44 rounded-full" />
+          </header>
+          <div className="-mx-3 grid grid-cols-2 gap-3 px-3 pt-1 @2xl:grid-cols-3 @5xl:grid-cols-4">
+            {Array.from({ length: desks }).map((_, i) => (
+              <DeskSkeleton key={i} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
 }
 
 export function StudentsPage() {
@@ -156,8 +189,6 @@ export function StudentsPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
     null
   )
-
-  const [isScrolledX, setIsScrolledX] = useState(false)
 
   const [studentToDelete, setStudentToDelete] =
     useState<StudentWithClass | null>(null)
@@ -299,6 +330,21 @@ export function StudentsPage() {
     page * pageSize
   )
 
+  // Rows on this page grouped under their class, in grade then section order.
+  const groupedPage = useMemo(() => {
+    const groups = new Map<string, StudentWithClass[]>()
+    for (const st of paginatedStudents) {
+      const key = `${st.grade}|${st.section}`
+      groups.set(key, [...(groups.get(key) ?? []), st])
+    }
+    return [...groups.entries()]
+      .map(([key, items]) => {
+        const [grade, section] = key.split("|")
+        return { key, grade: Number(grade), section, items }
+      })
+      .sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section))
+  }, [paginatedStudents])
+
   // Header Add Students button — always visible for admins
   useEffect(() => {
     if (!isAdmin) {
@@ -306,11 +352,7 @@ export function StudentsPage() {
       return
     }
     setHeaderActions(
-      <Button
-        size="lg"
-        className="rounded-full"
-        onClick={() => setDrawerOpen(true)}
-      >
+      <Button size="lg" onClick={() => setDrawerOpen(true)}>
         <PlusIcon className="size-3.5" />
         <span className="hidden sm:inline">Add Students</span>
       </Button>
@@ -498,316 +540,434 @@ export function StudentsPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-full w-full items-center justify-center">
-        <Spinner className="size-6" />
-      </div>
-    )
-  }
+  const activeCount =
+    selectedGrades.length +
+    selectedSections.length +
+    selectedGenders.length +
+    selectedBloodGroups.length
 
-  if (error) {
-    return (
-      <div className="flex min-h-full w-full flex-col items-center justify-center gap-4">
-        <p className="text-sm text-destructive">{error}</p>
-        <Button variant="outline" onClick={fetchAll}>
-          Retry
-        </Button>
-      </div>
-    )
-  }
-
-  if (classes.length === 0) {
-    return (
-      <div className="flex min-h-full w-full flex-col items-center justify-center gap-4 p-6">
-        <div className="flex size-16 items-center justify-center rounded-full bg-muted">
-          <GraduationCapIcon className="size-6 text-muted-foreground" />
-        </div>
-        <div className="flex max-w-sm flex-col items-center gap-1 text-center">
-          <p className="text-base font-medium text-secondary-foreground">
-            No classes found
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Create classes first in the Classes module, then come back here to
-            manage students.
-          </p>
-        </div>
-      </div>
-    )
+  const clearAllFilters = () => {
+    setSelectedGrades([])
+    setSelectedSections([])
+    setSelectedGenders([])
+    setSelectedBloodGroups([])
   }
 
   return (
-    <div className="flex h-full w-full flex-col gap-4 p-4 md:p-6">
-      {/* Filters — minimal: search + popover + active-filter chips */}
-      {(() => {
-        const activeCount =
-          selectedGrades.length +
-          selectedSections.length +
-          selectedGenders.length +
-          selectedBloodGroups.length
-
-        const clearAll = () => {
-          setSelectedGrades([])
-          setSelectedSections([])
-          setSelectedGenders([])
-          setSelectedBloodGroups([])
-        }
-
-        const renderOption = (
-          value: string,
-          label: string,
-          selected: boolean,
-          onToggle: () => void
-        ) => (
-          <button
-            key={value}
-            type="button"
-            onClick={onToggle}
-            className={
-              "rounded-full border px-2.5 py-1 text-xs transition-colors " +
-              (selected
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-secondary-foreground hover:bg-muted")
-            }
-          >
-            {label}
-          </button>
-        )
-
-        return (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <div className="relative min-w-0 flex-1 sm:max-w-72">
-                <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search students..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="h-9 rounded-full pl-9"
-                />
-              </div>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 rounded-full"
-                  >
-                    <SlidersHorizontalIcon className="size-3.5" />
-                    Filters
-                    {activeCount > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="ml-1 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
-                      >
-                        {activeCount}
-                      </Badge>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-80 p-0">
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                    <p className="text-sm font-medium">Filters</p>
-                    {activeCount > 0 && (
-                      <button
-                        onClick={clearAll}
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex max-h-[60vh] flex-col gap-4 overflow-auto p-4">
-                    <MultiSelectField
-                      label="Grade"
-                      placeholder="All Grades"
-                      options={grades.map((g) => ({
-                        value: g,
-                        label: `Grade ${g}`,
-                      }))}
-                      selected={selectedGrades}
-                      onToggle={(v) => toggleArrayValue(setSelectedGrades, v)}
-                      onClear={() => setSelectedGrades([])}
-                      searchable={grades.length > 8}
-                    />
-                    <MultiSelectField
-                      label="Section"
-                      placeholder={
-                        sections.length === 0
-                          ? "No sections available"
-                          : "All Sections"
-                      }
-                      options={sections.map((s) => ({
-                        value: s,
-                        label: `Section ${s}`,
-                      }))}
-                      selected={selectedSections}
-                      onToggle={(v) => toggleArrayValue(setSelectedSections, v)}
-                      onClear={() => setSelectedSections([])}
-                      searchable={sections.length > 8}
-                    />
-                    <div className="flex flex-col gap-2">
-                      <Label className="text-xs text-muted-foreground">
-                        Gender
-                      </Label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {GENDER_OPTIONS.map((g) =>
-                          renderOption(g, g, selectedGenders.includes(g), () =>
-                            toggleArrayValue(setSelectedGenders, g)
-                          )
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label className="text-xs text-muted-foreground">
-                        Blood Group
-                      </Label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {BLOOD_GROUPS.map((bg) =>
-                          renderOption(
-                            bg,
-                            bg,
-                            selectedBloodGroups.includes(bg),
-                            () => toggleArrayValue(setSelectedBloodGroups, bg)
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {activeCount > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {selectedGrades.map((g) => (
-                  <FilterChip
-                    key={`grade-${g}`}
-                    label={`Grade ${g}`}
-                    onRemove={() => toggleArrayValue(setSelectedGrades, g)}
-                  />
-                ))}
-                {selectedSections.map((s) => (
-                  <FilterChip
-                    key={`section-${s}`}
-                    label={`Section ${s}`}
-                    onRemove={() => toggleArrayValue(setSelectedSections, s)}
-                  />
-                ))}
-                {selectedGenders.map((g) => (
-                  <FilterChip
-                    key={`gender-${g}`}
-                    label={g}
-                    onRemove={() => toggleArrayValue(setSelectedGenders, g)}
-                  />
-                ))}
-                {selectedBloodGroups.map((bg) => (
-                  <FilterChip
-                    key={`blood-${bg}`}
-                    label={bg}
-                    onRemove={() =>
-                      toggleArrayValue(setSelectedBloodGroups, bg)
-                    }
-                  />
-                ))}
-                <button
-                  onClick={clearAll}
-                  className="ml-1 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Clear all
-                </button>
-              </div>
-            )}
-          </div>
-        )
-      })()}
-
-      {/* Table — fills remaining height, only body scrolls */}
-      <div
-        onScroll={(e) => setIsScrolledX(e.currentTarget.scrollLeft > 0)}
-        data-scrolled-x={isScrolledX || undefined}
-        className="group/table min-h-0 flex-1 overflow-auto overscroll-none rounded-lg border [&_[data-slot=table-container]]:overflow-visible"
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "@container flex min-h-full flex-col gap-5 pb-12"
+      )}
+    >
+      <PageHeader
+        icon={GraduationCapIcon}
+        title="Students"
+        description="Everyone enrolled, across every class."
       >
-        <Table className="border-collapse">
-          <TableHeader className="sticky top-0 z-20 bg-sidebar shadow-[0_1px_0_0_var(--border)] [&_th]:h-10 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="sticky left-0 z-30 w-10 shrink-0 bg-sidebar">
-                #
-              </TableHead>
-              <TableHead className="sticky left-10 z-30 min-w-56 bg-sidebar transition-shadow group-data-[scrolled-x]/table:border-r group-data-[scrolled-x]/table:border-border group-data-[scrolled-x]/table:shadow-[6px_0_8px_-6px_rgba(0,0,0,0.18)]">
-                Name
-              </TableHead>
-              <TableHead className="min-w-36">Class</TableHead>
-              <TableHead className="min-w-40">Admission No.</TableHead>
-              <TableHead className="min-w-28">Roll No.</TableHead>
-              <TableHead className="min-w-40">Register No.</TableHead>
-              <TableHead className="min-w-28">Gender</TableHead>
-              <TableHead className="min-w-44">Date of Birth</TableHead>
-              <TableHead className="min-w-32">Blood Group</TableHead>
-              <TableHead className="min-w-40">Contact No.</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedStudents.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={10}
-                  className="h-32 text-center text-sm text-muted-foreground"
+        {isLoading && <PageToolbarSkeleton />}
+        {!isLoading && !error && classes.length > 0 && (
+          <PageToolbar
+            className="animate-in duration-300 fade-in-0"
+            search={{
+              value: search,
+              onChange: setSearch,
+              placeholder: "Search by name or roll number…",
+            }}
+            summary={
+              <>
+                {countSummary(
+                  filtered.length,
+                  allStudents.length,
+                  "student",
+                  activeCount > 0 || search.trim().length > 0
+                )}
+                {totalPages > 1 && ` · page ${page} of ${totalPages}`}
+              </>
+            }
+            trailing={
+              <div className="flex items-center gap-2">
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => setPageSize(Number(v))}
                 >
-                  {search ||
-                  selectedGrades.length > 0 ||
-                  selectedSections.length > 0 ||
-                  selectedGenders.length > 0 ||
-                  selectedBloodGroups.length > 0
-                    ? "No students match your filters."
-                    : "No students found."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedStudents.map((student, idx) => {
-                const dobDate = student.date_of_birth
-                  ? new Date(student.date_of_birth + "T00:00:00")
-                  : null
-                const age = dobDate
-                  ? differenceInYears(new Date(), dobDate)
-                  : null
-
-                return (
-                  <TableRow
-                    key={student.id}
-                    className="group cursor-pointer"
-                    onClick={() => handleRowClick(student.id)}
+                  <SelectTrigger
+                    className="h-9 w-[7.5rem] text-xs"
+                    aria-label="Students per page"
                   >
-                    {/* Index */}
-                    <TableCell className="sticky left-0 z-10 bg-background text-xs text-muted-foreground group-hover:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-background))]">
-                      {(page - 1) * pageSize + idx + 1}
-                    </TableCell>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    {[25, 50, 100].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n} per page
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {totalPages > 1 && (
+                  <div className="flex h-9 items-center rounded-md border border-border">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="h-full w-8 rounded-r-none"
+                      aria-label="Previous page"
+                      disabled={page === 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      <CaretLeftIcon className="size-3.5" />
+                    </Button>
+                    <span className="h-4 w-px bg-border" />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="h-full w-8 rounded-l-none"
+                      aria-label="Next page"
+                      disabled={page === totalPages}
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }
+                    >
+                      <CaretRightIcon className="size-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            }
+            filters={{
+              activeCount,
+              onClearAll: clearAllFilters,
+              resultLabel: `${filtered.length} of ${allStudents.length} students`,
+              children: (
+                <>
+                  <MultiSelectField
+                    icon={ChalkboardIcon}
+                    label="Grade"
+                    placeholder="Any grade"
+                    options={grades.map((g) => ({
+                      value: g,
+                      label: `Grade ${g}`,
+                    }))}
+                    selected={selectedGrades}
+                    onToggle={(v) => toggleArrayValue(setSelectedGrades, v)}
+                    onClear={() => setSelectedGrades([])}
+                    searchable={grades.length > 8}
+                  />
+                  <MultiSelectField
+                    icon={ArrowsSplitIcon}
+                    label="Section"
+                    placeholder={
+                      sections.length === 0 ? "No sections yet" : "Any section"
+                    }
+                    options={sections.map((sec) => ({
+                      value: sec,
+                      label: `Section ${sec}`,
+                    }))}
+                    selected={selectedSections}
+                    onToggle={(v) => toggleArrayValue(setSelectedSections, v)}
+                    onClear={() => setSelectedSections([])}
+                    searchable={sections.length > 8}
+                  />
+                  <div className="flex flex-col gap-2">
+                    <FilterFieldHeader
+                      icon={GenderIntersexIcon}
+                      label="Gender"
+                      count={selectedGenders.length}
+                      onClear={() => setSelectedGenders([])}
+                    />
+                    <div className="flex flex-wrap gap-1.5">
+                      {GENDER_OPTIONS.map((g) => (
+                        <FilterPill
+                          key={g}
+                          label={g}
+                          selected={selectedGenders.includes(g)}
+                          onToggle={() =>
+                            toggleArrayValue(setSelectedGenders, g)
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <FilterFieldHeader
+                      icon={DropIcon}
+                      label="Blood group"
+                      count={selectedBloodGroups.length}
+                      onClear={() => setSelectedBloodGroups([])}
+                    />
+                    <div className="flex flex-wrap gap-1.5">
+                      {BLOOD_GROUPS.map((bg) => (
+                        <FilterPill
+                          key={bg}
+                          label={bg}
+                          selected={selectedBloodGroups.includes(bg)}
+                          onToggle={() =>
+                            toggleArrayValue(setSelectedBloodGroups, bg)
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ),
+            }}
+            chips={
+              <>
+                {selectedGrades.length > 0 && (
+                  <FilterChipGroup icon={ChalkboardIcon} label="Grade">
+                    {selectedGrades.map((g) => (
+                      <FilterChip
+                        key={`grade-${g}`}
+                        label={`Grade ${g}`}
+                        onRemove={() => toggleArrayValue(setSelectedGrades, g)}
+                      />
+                    ))}
+                  </FilterChipGroup>
+                )}
+                {selectedSections.length > 0 && (
+                  <FilterChipGroup icon={ArrowsSplitIcon} label="Section">
+                    {selectedSections.map((sec) => (
+                      <FilterChip
+                        key={`section-${sec}`}
+                        label={`Section ${sec}`}
+                        onRemove={() =>
+                          toggleArrayValue(setSelectedSections, sec)
+                        }
+                      />
+                    ))}
+                  </FilterChipGroup>
+                )}
+                {selectedGenders.length > 0 && (
+                  <FilterChipGroup icon={GenderIntersexIcon} label="Gender">
+                    {selectedGenders.map((g) => (
+                      <FilterChip
+                        key={`gender-${g}`}
+                        label={g}
+                        onRemove={() => toggleArrayValue(setSelectedGenders, g)}
+                      />
+                    ))}
+                  </FilterChipGroup>
+                )}
+                {selectedBloodGroups.length > 0 && (
+                  <FilterChipGroup icon={DropIcon} label="Blood group">
+                    {selectedBloodGroups.map((bg) => (
+                      <FilterChip
+                        key={`blood-${bg}`}
+                        label={bg}
+                        onRemove={() =>
+                          toggleArrayValue(setSelectedBloodGroups, bg)
+                        }
+                      />
+                    ))}
+                  </FilterChipGroup>
+                )}
+              </>
+            }
+          />
+        )}
+      </PageHeader>
 
-                    {/* Name with avatar + hover actions */}
-                    <TableCell className="sticky left-10 z-10 bg-background transition-shadow group-hover:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-background))] group-data-[scrolled-x]/table:border-r group-data-[scrolled-x]/table:border-border group-data-[scrolled-x]/table:shadow-[6px_0_8px_-6px_rgba(0,0,0,0.18)]">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          <div
-                            className={`flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${getAvatarColor(student.full_name)}`}
-                          >
-                            {getInitials(student.full_name)}
-                          </div>
-                          <span className="max-w-72 truncate text-sm font-medium text-secondary-foreground">
+      <LoadingSwap
+        loading={isLoading}
+        skeleton={<RosterSkeleton />}
+        className="flex-1"
+      >
+        {error ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+            <Sticker name="worried" size={88} />
+            <div className="flex max-w-[360px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                Couldn't load students
+              </p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+            <Button variant="outline" onClick={fetchAll}>
+              Try again
+            </Button>
+          </div>
+        ) : classes.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+            <Sticker name="classroom" size={200} />
+            <div className="flex max-w-[380px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                No classes yet
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Students live inside classes. Create your grades and sections
+                first, then enrol students here.
+              </p>
+            </div>
+          </div>
+        ) : paginatedStudents.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+            <Sticker
+              name={activeCount > 0 || search ? "lost" : "friends"}
+              size={activeCount > 0 || search ? 120 : 200}
+            />
+            <div className="flex max-w-[360px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                {activeCount > 0 || search
+                  ? "Nobody matches that"
+                  : "No students enrolled yet"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {activeCount > 0 || search
+                  ? "Try a different name or drop a filter."
+                  : isAdmin
+                    ? "Add students to a class and they'll appear here, grouped by section."
+                    : "Once students are enrolled they'll appear here."}
+              </p>
+            </div>
+            {activeCount > 0 || search ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearch("")
+                  clearAllFilters()
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : isAdmin ? (
+              <Button onClick={() => setDrawerOpen(true)}>
+                <PlusIcon className="size-3.5" />
+                Add students
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <GroupedList>
+            {groupedPage.map((group) => (
+              <ListGroup
+                key={group.key}
+                icon={ChalkboardIcon}
+                label={`Grade ${group.grade} · Section ${group.section}`}
+                count={group.items.length}
+              >
+                {/* Seating chart: one desk per student, roll number in the
+                  corner, so a section reads the way its classroom does */}
+                <div className="grid grid-cols-2 gap-3 px-3 pt-1 @2xl:grid-cols-3 @5xl:grid-cols-4">
+                  {group.items.map((student) => {
+                    const dobDate = student.date_of_birth
+                      ? new Date(student.date_of_birth + "T00:00:00")
+                      : null
+                    const age = dobDate
+                      ? differenceInYears(new Date(), dobDate)
+                      : null
+                    const vitals = [
+                      age != null ? `${age} yrs` : null,
+                      student.gender || null,
+                    ].filter(Boolean)
+                    const wash =
+                      GENDER_WASH[student.gender ?? ""] ?? GENDER_WASH.default
+                    return (
+                      <div
+                        key={student.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleRowClick(student.id)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleRowClick(student.id)
+                        }
+                        className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-background text-center transition-all outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {/* Desk top — tinted in the grade's colour */}
+                        <div
+                          className={cn(
+                            "relative flex h-8 items-start justify-between px-3 pt-1.5",
+                            wash
+                          )}
+                        >
+                          <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+                            {student.roll_number
+                              ? String(student.roll_number).padStart(2, "0")
+                              : "—"}
+                          </span>
+                          {student.blood_group && (
+                            <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                              <DropIcon
+                                weight="fill"
+                                className="size-3 text-red-500"
+                              />
+                              {student.blood_group}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Avatar hangs off the band */}
+                        <div className="-mt-4 flex justify-center">
+                          <Avatar className="size-10 ring-4 ring-background">
+                            <AvatarFallback
+                              className={cn("text-xs text-foreground/70", wash)}
+                            >
+                              {getInitials(student.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+
+                        <div className="flex min-w-0 flex-col gap-0.5 px-3 pt-2">
+                          <span className="truncate text-sm font-medium text-foreground">
                             {student.full_name}
                           </span>
+                          <span className="truncate text-[11px] text-muted-foreground">
+                            {vitals.length > 0 ? vitals.join(" · ") : "—"}
+                          </span>
                         </div>
+
+                        {/* Records */}
+                        <dl className="mt-3 flex flex-col gap-1.5 border-t border-dashed border-border px-4 py-3 text-left text-[11px]">
+                          {[
+                            {
+                              icon: IdentificationBadgeIcon,
+                              label: "Admission",
+                              value: student.admission_number,
+                            },
+                            {
+                              icon: HashIcon,
+                              label: "Register",
+                              value: student.register_number,
+                            },
+                            {
+                              icon: PhoneIcon,
+                              label: "Phone",
+                              value: student.contact_number,
+                            },
+                          ].map((row) => (
+                            <div
+                              key={row.label}
+                              className="flex items-center justify-between gap-3"
+                            >
+                              <dt className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+                                <row.icon className="size-3.5" />
+                                {row.label}
+                              </dt>
+                              <dd className="truncate text-secondary-foreground tabular-nums">
+                                {row.value || "—"}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+
                         {isAdmin && (
-                          <div onClick={(e) => e.stopPropagation()}>
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            className="absolute top-5 right-1.5"
+                          >
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
-                                  size="icon"
-                                  className="size-7 shrink-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
-                                  aria-label="Row actions"
+                                  size="icon-sm"
+                                  className="size-7 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                                  aria-label="Student actions"
                                 >
-                                  <MoreHorizontalIcon className="size-4" />
+                                  <DotsThreeIcon
+                                    weight="bold"
+                                    className="size-4"
+                                  />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
@@ -826,7 +986,7 @@ export function StudentsPage() {
                                     setStudentToDelete(student)
                                   }}
                                 >
-                                  <Trash2Icon className="size-3.5" />
+                                  <TrashIcon className="size-3.5" />
                                   Delete
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -834,156 +994,14 @@ export function StudentsPage() {
                           </div>
                         )}
                       </div>
-                    </TableCell>
-
-                    {/* Class (Grade + Section merged) */}
-                    <TableCell>
-                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
-                        G{student.grade} · {student.section}
-                      </span>
-                    </TableCell>
-
-                    {/* Admission No. */}
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {student.admission_number || (
-                        <span className="font-sans text-muted-foreground/60">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* Roll No. */}
-                    <TableCell className="text-xs text-muted-foreground tabular-nums">
-                      {student.roll_number || (
-                        <span className="text-muted-foreground/60">—</span>
-                      )}
-                    </TableCell>
-
-                    {/* Register No. */}
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {student.register_number || (
-                        <span className="font-sans text-muted-foreground/60">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* Gender badge */}
-                    <TableCell>
-                      {student.gender ? (
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${GENDER_BADGE[student.gender] ?? "border-border bg-muted text-muted-foreground"}`}
-                        >
-                          {student.gender}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/60">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* Date of Birth + age — single line */}
-                    <TableCell className="text-xs text-muted-foreground">
-                      {dobDate ? (
-                        <>
-                          {format(dobDate, "MMM d, yyyy")}
-                          <span className="text-muted-foreground/60">
-                            {" "}
-                            · {age} yrs
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground/60">—</span>
-                      )}
-                    </TableCell>
-
-                    {/* Blood Group badge */}
-                    <TableCell>
-                      {student.blood_group ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400">
-                          <DropletIcon className="size-3" />
-                          {student.blood_group}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/60">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-
-                    {/* Contact No. */}
-                    <TableCell>
-                      {student.contact_number ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <PhoneIcon className="size-3 shrink-0 text-muted-foreground/50" />
-                          {student.contact_number}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/60">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Footer: rows-per-page left, prev/next right */}
-      <div className="flex items-center justify-between gap-4">
-        <Field orientation="horizontal" className="w-fit">
-          <FieldLabel
-            htmlFor="rows-per-page"
-            className="text-xs text-muted-foreground"
-          >
-            Rows per page
-          </FieldLabel>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(v) => setPageSize(Number(v))}
-          >
-            <SelectTrigger className="h-8 w-20 text-xs" id="rows-per-page">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="start">
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="25">25</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-              <SelectItem value="100">100</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-
-        <p className="hidden text-xs text-muted-foreground sm:block">
-          Page {page} of {totalPages} · {filtered.length} student
-          {filtered.length !== 1 ? "s" : ""}
-        </p>
-
-        <Pagination className="mx-0 w-auto">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                aria-disabled={page === 1}
-                className={page === 1 ? "pointer-events-none opacity-50" : ""}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                aria-disabled={page === totalPages}
-                className={
-                  page === totalPages ? "pointer-events-none opacity-50" : ""
-                }
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
+                    )
+                  })}
+                </div>
+              </ListGroup>
+            ))}
+          </GroupedList>
+        )}
+      </LoadingSwap>
 
       {isAdmin && (
         <AddStudentDrawer
@@ -1054,12 +1072,12 @@ export function StudentsPage() {
             >
               {isDeleting ? (
                 <>
-                  <Loader2Icon className="size-3.5 animate-spin" />
+                  <CircleNotchIcon className="size-3.5 animate-spin" />
                   Deleting…
                 </>
               ) : (
                 <>
-                  <Trash2Icon className="size-3.5" />
+                  <TrashIcon className="size-3.5" />
                   Delete
                 </>
               )}

@@ -16,8 +16,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { MoreHorizontalIcon, FolderIcon, ArrowRightIcon, Trash2Icon } from "lucide-react"
-
+import { DotsThreeIcon, FolderIcon, ArrowRightIcon, TrashIcon } from "@phosphor-icons/react"
 export function NavProjects({
   projects,
 }: {
@@ -47,7 +46,7 @@ export function NavProjects({
                   showOnHover
                   className="aria-expanded:bg-muted"
                 >
-                  <MoreHorizontalIcon
+                  <DotsThreeIcon
                   />
                   <span className="sr-only">More</span>
                 </SidebarMenuAction>
@@ -67,7 +66,7 @@ export function NavProjects({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <Trash2Icon className="text-muted-foreground" />
+                  <TrashIcon className="text-muted-foreground" />
                   <span>Delete Project</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -76,7 +75,7 @@ export function NavProjects({
         ))}
         <SidebarMenuItem>
           <SidebarMenuButton className="text-sidebar-foreground/70">
-            <MoreHorizontalIcon className="text-sidebar-foreground/70" />
+            <DotsThreeIcon className="text-sidebar-foreground/70" />
             <span>More</span>
           </SidebarMenuButton>
         </SidebarMenuItem>

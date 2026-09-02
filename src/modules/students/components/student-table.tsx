@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react"
-import { SearchIcon } from "lucide-react"
-
+import { MagnifyingGlassIcon } from "@phosphor-icons/react"
 import { Input } from "@/components/ui/input"
 import {
   Table,
@@ -47,14 +46,14 @@ export function StudentTable({ students }: StudentTableProps) {
       (s) =>
         s.full_name.toLowerCase().includes(q) ||
         String(s.roll_number).toLowerCase().includes(q) ||
-        s.register_number?.toLowerCase().includes(q),
+        s.register_number?.toLowerCase().includes(q)
     )
   }, [students, search])
 
   return (
     <div className="flex flex-col gap-4">
       <div className="relative max-w-sm">
-        <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <MagnifyingGlassIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search by name, roll or register no..."
           value={search}

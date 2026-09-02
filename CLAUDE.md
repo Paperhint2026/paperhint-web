@@ -24,6 +24,8 @@ Aliases (mirrored in [tsconfig.app.json](tsconfig.app.json) and [vite.config.ts]
 
 Styling lives in [src/index.css](src/index.css) — Tailwind v4 with `@import "tailwindcss"`, `tw-animate-css`, `shadcn/tailwind.css`, and the Geist variable font. There is no `tailwind.config.js`; theme tokens are declared inline via `@theme inline` and CSS variables. Use the existing tokens (`bg-background`, `text-muted-foreground`, etc.) rather than hard-coded colors.
 
+The shell is a two-surface design: `--sidebar` is the app **ground** and `--background` is the **content card** that floats on it (`<Sidebar variant="inset">` — see [app-sidebar.tsx](src/components/layout/app-sidebar.tsx)). The ground must always read as recessed relative to the card — in light mode that means `--sidebar` darker than `--background`, and in dark mode the same direction (ground below card). `--sidebar-active` / `--sidebar-active-foreground` are ours, not stock shadcn: they paint the raised pill on the selected nav item, and are consumed by `data-active:` variants in `sidebarMenuButtonVariants` ([ui/sidebar.tsx](src/components/ui/sidebar.tsx)). `--sidebar-accent` stays the *hover* surface. If you change one of these four, change its `.dark` counterpart in the same edit.
+
 ## Architecture
 
 ### Entry & routing
@@ -41,9 +43,11 @@ All routes are declared in [src/routes/index.tsx](src/routes/index.tsx) using `c
     /class/:classSubjectId/{knowledge,exams,grading,students,...}
 ```
 
-Two parameterized scopes drive most of the header behavior:
+Two parameterized scopes drive most of the shell behavior:
 - `:grade` → grade-level overview pages.
-- `:classSubjectId` → class-subject scoped pages (knowledge / exams / grading / students). [AppLayout](src/components/layout/app-layout.tsx) renders a `ToggleGroup` whose value it derives from the pathname (e.g. `/class/:csId/exams/:examId/questions` keeps the "Exams" tab highlighted). When adding a new class-subject sub-page, update the `classSubTab` derivation logic — there is no auto-detection.
+- `:classSubjectId` → class-subject scoped pages. Navigation between a class's sections lives in the **sidebar**, not the header: [app-sidebar.tsx](src/components/layout/app-sidebar.tsx) declares them in `CLASS_SECTIONS` and [NavWorkspaces](src/components/nav-workspaces.tsx) renders them nested under whichever class is open. When adding a class-subject sub-page, add it to `CLASS_SECTIONS` (there is no auto-detection) and add its label to the `classSubLabel` switch in [app-layout.tsx](src/components/layout/app-layout.tsx) so the breadcrumb names it — deeper pages (`/exams/:examId/questions`, grading review, PDF builder…) fall through to `getPageTitleFromPath`.
+
+The header itself is breadcrumb + action slot only. Its `SidebarTrigger` renders **only** when the sidebar's own collapse control is out of reach (mobile, or collapsed to icons) — the expanded sidebar carries that control in its header, so `AppLayoutInner` sits inside `SidebarProvider` in order to read `useSidebar()`.
 
 ### Module layout
 

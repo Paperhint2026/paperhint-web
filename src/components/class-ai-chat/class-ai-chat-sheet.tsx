@@ -1,22 +1,22 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   ArrowUpIcon,
-  AtSignIcon,
+  AtIcon,
+  BookOpenIcon,
+  ChalkboardIcon,
+  ChartBarIcon,
+  CircleNotchIcon,
   FileIcon,
   FileTextIcon,
   ImageIcon,
-  Loader2Icon,
-  MessageSquarePlusIcon,
+  ListChecksIcon,
+  MagnifyingGlassIcon,
   PaperclipIcon,
-  SparklesIcon,
+  PlusIcon,
   XIcon,
-} from "lucide-react"
+  type Icon,
+} from "@phosphor-icons/react"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
 import rehypeRaw from "rehype-raw"
@@ -27,15 +27,24 @@ import remarkMath from "remark-math"
 import "katex/dist/katex.min.css"
 
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth"
 import type { ClassAiChat, Material } from "@/hooks/use-class-ai-chat"
 import { Button } from "@/components/ui/button"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { PaperhintMark } from "@/components/shared/paperhint-mark"
+import { Sticker } from "@/components/shared/sticker"
 
 interface ClassAiChatSheetProps {
   open: boolean
@@ -44,12 +53,37 @@ interface ClassAiChatSheetProps {
   chat: ClassAiChat
 }
 
-const SUGGESTIONS = [
-  "Summarise the key concepts from Chapter 1",
-  "Create a 40-minute lesson plan for this topic",
-  "Generate 10 quiz questions from the uploaded notes",
-  "Explain this with a diagram",
+/* Same shape as the Ask Hint page's starters: a short chip, a full prompt. */
+const SUGGESTIONS: { icon: Icon; label: string; prompt: string }[] = [
+  {
+    icon: BookOpenIcon,
+    label: "Summarise a chapter",
+    prompt: "Summarise the key concepts from the most recent chapter.",
+  },
+  {
+    icon: ListChecksIcon,
+    label: "Quiz questions",
+    prompt:
+      "Write 10 short quiz questions from the uploaded notes, with answers.",
+  },
+  {
+    icon: ChalkboardIcon,
+    label: "Lesson plan",
+    prompt: "Draft a 40-minute lesson plan for the next topic in this class.",
+  },
+  {
+    icon: ChartBarIcon,
+    label: "Explain with a diagram",
+    prompt: "Explain the hardest concept in these materials with a diagram.",
+  },
 ]
+
+/* Fade the sky out at the top and both side edges, keep the hill and book
+   stack solid — the same treatment the Ask Hint page gives the scene. */
+const MASK = [
+  "linear-gradient(to top, black 45%, transparent 100%)",
+  "linear-gradient(to right, transparent 0%, black 18%, black 82%, transparent 100%)",
+].join(", ")
 
 function getFileIcon(url: string) {
   const lower = url.toLowerCase()
@@ -88,6 +122,10 @@ export function ClassAiChatSheet({
     resetChat,
   } = chat
 
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const firstName = user?.full_name?.split(" ")[0] ?? "there"
+
   const [mentionOpen, setMentionOpen] = useState(false)
   const [mentionQuery, setMentionQuery] = useState("")
   const [mentionStartIdx, setMentionStartIdx] = useState<number | null>(null)
@@ -102,7 +140,7 @@ export function ClassAiChatSheet({
 
   const pinnedMaterials = useMemo(
     () => materials.filter((m) => pinnedIds.has(m.id)),
-    [materials, pinnedIds],
+    [materials, pinnedIds]
   )
 
   // --- @-mention detection ---------------------------------------------------
@@ -121,25 +159,23 @@ export function ClassAiChatSheet({
       if (ch === " " || ch === "\n" || ch === "\t") break
       i--
     }
-    if (atIdx === -1) return { open: false, query: "", start: null as number | null }
+    if (atIdx === -1)
+      return { open: false, query: "", start: null as number | null }
     const before = atIdx === 0 ? "" : value[atIdx - 1]
-    const validBoundary = atIdx === 0 || before === " " || before === "\n" || before === "\t"
-    if (!validBoundary) return { open: false, query: "", start: null as number | null }
-    return {
-      open: true,
-      query: value.slice(atIdx + 1, caretIdx),
-      start: atIdx,
-    }
+    const validBoundary =
+      atIdx === 0 || before === " " || before === "\n" || before === "\t"
+    if (!validBoundary)
+      return { open: false, query: "", start: null as number | null }
+    return { open: true, query: value.slice(atIdx + 1, caretIdx), start: atIdx }
   }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     setInput(value)
 
-    // Auto-resize
     const el = e.target
     el.style.height = "auto"
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
 
     const caret = el.selectionStart ?? value.length
     const m = detectMention(value, caret)
@@ -190,7 +226,6 @@ export function ClassAiChatSheet({
     setMentionOpen(false)
     if (textareaRef.current) textareaRef.current.style.height = "auto"
 
-    // Fire-and-forget — the hook updates message state as tokens arrive.
     void send(q, pinnedSnapshot)
   }
 
@@ -212,266 +247,353 @@ export function ClassAiChatSheet({
     }
   }
 
-  const handleResetChat = () => {
-    resetChat()
-    textareaRef.current?.focus()
+  const pickSuggestion = (prompt: string) => {
+    setInput(prompt)
+    setTimeout(() => textareaRef.current?.focus(), 50)
   }
+
+  const isEmpty = messages.length === 0 && !isStreaming
+  const hasMaterials = materials.length > 0
+
+  const composer = (
+    <div className="flex w-full flex-col gap-2">
+      {/* Pinned chips */}
+      {pinnedMaterials.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {pinnedMaterials.map((m) => {
+            const FIcon = getFileIcon(m.file_url)
+            return (
+              <span
+                key={m.id}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background py-0.5 pr-1 pl-2 text-xs"
+              >
+                <FIcon className="size-3 text-muted-foreground" />
+                <span className="max-w-[180px] truncate">{m.title}</span>
+                <button
+                  type="button"
+                  onClick={() => togglePin(m.id)}
+                  aria-label={`Detach ${m.title}`}
+                  className="flex size-4 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </span>
+            )
+          })}
+          <span className="text-[11px] text-muted-foreground">
+            Answer will use only these
+          </span>
+        </div>
+      )}
+
+      {/* The prompt box — same wrapper as the Ask Hint page: the border is
+          a layer the glow can orbit in, clipped back to the rounded rect. */}
+      <div className="group/composer relative w-full overflow-hidden rounded-xl bg-foreground/15 p-px shadow-sm">
+        {isEmpty && hasMaterials ? (
+          <div
+            aria-hidden
+            className="absolute top-1/2 left-1/2 aspect-square w-[140%] -translate-x-1/2 -translate-y-1/2 animate-spin opacity-70 [animation-duration:5s] motion-reduce:hidden"
+            style={{
+              background:
+                "conic-gradient(from 0deg, transparent 0%, var(--color-primary) 12%, transparent 28%)",
+            }}
+          />
+        ) : null}
+        <div className="relative flex w-full flex-col rounded-[calc(var(--radius)*1.4-1px)] bg-card">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onBlur={() => setTimeout(() => setMentionOpen(false), 200)}
+            placeholder={
+              hasMaterials
+                ? `Ask about ${classLabel ?? "this class"}… type @ to point at a file`
+                : "Upload a source first, then ask away"
+            }
+            aria-label="Ask Hint about this class"
+            rows={1}
+            className="relative max-h-40 min-h-[46px] w-full resize-none overflow-y-auto bg-transparent px-4 pt-3.5 text-sm leading-6 outline-none placeholder:text-muted-foreground/60"
+          />
+          <div className="flex items-center justify-between px-2.5 pb-2.5">
+            <AttachButton
+              materials={materials}
+              pinnedIds={pinnedIds}
+              onToggle={togglePin}
+            />
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!input.trim() || isStreaming || !classSubjectId}
+              aria-label="Send"
+              className={cn(
+                "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
+                input.trim() && !isStreaming
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-muted text-muted-foreground/40"
+              )}
+            >
+              {isStreaming ? (
+                <CircleNotchIcon className="size-4 animate-spin" />
+              ) : (
+                <ArrowUpIcon className="size-4" weight="bold" />
+              )}
+            </button>
+          </div>
+
+          {mentionOpen && filteredMentions.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-2 max-h-64 w-full max-w-sm overflow-y-auto rounded-xl border border-border bg-popover p-1.5 shadow-xl">
+              <div className="px-2 py-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                Point at a file
+                {mentionQuery ? (
+                  <span className="ml-1 font-normal tracking-normal text-foreground normal-case">
+                    · "{mentionQuery}"
+                  </span>
+                ) : null}
+              </div>
+              {filteredMentions.map((m) => {
+                const FIcon = getFileIcon(m.file_url)
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => pickMentionMaterial(m)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted"
+                  >
+                    <FIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">{m.title}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
         size="2xl"
+        showCloseButton={false}
         className="flex min-h-0 flex-col gap-0 bg-background p-0"
       >
-        <SheetHeader className="shrink-0 flex-row items-center justify-between gap-4 border-b p-4">
+        {/* Header */}
+        <SheetHeader className="shrink-0 flex-row items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/15 to-cyan-400/15">
-              <SparklesIcon className="size-4 text-primary" />
-            </div>
+            <PaperhintMark className="size-6 shrink-0 text-primary" />
             <div className="min-w-0">
-              <SheetTitle className="truncate">Ask AI about this class</SheetTitle>
+              <SheetTitle className="truncate font-serif text-base font-medium tracking-tight">
+                Ask <em className="text-primary italic">hint</em>
+              </SheetTitle>
               <SheetDescription className="truncate text-xs">
-                {classLabel
-                  ? `Scoped to ${classLabel} — ${materials.length} material${materials.length === 1 ? "" : "s"} available`
-                  : "Auto-scoped to this class's knowledge"}
+                {classLabel ?? "This class"}
+                <span className="mx-1.5 text-border">·</span>
+                {materials.length}{" "}
+                {materials.length === 1 ? "source" : "sources"}
               </SheetDescription>
             </div>
           </div>
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-full"
+                    onClick={() => {
+                      resetChat()
+                      textareaRef.current?.focus()
+                    }}
+                    aria-label="New chat"
+                  >
+                    <PlusIcon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">New chat</TooltipContent>
+              </Tooltip>
+            )}
+            <SheetClose asChild>
               <Button
                 variant="ghost"
-                size="sm"
-                onClick={handleResetChat}
-                className="mr-8 gap-1.5 text-xs"
+                size="icon-sm"
+                className="rounded-full"
+                aria-label="Close"
               >
-                <MessageSquarePlusIcon className="size-3.5" />
-                New chat
+                <XIcon className="size-4" />
               </Button>
-            )}
+            </SheetClose>
           </div>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-5 md:px-6">
-            {messages.length === 0 && !isStreaming ? (
-              <EmptyState
-                materialsCount={materials.length}
-                onPick={(s) => {
-                  setInput(s)
-                  setTimeout(() => textareaRef.current?.focus(), 50)
+        {isEmpty ? (
+          /* ── Landing: scene, greeting, composer, starters ── */
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-72 overflow-hidden"
+            >
+              <img
+                src="/ask-hint-scene.jpg"
+                alt=""
+                className="size-full object-cover object-[center_62%] opacity-70 dark:opacity-30"
+                style={{
+                  maskImage: MASK,
+                  WebkitMaskImage: MASK,
+                  maskComposite: "intersect",
+                  WebkitMaskComposite: "source-in",
                 }}
               />
-            ) : (
-              messages.map((msg) =>
-                msg.role === "user" ? (
-                  <div key={msg.id} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-                      {msg.pinnedMaterialIds && msg.pinnedMaterialIds.length > 0 && (
-                        <div className="mb-1.5 flex flex-wrap gap-1">
-                          {msg.pinnedMaterialIds.map((id) => {
-                            const mat = materials.find((m) => m.id === id)
-                            return (
-                              <span
-                                key={id}
-                                className="inline-flex items-center gap-1 rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px]"
-                              >
-                                <AtSignIcon className="size-2.5" />
-                                {mat?.title ?? "Material"}
-                              </span>
-                            )
-                          })}
-                        </div>
-                      )}
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div key={msg.id} className="flex gap-3">
-                    <div className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/15 to-cyan-400/15">
-                      <SparklesIcon className="size-3.5 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1 text-sm leading-relaxed">
-                      {msg.id === streamingMessageId && !msg.content ? (
-                        <div className="inline-flex items-center gap-2 rounded-full bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground">
-                          <Loader2Icon className="size-3.5 animate-spin text-primary" />
-                          Thinking…
-                        </div>
-                      ) : msg.id === streamingMessageId ? (
-                        <StreamingMarkdown content={msg.content} />
-                      ) : (
-                        <AnswerMarkdown content={msg.content} />
-                      )}
-                      {msg.sources && msg.sources.length > 0 && (
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                            Sources
-                          </span>
-                          {msg.sources.map((s) => (
-                            <span
-                              key={s.id}
-                              title={s.title}
-                              className="max-w-[200px] truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                            >
-                              {s.title}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ),
-              )
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/75 to-transparent" />
+            </div>
 
-        <div className="shrink-0 border-t bg-background px-4 py-3 md:px-6">
-          <div className="mx-auto max-w-3xl">
-            {/* Pinned chips */}
-            {pinnedMaterials.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {pinnedMaterials.map((m) => {
-                  const Icon = getFileIcon(m.file_url)
-                  return (
-                    <span
-                      key={m.id}
-                      className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2 py-1 text-xs"
-                    >
-                      <Icon className="size-3 text-muted-foreground" />
-                      <span className="max-w-[180px] truncate">{m.title}</span>
-                      <button
-                        onClick={() => togglePin(m.id)}
-                        className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-                      >
-                        <XIcon className="size-3" />
-                      </button>
-                    </span>
-                  )
-                })}
-                <span className="inline-flex items-center px-2 py-1 text-[10px] text-muted-foreground">
-                  Answer will use ONLY these materials
-                </span>
+            <div className="relative mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-6 px-6 py-10 text-center">
+              <PaperhintMark className="size-9 text-primary" />
+              <div className="flex flex-col gap-2">
+                <h2 className="font-serif text-[26px] leading-snug font-medium tracking-tight text-balance text-foreground">
+                  Hi <em className="text-primary italic">{firstName}</em>, what
+                  would you like to know about{" "}
+                  <em className="text-primary italic">
+                    {classLabel ?? "this class"}
+                  </em>
+                  ?
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {hasMaterials
+                    ? `Answers come only from this class's ${materials.length} ${materials.length === 1 ? "source" : "sources"}. Type @ to point at one.`
+                    : "Hint answers from this class's sources, and there aren't any yet."}
+                </p>
               </div>
-            )}
 
-            <div className="relative flex items-end rounded-2xl border bg-muted/30 shadow-sm focus-within:border-primary/40 focus-within:shadow-md">
-              <AttachButton
-                materials={materials}
-                pinnedIds={pinnedIds}
-                onToggle={togglePin}
-              />
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onBlur={() => {
-                  // Delay close so click on mention entry fires first
-                  setTimeout(() => setMentionOpen(false), 200)
-                }}
-                placeholder={
-                  materials.length === 0
-                    ? "No materials yet. Upload some first to get better answers."
-                    : "Ask anything. Type @ to attach a specific material…"
-                }
-                rows={1}
-                className="max-h-[180px] min-h-[40px] flex-1 resize-none overflow-y-auto bg-transparent py-3 pr-2 text-sm leading-6 outline-none placeholder:text-muted-foreground/50"
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isStreaming || !classSubjectId}
-                className={cn(
-                  "mr-2 mb-2 flex size-9 shrink-0 items-center justify-center rounded-xl transition-all",
-                  input.trim() && !isStreaming
-                    ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                    : "text-muted-foreground/40",
-                )}
-              >
-                {isStreaming ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <ArrowUpIcon className="size-4" />
-                )}
-              </button>
-
-              {mentionOpen && filteredMentions.length > 0 && (
-                <div className="absolute bottom-full left-0 mb-2 max-h-64 w-full max-w-sm overflow-y-auto rounded-xl border bg-popover p-1.5 shadow-xl ring-1 ring-foreground/5">
-                  <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                    Attach material{" "}
-                    {mentionQuery ? (
-                      <span className="text-foreground">· "{mentionQuery}"</span>
-                    ) : null}
-                  </div>
-                  {filteredMentions.map((m) => {
-                    const Icon = getFileIcon(m.file_url)
-                    return (
+              {hasMaterials ? (
+                <>
+                  {composer}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {SUGGESTIONS.map((s) => (
                       <button
-                        key={m.id}
+                        key={s.label}
                         type="button"
-                        onClick={() => pickMentionMaterial(m)}
-                        onMouseDown={(e) => e.preventDefault()}
-                        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-muted"
+                        onClick={() => pickSuggestion(s.prompt)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       >
-                        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate">{m.title}</span>
-                        {m.processed && (
-                          <SparklesIcon className="size-3 shrink-0 text-emerald-500" />
-                        )}
+                        <s.icon aria-hidden className="size-3.5" />
+                        {s.label}
                       </button>
-                    )
-                  })}
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-3">
+                  <Sticker name="point" size={72} />
+                  <Button
+                    onClick={() => {
+                      onOpenChange(false)
+                      if (classSubjectId)
+                        navigate(`/class/${classSubjectId}/knowledge`)
+                    }}
+                  >
+                    <BookOpenIcon className="size-3.5" />
+                    Add a source
+                  </Button>
                 </div>
               )}
             </div>
-
-            <p className="mt-2 text-center text-[10px] text-muted-foreground/60">
-              Answers are grounded in your class materials. Verify before using in class.
-            </p>
           </div>
-        </div>
+        ) : (
+          /* ── Conversation ── */
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6 md:px-6">
+                {messages.map((msg) =>
+                  msg.role === "user" ? (
+                    <div key={msg.id} className="flex justify-end">
+                      <div className="max-w-[80%] rounded-xl bg-muted px-3.5 py-2.5 text-sm text-foreground">
+                        {msg.pinnedMaterialIds &&
+                          msg.pinnedMaterialIds.length > 0 && (
+                            <div className="mb-1.5 flex flex-wrap gap-1">
+                              {msg.pinnedMaterialIds.map((id) => {
+                                const mat = materials.find((m) => m.id === id)
+                                return (
+                                  <span
+                                    key={id}
+                                    className="inline-flex items-center gap-1 rounded-full bg-background px-2 py-0.5 text-[10px] text-muted-foreground"
+                                  >
+                                    <AtIcon className="size-2.5" />
+                                    {mat?.title ?? "Material"}
+                                  </span>
+                                )
+                              })}
+                            </div>
+                          )}
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={msg.id} className="flex gap-3">
+                      {/* Same wait as the Ask Hint page: the mark itself turns
+                          and the line shimmers, laid out as Hint's turn. */}
+                      <PaperhintMark
+                        className={cn(
+                          "mt-0.5 size-5 shrink-0 text-primary",
+                          msg.id === streamingMessageId &&
+                            !msg.content &&
+                            "animate-spin [animation-duration:1.8s] motion-reduce:animate-none"
+                        )}
+                      />
+                      <div className="min-w-0 flex-1 text-sm leading-relaxed">
+                        {msg.id === streamingMessageId && !msg.content ? (
+                          <span className="[animation:text-shimmer_2.2s_linear_infinite] bg-[linear-gradient(90deg,var(--color-muted-foreground)_0%,var(--color-foreground)_50%,var(--color-muted-foreground)_100%)] bg-[length:200%_auto] bg-clip-text text-sm leading-relaxed text-transparent motion-reduce:[animation:none]">
+                            Searching this class's sources…
+                          </span>
+                        ) : (
+                          <>
+                            {msg.sources && msg.sources.length > 0 && (
+                              <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <MagnifyingGlassIcon className="size-3.5" />
+                                <span>From</span>
+                                {msg.sources.map((s) => (
+                                  <Tooltip key={s.id}>
+                                    <TooltipTrigger asChild>
+                                      <span className="max-w-[200px] truncate rounded-md bg-muted px-1.5 py-0.5 text-secondary-foreground">
+                                        {s.title}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{s.title}</TooltipContent>
+                                  </Tooltip>
+                                ))}
+                              </div>
+                            )}
+                            {msg.id === streamingMessageId ? (
+                              <StreamingMarkdown content={msg.content} />
+                            ) : (
+                              <AnswerMarkdown content={msg.content} />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+
+            <div className="shrink-0 border-t border-border bg-background px-4 py-3 md:px-6">
+              <div className="mx-auto flex max-w-2xl flex-col gap-2">
+                {composer}
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Grounded in this class's sources. Check before you teach it.
+                </p>
+              </div>
+            </div>
+          </>
+        )}
       </SheetContent>
     </Sheet>
-  )
-}
-
-function EmptyState({
-  materialsCount,
-  onPick,
-}: {
-  materialsCount: number
-  onPick: (s: string) => void
-}) {
-  return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
-      <div className="relative mb-5">
-        <div className="absolute -inset-3 rounded-full bg-gradient-to-r from-violet-500/20 via-primary/20 to-cyan-400/20 blur-xl" />
-        <div className="relative flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/10 to-cyan-400/10 ring-1 ring-white/10">
-          <SparklesIcon className="size-7 text-primary" />
-        </div>
-      </div>
-      <h2 className="mb-1.5 font-heading text-lg">How can I help today?</h2>
-      <p className="mb-6 max-w-sm text-xs text-muted-foreground">
-        {materialsCount === 0
-          ? "Upload materials for this class first — I'll answer straight from them."
-          : "Ask me anything. I'll answer using only this class's materials. Use @ to pin a specific document."}
-      </p>
-      {materialsCount > 0 && (
-        <div className="grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => onPick(s)}
-              className="rounded-xl border bg-card px-3 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:bg-muted/50 hover:text-foreground"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -495,14 +617,24 @@ function AttachButton({
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        title="Attach material"
-        onClick={() => setOpen((p) => !p)}
-        className="m-2 flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        <PaperclipIcon className="size-4" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setOpen((p) => !p)}
+            aria-label="Point at a file"
+            className={cn(
+              "flex size-8 items-center justify-center rounded-lg transition-colors",
+              pinnedIds.size > 0
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <PaperclipIcon className="size-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Point at a file</TooltipContent>
+      </Tooltip>
 
       {open && (
         <>
@@ -511,26 +643,29 @@ function AttachButton({
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute bottom-full left-0 z-40 mb-2 w-80 overflow-hidden rounded-xl border bg-popover shadow-xl ring-1 ring-foreground/5">
-            <div className="border-b p-2">
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search materials…"
-                className="w-full rounded-md bg-muted/40 px-2.5 py-1.5 text-xs outline-none"
-              />
+          <div className="absolute bottom-full left-0 z-40 mb-2 w-80 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
+            <div className="border-b border-border p-2">
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={`Search ${materials.length} sources…`}
+                  className="h-8 w-full rounded-md border border-border bg-background pr-2 pl-8 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
             </div>
             <div className="max-h-64 overflow-y-auto p-1">
               {filtered.length === 0 ? (
                 <p className="px-3 py-4 text-center text-xs text-muted-foreground">
                   {materials.length === 0
-                    ? "No materials in this class yet."
-                    : "No match."}
+                    ? "No sources in this class yet."
+                    : "Nothing matches."}
                 </p>
               ) : (
                 filtered.map((m) => {
-                  const Icon = getFileIcon(m.file_url)
+                  const FIcon = getFileIcon(m.file_url)
                   const picked = pinnedIds.has(m.id)
                   return (
                     <button
@@ -539,12 +674,10 @@ function AttachButton({
                       onClick={() => onToggle(m.id)}
                       className={cn(
                         "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors",
-                        picked
-                          ? "bg-primary/10 text-primary"
-                          : "hover:bg-muted",
+                        picked ? "bg-primary/10 text-primary" : "hover:bg-muted"
                       )}
                     >
-                      <Icon className="size-3.5 shrink-0" />
+                      <FIcon className="size-3.5 shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{m.title}</span>
                       {picked && <span className="text-[10px]">Attached</span>}
                     </button>
@@ -561,13 +694,8 @@ function AttachButton({
 
 /**
  * Smoothly reveals `target` by advancing a displayed-length counter on every
- * animation frame, sized to the lag. Effect: chunky SSE tokens look like a
- * steady flow rather than visible "stair steps" landing.
- *
- * - Initial render shows whatever has already arrived (no replay).
- * - On every frame, advance toward target by max(2, lag/8) chars — so big
- *   bursts catch up fast and a trickle still flows visibly.
- * - When target shrinks (e.g. new message starts at 0 / hard reset), snap.
+ * animation frame, sized to the lag, so chunky SSE tokens read as a steady
+ * flow rather than visible stair steps.
  */
 function useSmoothedStream(target: string): string {
   const [displayed, setDisplayed] = useState(target)
@@ -585,8 +713,8 @@ function useSmoothedStream(target: string): string {
       if (!active) return
       setDisplayed((current) => {
         const t = targetRef.current
-        if (current.length > t.length) return t // shrink → snap
-        if (current.length >= t.length) return current // caught up → bail out
+        if (current.length > t.length) return t
+        if (current.length >= t.length) return current
         const lag = t.length - current.length
         const advance = Math.max(2, Math.ceil(lag / 8))
         return t.slice(0, current.length + advance)
@@ -611,30 +739,33 @@ function StreamingMarkdown({ content }: { content: string }) {
 
 function AnswerMarkdown({ content }: { content: string }) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none [&_svg]:max-w-full [&_svg]:h-auto">
+    <div className="prose prose-sm dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted prose-pre:text-foreground max-w-none [&_svg]:h-auto [&_svg]:max-w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
         rehypePlugins={[rehypeRaw, rehypeKatex]}
         components={{
           table: ({ children, ...props }) => (
-            <div className="my-3 overflow-x-auto rounded-lg border">
-              <table className="w-full text-[13px]" {...props}>{children}</table>
+            <div className="my-3 overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-[13px]" {...props}>
+                {children}
+              </table>
             </div>
           ),
           th: ({ children, ...props }) => (
-            <th className="bg-muted/50 px-3 py-2 text-left text-xs font-semibold" {...props}>{children}</th>
+            <th
+              className="bg-muted/50 px-3 py-2 text-left text-xs font-semibold"
+              {...props}
+            >
+              {children}
+            </th>
           ),
           td: ({ children, ...props }) => (
-            <td className="border-t px-3 py-2 text-[13px]" {...props}>{children}</td>
-          ),
-          p: ({ children, ...props }) => (
-            <p className="mb-3 last:mb-0" {...props}>{children}</p>
-          ),
-          ul: ({ children, ...props }) => (
-            <ul className="mb-3 list-disc pl-5 last:mb-0" {...props}>{children}</ul>
-          ),
-          ol: ({ children, ...props }) => (
-            <ol className="mb-3 list-decimal pl-5 last:mb-0" {...props}>{children}</ol>
+            <td
+              className="border-t border-border px-3 py-2 text-[13px]"
+              {...props}
+            >
+              {children}
+            </td>
           ),
         }}
       >

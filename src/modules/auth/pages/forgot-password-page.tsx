@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
-import { ArrowLeftIcon, Loader2Icon, MailIcon } from "lucide-react"
-
+import {
+  ArrowLeftIcon,
+  CircleNotchIcon,
+  EnvelopeIcon,
+} from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,7 +50,7 @@ export function ForgotPasswordPage() {
         <div className="w-full max-w-sm rounded-2xl border bg-background p-8 shadow-lg">
           <div className="flex flex-col items-center gap-4 text-center">
             <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
-              <MailIcon className="size-6 text-primary" />
+              <EnvelopeIcon className="size-6 text-primary" />
             </div>
             <h1 className="text-xl font-semibold">Check Your Email</h1>
             <p className="text-sm text-muted-foreground">
@@ -90,7 +93,7 @@ export function ForgotPasswordPage() {
             P
           </div>
           <h1 className="text-xl font-semibold">Forgot Password?</h1>
-          <p className="text-sm text-muted-foreground text-center">
+          <p className="text-center text-sm text-muted-foreground">
             Enter your email address and we'll send you a link to reset your
             password.
           </p>
@@ -118,7 +121,7 @@ export function ForgotPasswordPage() {
             className="w-full"
             disabled={isSubmitting}
           >
-            {isSubmitting && <Loader2Icon className="animate-spin" />}
+            {isSubmitting && <CircleNotchIcon className="animate-spin" />}
             Send Reset Link
           </Button>
 

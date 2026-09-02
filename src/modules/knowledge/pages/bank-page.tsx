@@ -1,48 +1,53 @@
 import { useEffect, useMemo, useState } from "react"
 import {
+  BooksIcon,
+  ChalkboardIcon,
   CheckIcon,
-  Loader2Icon,
+  CircleNotchIcon,
+  FileTextIcon,
   PlusIcon,
-  SearchIcon,
-  SlidersHorizontalIcon,
-  UsersRoundIcon,
-} from "lucide-react"
+} from "@phosphor-icons/react"
 import dayjs from "dayjs"
 import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
+import { countSummary } from "@/lib/format"
+import { timeAgo } from "@/lib/time"
 import {
   classLabel,
   useTeacherAssignments,
   type Assignment,
 } from "@/hooks/use-teacher-assignments"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Spinner } from "@/components/ui/spinner"
+import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { PageHeader } from "@/components/layout/page-header"
+import { PageToolbar } from "@/components/shared/page-toolbar"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  FilterChip,
+  FilterChipGroup,
+  MultiSelectField,
+} from "@/components/shared/filter-controls"
+import { Sticker } from "@/components/shared/sticker"
+import { LoadingSwap } from "@/components/shared/loading-swap"
+import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { FilterChip } from "@/components/shared/filter-controls"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  MaterialGroup,
+  MaterialList,
+  MaterialListSkeleton,
+  MaterialRowSkeletonRight,
+  MaterialRow,
+} from "@/modules/knowledge/components/material-list"
 
 interface Uploader {
   id: string
@@ -131,7 +136,7 @@ export function BankPage() {
     }
   }, [debouncedSearch, subjectFilter, gradeFilter])
 
-  // Distinct subjects/grades across the current page, used to seed filter chips.
+  // Distinct subjects/grades across the current page, used to seed filters.
   const availableSubjects = useMemo(
     () =>
       Array.from(
@@ -153,7 +158,7 @@ export function BankPage() {
             )
             .filter(Boolean) as string[]
         )
-      ).sort(),
+      ).sort((a, b) => Number(a) - Number(b)),
     [materials]
   )
 
@@ -186,90 +191,178 @@ export function BankPage() {
     }
   }
 
+  // Group under the class each material was shared from.
+  const grouped = useMemo(() => {
+    const groups = new Map<string, BankMaterial[]>()
+    for (const m of materials) {
+      const key = m.primary_class_label ?? "Other"
+      groups.set(key, [...(groups.get(key) ?? []), m])
+    }
+    return [...groups.entries()].sort(([a], [b]) =>
+      a === "Other" ? 1 : b === "Other" ? -1 : a.localeCompare(b)
+    )
+  }, [materials])
+
+  const activeCount = (gradeFilter ? 1 : 0) + (subjectFilter ? 1 : 0)
+  const filtering = activeCount > 0 || debouncedSearch.length > 0
+  const clearAll = () => {
+    setGradeFilter(null)
+    setSubjectFilter(null)
+  }
+
   return (
-    <div className="flex h-full w-full flex-col gap-4 p-4 md:p-6">
-      {/* Toolbar — search + filter popover + active-filter chips */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1 sm:max-w-72">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search materials..."
-              className="h-9 rounded-full pl-9"
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "@container flex min-h-full flex-col gap-5 pb-12"
+      )}
+    >
+      <PageHeader
+        icon={BooksIcon}
+        title="Shared Library"
+        description="Materials teachers across the school have published. Pick any into your own class."
+      >
+        <PageToolbar
+          search={{
+            value: search,
+            onChange: setSearch,
+            placeholder: "Search by title or tag…",
+          }}
+          summary={
+            isLoading
+              ? undefined
+              : countSummary(materials.length, total, "material", filtering)
+          }
+          filters={
+            availableGrades.length > 0 || availableSubjects.length > 0
+              ? {
+                  activeCount,
+                  onClearAll: clearAll,
+                  resultLabel: `${materials.length} of ${total} materials`,
+                  children: (
+                    <>
+                      {availableGrades.length > 0 && (
+                        <MultiSelectField
+                          icon={ChalkboardIcon}
+                          label="Grade"
+                          placeholder="Any grade"
+                          options={availableGrades.map((g) => ({
+                            value: g,
+                            label: `Grade ${g}`,
+                          }))}
+                          selected={gradeFilter ? [gradeFilter] : []}
+                          onToggle={(v) =>
+                            setGradeFilter((cur) => (cur === v ? null : v))
+                          }
+                          onClear={() => setGradeFilter(null)}
+                        />
+                      )}
+                      {availableSubjects.length > 0 && (
+                        <MultiSelectField
+                          icon={BooksIcon}
+                          label="Subject"
+                          placeholder="Any subject"
+                          options={availableSubjects.map((s) => ({
+                            value: s,
+                            label: s,
+                          }))}
+                          selected={subjectFilter ? [subjectFilter] : []}
+                          onToggle={(v) =>
+                            setSubjectFilter((cur) => (cur === v ? null : v))
+                          }
+                          onClear={() => setSubjectFilter(null)}
+                          searchable={availableSubjects.length > 8}
+                        />
+                      )}
+                    </>
+                  ),
+                }
+              : undefined
+          }
+          chips={
+            <>
+              {gradeFilter && (
+                <FilterChipGroup icon={ChalkboardIcon} label="Grade">
+                  <FilterChip
+                    label={`Grade ${gradeFilter}`}
+                    onRemove={() => setGradeFilter(null)}
+                  />
+                </FilterChipGroup>
+              )}
+              {subjectFilter && (
+                <FilterChipGroup icon={BooksIcon} label="Subject">
+                  <FilterChip
+                    label={subjectFilter}
+                    onRemove={() => setSubjectFilter(null)}
+                  />
+                </FilterChipGroup>
+              )}
+            </>
+          }
+        />
+      </PageHeader>
+
+      <LoadingSwap
+        loading={isLoading}
+        skeleton={
+          <MaterialListSkeleton
+            right={
+              <MaterialRowSkeletonRight status={false} avatar action="button" />
+            }
+          />
+        }
+        className="flex-1"
+      >
+        {materials.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+            <Sticker
+              name={filtering ? "lost" : "friends"}
+              size={filtering ? 120 : 200}
             />
-          </div>
-
-          {(availableSubjects.length > 0 || availableGrades.length > 0) && (
-            <FiltersPopover
-              gradeFilter={gradeFilter}
-              subjectFilter={subjectFilter}
-              availableGrades={availableGrades}
-              availableSubjects={availableSubjects}
-              onApply={(g, s) => {
-                setGradeFilter(g)
-                setSubjectFilter(s)
-              }}
-            />
-          )}
-        </div>
-
-        {(gradeFilter || subjectFilter) && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {gradeFilter && (
-              <FilterChip
-                label={`Grade ${gradeFilter}`}
-                onRemove={() => setGradeFilter(null)}
-              />
-            )}
-            {subjectFilter && (
-              <FilterChip
-                label={subjectFilter}
-                onRemove={() => setSubjectFilter(null)}
-              />
+            <div className="flex max-w-[380px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                {filtering ? "Nothing matches that" : "Nothing shared yet"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {filtering
+                  ? "Try a different word, or drop a filter."
+                  : "When teachers publish a material to the school, it shows up here for everyone to pick from."}
+              </p>
+            </div>
+            {filtering && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearch("")
+                  clearAll()
+                }}
+              >
+                Clear search
+              </Button>
             )}
           </div>
-        )}
-      </div>
-
-      {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="size-6" />
-        </div>
-      ) : materials.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-sidebar p-5">
-          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
-            <UsersRoundIcon className="size-6 text-muted-foreground" />
-          </div>
-          <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
-            <p className="text-base font-medium text-secondary-foreground">
-              No public materials found
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Try a different search, or check back once teachers publish
-              materials to the school.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="min-h-0 flex-1 overflow-auto overscroll-none rounded-lg border [&_[data-slot=table-container]]:overflow-visible">
-            <Table className="border-collapse">
-              <TableHeader className="sticky top-0 z-20 bg-sidebar shadow-[0_1px_0_0_var(--border)] [&_th]:h-10 [&_th]:text-xs [&_th]:font-medium [&_th]:text-muted-foreground">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="min-w-56">Title</TableHead>
-                  <TableHead className="min-w-28">Class</TableHead>
-                  <TableHead className="min-w-40">Tags</TableHead>
-                  <TableHead className="min-w-28">Uploaded</TableHead>
-                  <TableHead className="min-w-40">Shared by</TableHead>
-                  <TableHead className="w-36 text-right">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {materials.map((m) => (
+        ) : (
+          <MaterialList
+            meta={
+              <>
+                <span className="tabular-nums">
+                  {materials.length} of {total}{" "}
+                  {total === 1 ? "material" : "materials"}
+                </span>
+                <span className="ml-auto">Newest first</span>
+              </>
+            }
+          >
+            {grouped.map(([label, items]) => (
+              <MaterialGroup
+                key={label}
+                icon={ChalkboardIcon}
+                label={label}
+                count={items.length}
+              >
+                {items.map((m) => (
                   <BankRow
                     key={m.id}
                     material={m}
@@ -278,148 +371,12 @@ export function BankPage() {
                     myAssignments={assignments ?? []}
                   />
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Showing {materials.length} of {total}
-          </p>
-        </>
-      )}
+              </MaterialGroup>
+            ))}
+          </MaterialList>
+        )}
+      </LoadingSwap>
     </div>
-  )
-}
-
-function FiltersPopover({
-  gradeFilter,
-  subjectFilter,
-  availableGrades,
-  availableSubjects,
-  onApply,
-}: {
-  gradeFilter: string | null
-  subjectFilter: string | null
-  availableGrades: string[]
-  availableSubjects: string[]
-  onApply: (grade: string | null, subject: string | null) => void
-}) {
-  const [open, setOpen] = useState(false)
-  // Local draft state so the user can dial in Grade + Subject before
-  // committing — avoids a refetch on every dropdown change. Drafts re-seed
-  // from the applied filters each time the popover opens.
-  const [draftGrade, setDraftGrade] = useState<string | null>(gradeFilter)
-  const [draftSubject, setDraftSubject] = useState<string | null>(subjectFilter)
-
-  const handleOpenChange = (next: boolean) => {
-    if (next) {
-      setDraftGrade(gradeFilter)
-      setDraftSubject(subjectFilter)
-    }
-    setOpen(next)
-  }
-
-  const activeCount = (gradeFilter ? 1 : 0) + (subjectFilter ? 1 : 0)
-
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-9 rounded-full"
-        >
-          <SlidersHorizontalIcon className="size-3.5" />
-          Filters
-          {activeCount > 0 && (
-            <Badge
-              variant="secondary"
-              className="ml-1 h-5 min-w-5 rounded-full px-1.5 text-[10px]"
-            >
-              {activeCount}
-            </Badge>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <p className="text-sm font-medium">Filters</p>
-          {activeCount > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setDraftGrade(null)
-                setDraftSubject(null)
-                onApply(null, null)
-                setOpen(false)
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-        <div className="flex flex-col gap-4 p-4">
-          {availableGrades.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs text-muted-foreground">Class</Label>
-              <Select
-                value={draftGrade ?? "__all"}
-                onValueChange={(v) => setDraftGrade(v === "__all" ? null : v)}
-              >
-                <SelectTrigger className="h-9 w-full text-sm">
-                  <SelectValue placeholder="All classes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all">All classes</SelectItem>
-                  {availableGrades.map((g) => (
-                    <SelectItem key={g} value={g}>
-                      Grade {g}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {availableSubjects.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs text-muted-foreground">Subject</Label>
-              <Select
-                value={draftSubject ?? "__all"}
-                onValueChange={(v) => setDraftSubject(v === "__all" ? null : v)}
-              >
-                <SelectTrigger className="h-9 w-full text-sm">
-                  <SelectValue placeholder="All subjects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all">All subjects</SelectItem>
-                  {availableSubjects.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end">
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 rounded-full text-xs"
-              onClick={() => {
-                onApply(draftGrade, draftSubject)
-                setOpen(false)
-              }}
-            >
-              Apply
-            </Button>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
   )
 }
 
@@ -443,118 +400,95 @@ function BankRow({
   const uploaderName = material.uploader?.full_name ?? "Unknown"
 
   return (
-    <TableRow>
-      <TableCell>
-        <span className="block max-w-72 truncate text-sm font-medium text-secondary-foreground">
-          {material.title}
-        </span>
-      </TableCell>
-      <TableCell>
-        {material.primary_class_label ? (
-          <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
-            {material.primary_class_label}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground/60">—</span>
-        )}
-      </TableCell>
-      <TableCell>
-        {material.tags && material.tags.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1">
-            {material.tags.slice(0, 2).map((t) => (
-              <span
-                key={t}
-                className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
-              >
-                {t}
+    <MaterialRow
+      icon={FileTextIcon}
+      iconTitle="PDF"
+      title={material.title}
+      subtitle={material.tags.join(", ") || undefined}
+      right={
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Avatar className="size-5">
+                {material.uploader?.profile_url ? (
+                  <AvatarImage
+                    src={material.uploader.profile_url}
+                    alt={uploaderName}
+                  />
+                ) : null}
+                <AvatarFallback className="text-[8px]">
+                  {initials(uploaderName)}
+                </AvatarFallback>
+              </Avatar>
+            </TooltipTrigger>
+            <TooltipContent>{uploaderName}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="w-14 text-right tabular-nums">
+                {timeAgo(material.uploaded_at)}
               </span>
-            ))}
-            {material.tags.length > 2 && (
-              <span
-                title={material.tags.slice(2).join(", ")}
-                className="text-[11px] text-muted-foreground/60"
+            </TooltipTrigger>
+            <TooltipContent>
+              {dayjs(material.uploaded_at).format("D MMM YYYY")}
+            </TooltipContent>
+          </Tooltip>
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn(
+                  "h-8 w-32 gap-1.5 text-xs",
+                  linkedCount > 0 && "text-muted-foreground"
+                )}
+                disabled={picking}
               >
-                +{material.tags.length - 2}
-              </span>
-            )}
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground/60">—</span>
-        )}
-      </TableCell>
-      <TableCell className="text-xs text-muted-foreground">
-        {dayjs(material.uploaded_at).format("MMM D, YYYY")}
-      </TableCell>
-      <TableCell>
-        <div className="flex min-w-0 items-center gap-1.5">
-          <Avatar className="size-5">
-            {material.uploader?.profile_url ? (
-              <AvatarImage
-                src={material.uploader.profile_url}
-                alt={uploaderName}
-              />
-            ) : null}
-            <AvatarFallback className="text-[9px]">
-              {initials(uploaderName)}
-            </AvatarFallback>
-          </Avatar>
-          <span className="truncate text-xs text-muted-foreground">
-            {uploaderName}
-          </span>
-        </div>
-      </TableCell>
-      <TableCell className="text-right">
-        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              size="sm"
-              variant={linkedCount > 0 ? "outline" : "default"}
-              className="h-7 gap-1 rounded-full text-xs"
-              disabled={picking}
-            >
-              {picking ? (
-                <Loader2Icon className="size-3 animate-spin" />
-              ) : linkedCount > 0 ? (
-                <>
-                  <CheckIcon className="size-3" />
-                  Added to {linkedCount}
-                </>
-              ) : (
-                <>
-                  <PlusIcon className="size-3" />
-                  Add to class
-                </>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-64 p-2">
-            {remainingClasses.length === 0 ? (
-              <p className="p-2 text-xs text-muted-foreground">
-                Already added to every class you teach.
-              </p>
-            ) : (
-              <div className="flex flex-col">
-                <p className="p-2 text-[10px] tracking-wide text-muted-foreground uppercase">
-                  Add to
+                {picking ? (
+                  <CircleNotchIcon className="size-3.5 animate-spin" />
+                ) : linkedCount > 0 ? (
+                  <>
+                    <CheckIcon className="size-3.5 text-primary" />
+                    Used in {linkedCount}
+                  </>
+                ) : (
+                  <>
+                    <PlusIcon className="size-3.5" />
+                    Use in my class
+                  </>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 gap-0 p-1">
+              {remainingClasses.length === 0 ? (
+                <p className="p-3 text-xs text-muted-foreground">
+                  Already used in every class you teach.
                 </p>
-                {remainingClasses.map((a) => (
-                  <button
-                    key={a.class_subject_id}
-                    type="button"
-                    onClick={() => {
-                      setPickerOpen(false)
-                      onPick(material, a.class_subject_id)
-                    }}
-                    className="rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
-                  >
-                    {classLabel(a)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
-      </TableCell>
-    </TableRow>
+              ) : (
+                <div className="flex flex-col">
+                  <p className="px-2 pt-2 pb-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                    Use in
+                  </p>
+                  {remainingClasses.map((a) => (
+                    <button
+                      key={a.class_subject_id}
+                      type="button"
+                      onClick={() => {
+                        setPickerOpen(false)
+                        onPick(material, a.class_subject_id)
+                      }}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                    >
+                      <ChalkboardIcon className="size-3.5 text-muted-foreground" />
+                      {classLabel(a)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+        </>
+      }
+    />
   )
 }

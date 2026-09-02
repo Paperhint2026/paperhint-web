@@ -1,21 +1,31 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
+  ArrowsOutLineVerticalIcon,
+  CaretRightIcon,
+  CircleNotchIcon,
+  DotsSixVerticalIcon,
   DownloadIcon,
   EyeIcon,
-  GripVerticalIcon,
-  Loader2Icon,
+  ListNumbersIcon,
+  MinusIcon,
+  NoteIcon,
   PencilIcon,
   PlusIcon,
   ScissorsIcon,
-  SpaceIcon,
-  Trash2Icon,
-  TypeIcon,
-  AlertTriangleIcon,
-} from "lucide-react"
+  TextHOneIcon,
+  TextTIcon,
+  TrashIcon,
+  type Icon,
+} from "@phosphor-icons/react"
 import {
   DndContext,
   closestCenter,
@@ -42,11 +52,20 @@ import {
   BlobProvider,
 } from "@react-pdf/renderer"
 import { toast } from "sonner"
+import { AnimatePresence, motion } from "motion/react"
 
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAppSelector } from "@/store"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { Skeleton } from "@/components/ui/skeleton"
+import { PaperhintMark } from "@/components/shared/paperhint-mark"
+import { LoadingSwap } from "@/components/shared/loading-swap"
 
 // ─── Types ────────────────────────────────────────────
 
@@ -65,10 +84,22 @@ interface Exam {
   id: string
   exam_name: string
   total_marks: number
-  blueprint: { section: string; type: string; num_questions: number; marks_per_question: number }[]
+  blueprint: {
+    section: string
+    type: string
+    num_questions: number
+    marks_per_question: number
+  }[]
 }
 
-type BlockType = "header" | "instruction" | "section-title" | "question" | "text" | "spacer" | "page-break"
+type BlockType =
+  | "header"
+  | "instruction"
+  | "section-title"
+  | "question"
+  | "text"
+  | "spacer"
+  | "page-break"
 
 interface Block {
   id: string
@@ -111,21 +142,23 @@ function newBlockId() {
 }
 
 function stripMarkdown(text: string): string {
-  return text
-    .replace(/\$\$[\s\S]*?\$\$/g, "[Formula]")
-    .replace(/\$[^$]+\$/g, "[Formula]")
-    .replace(/<svg[\s\S]*?<\/svg>/gi, "[Diagram]")
-    // <img> tags render as separate <Image> components below the question
-    // text; strip them from the prose so the raw markup doesn't print.
-    .replace(/<img\b[^>]*?\/?\s*>/gi, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .replace(/#{1,6}\s/g, "")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/^\s*[-*+]\s/gm, "• ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
+  return (
+    text
+      .replace(/\$\$[\s\S]*?\$\$/g, "[Formula]")
+      .replace(/\$[^$]+\$/g, "[Formula]")
+      .replace(/<svg[\s\S]*?<\/svg>/gi, "[Diagram]")
+      // <img> tags render as separate <Image> components below the question
+      // text; strip them from the prose so the raw markup doesn't print.
+      .replace(/<img\b[^>]*?\/?\s*>/gi, "")
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/#{1,6}\s/g, "")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/^\s*[-*+]\s/gm, "• ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  )
 }
 
 // Extract every <img src="..."> URL from a question content string, in
@@ -146,10 +179,16 @@ function extractImageUrls(text: string): string[] {
 const IMG_OR_SVG_RE = /<svg\b[\s\S]*?<\/svg>|<img\b[^>]*?\/?\s*>/gi
 function stripQuestionMarkupForPreview(text: string): string {
   if (!text) return ""
-  return text.replace(IMG_OR_SVG_RE, "").replace(/\n{3,}/g, "\n\n").trim()
+  return text
+    .replace(IMG_OR_SVG_RE, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
 }
 
-function reassembleQuestionContent(original: string, editedProse: string): string {
+function reassembleQuestionContent(
+  original: string,
+  editedProse: string
+): string {
   const media: string[] = []
   original.replace(IMG_OR_SVG_RE, (m) => {
     media.push(m)
@@ -189,9 +228,13 @@ function ResizableImage({
       const nextWidthPct = clamp(
         startBox.widthPct + (dx / parentWidth) * 100,
         MIN_WIDTH_PCT,
-        100,
+        100
       )
-      const nextHeightPx = clamp(startBox.heightPx + dy, MIN_HEIGHT_PX, MAX_HEIGHT_PX)
+      const nextHeightPx = clamp(
+        startBox.heightPx + dy,
+        MIN_HEIGHT_PX,
+        MAX_HEIGHT_PX
+      )
       onChange({ widthPct: nextWidthPct, heightPx: nextHeightPx })
     }
     const onUp = () => {
@@ -219,12 +262,19 @@ function ResizableImage({
         aria-label="Resize image"
         onMouseDown={handleMouseDown}
         className={cn(
-          "absolute -bottom-1 -right-1 flex size-4 cursor-nwse-resize items-center justify-center rounded-sm border border-border/60 bg-background/70 text-muted-foreground shadow-sm backdrop-blur",
-          "opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground",
+          "absolute -right-1 -bottom-1 flex size-4 cursor-nwse-resize items-center justify-center rounded-sm border border-border/60 bg-background/70 text-muted-foreground shadow-sm backdrop-blur",
+          "opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
         )}
       >
         {/* Two short strokes forming the corner-grip glyph */}
-        <svg viewBox="0 0 8 8" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.2">
+        <svg
+          viewBox="0 0 8 8"
+          width="8"
+          height="8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.2"
+        >
           <path d="M2 7 L7 2" />
           <path d="M4.5 7 L7 4.5" />
         </svg>
@@ -240,7 +290,7 @@ function clamp(v: number, lo: number, hi: number) {
 function buildInitialBlocks(
   exam: Exam,
   questions: ApiQuestion[],
-  schoolName: string,
+  schoolName: string
 ): Block[] {
   const blocks: Block[] = []
 
@@ -296,7 +346,9 @@ function buildInitialBlocks(
       })
     }
 
-    const sorted = [...sectionGroups[sec]].sort((a, b) => a.question_order - b.question_order)
+    const sorted = [...sectionGroups[sec]].sort(
+      (a, b) => a.question_order - b.question_order
+    )
 
     for (const q of sorted) {
       blocks.push({
@@ -320,6 +372,37 @@ function buildInitialBlocks(
 
 // ─── Sortable Block Component ─────────────────────────
 
+/**
+ * A textarea that grows with what is typed and shrinks back when text is
+ * removed, so a block on the sheet is exactly as tall as its content — like
+ * a printed line, never clipped, never a fixed row count.
+ */
+function AutoGrowTextarea({
+  value,
+  className,
+  ...rest
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = "0px"
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      rows={1}
+      className={cn(
+        "block resize-none overflow-hidden p-0 align-top",
+        className
+      )}
+      {...rest}
+    />
+  )
+}
+
 function SortableBlock({
   block,
   onUpdate,
@@ -329,153 +412,285 @@ function SortableBlock({
   onUpdate: (id: string, changes: Partial<Block>) => void
   onRemove: (id: string) => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: block.id })
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   }
 
-  const blockStyles: Record<BlockType, string> = {
-    header: "border-l-4 border-l-primary bg-primary/5",
-    instruction: "border-l-4 border-l-amber-400 bg-amber-50/50 dark:bg-amber-950/20",
-    "section-title": "border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20",
-    question: "border-l-4 border-l-green-500 bg-background",
-    text: "border-l-4 border-l-gray-400 bg-muted/30",
-    spacer: "border-l-4 border-l-dashed border-l-muted-foreground/30 bg-muted/10",
-    "page-break": "border-l-4 border-l-red-400 bg-red-50/30 dark:bg-red-950/10",
+  /* One quiet tag per block type. Colour is reserved for the accent line on
+     the left, and only the types a reader must not confuse get one. */
+  const typeMeta: Record<
+    BlockType,
+    { label: string; accent: string; hint?: string }
+  > = {
+    header: { label: "Header", accent: "bg-primary" },
+    instruction: {
+      label: "Instructions",
+      accent: "bg-amber-400",
+      hint: "Printed in small type under the title",
+    },
+    "section-title": { label: "Section", accent: "bg-foreground/40" },
+    question: {
+      label: "Question",
+      accent: "bg-foreground/20",
+      hint: "Edits here change the printout only, not the saved question",
+    },
+    text: { label: "Text", accent: "bg-foreground/20" },
+    spacer: { label: "Space", accent: "bg-transparent" },
+    "page-break": { label: "Page break", accent: "bg-transparent" },
   }
-
-  const typeLabels: Record<BlockType, string> = {
-    header: "HEADER",
-    instruction: "INSTRUCTIONS",
-    "section-title": "SECTION",
-    question: "QUESTION",
-    text: "TEXT",
-    spacer: "SPACER",
-    "page-break": "PAGE BREAK",
-  }
+  const meta = typeMeta[block.type]
 
   const handleContentChange = (value: string) => {
     onUpdate(block.id, { content: value })
   }
+
+  const isStructural = block.type === "spacer" || block.type === "page-break"
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative rounded-lg border transition-shadow",
-        blockStyles[block.type],
-        isDragging && "z-50 shadow-xl opacity-90",
+        "group/block relative rounded-lg border border-transparent transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-primary)_8%,transparent)]",
+        isDragging && "z-50 border-border bg-background shadow-xl"
       )}
     >
-      {/* Minimal top bar — drag handle + label + delete */}
-      <div className="flex items-center gap-1 px-2 py-1">
-        <button
-          {...attributes}
-          {...listeners}
-          className="cursor-grab rounded p-0.5 text-muted-foreground/40 transition-colors hover:text-foreground active:cursor-grabbing"
-        >
-          <GripVerticalIcon className="size-3" />
-        </button>
+      {/* Accent line — shows on hover so the sheet stays calm at rest */}
+      <span
+        aria-hidden
+        className={cn(
+          "absolute top-2 bottom-2 left-0 w-0.5 rounded-full opacity-0 transition-opacity group-hover/block:opacity-100",
+          meta.accent
+        )}
+      />
 
-        <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/50">
-          {typeLabels[block.type]}
-        </span>
+      {/* Drag handle — hangs off the left edge on hover */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+        className="absolute top-1/2 -left-6 flex size-6 -translate-y-1/2 cursor-grab items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-opacity group-hover/block:opacity-100 hover:text-foreground focus-visible:opacity-100 active:cursor-grabbing"
+      >
+        <DotsSixVerticalIcon className="size-3.5" />
+      </button>
+
+      {/* Chrome — a small toolbar floating over the top-right corner, so the
+          block itself keeps the printed page's spacing */}
+      <div className="pointer-events-none absolute -top-9 right-3 z-10 flex h-8 translate-y-1 items-center gap-1.5 rounded-lg bg-foreground px-1.5 text-[11px] text-background opacity-0 shadow-lg shadow-black/20 transition-all duration-150 group-hover/block:pointer-events-auto group-hover/block:translate-y-0 group-hover/block:opacity-100 focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:opacity-100">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="px-1.5 text-[10px] font-semibold tracking-wider text-background/70 uppercase">
+              {meta.label}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{meta.hint}</TooltipContent>
+        </Tooltip>
 
         {block.type === "question" && (
-          <div className="ml-1 flex items-center gap-1">
-            <span className="text-[8px] text-muted-foreground/50">Q</span>
-            <input
-              value={block.meta?.questionNumber || ""}
-              onChange={(e) =>
-                onUpdate(block.id, { meta: { ...block.meta, questionNumber: e.target.value } })
-              }
-              className="w-8 border-none bg-transparent p-0 text-[9px] font-semibold text-green-600 outline-none dark:text-green-400"
-            />
-            <span className="text-[8px] text-muted-foreground/50">·</span>
-            <input
-              type="number"
-              value={block.meta?.marks || 0}
-              onChange={(e) =>
-                onUpdate(block.id, { meta: { ...block.meta, marks: Number(e.target.value) } })
-              }
-              className="w-8 border-none bg-transparent p-0 text-[9px] font-semibold text-green-600 outline-none dark:text-green-400"
-            />
-            <span className="text-[8px] text-muted-foreground/50">marks</span>
+          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <span className="h-4 w-px bg-background/20" />
+
+            {/* Number — a labelled field, so "1" is unmistakably the question
+                number and not a count */}
+            <label className="flex items-center gap-1.5 px-1 text-background/70">
+              <span>No.</span>
+              <input
+                value={block.meta?.questionNumber || ""}
+                onChange={(e) =>
+                  onUpdate(block.id, {
+                    meta: { ...block.meta, questionNumber: e.target.value },
+                  })
+                }
+                aria-label="Question number"
+                className="h-5 w-7 rounded-md bg-background/15 text-center text-[11px] font-semibold text-background tabular-nums outline-none focus:bg-background/25"
+              />
+            </label>
+
+            <span className="h-4 w-px bg-background/20" />
+
+            {/* Marks — a stepper. Reads as a quantity you nudge, not a field
+                to type into blind. */}
+            <span className="flex items-center gap-1.5 px-1 text-background/70">
+              <span>Marks</span>
+              <span className="flex items-center overflow-hidden rounded-md bg-background/15">
+                <button
+                  type="button"
+                  aria-label="One mark less"
+                  disabled={(block.meta?.marks ?? 0) <= 0}
+                  onClick={() =>
+                    onUpdate(block.id, {
+                      meta: {
+                        ...block.meta,
+                        marks: Math.max(0, (block.meta?.marks ?? 0) - 1),
+                      },
+                    })
+                  }
+                  className="flex h-5 w-5 items-center justify-center text-background/70 transition-colors hover:bg-background/20 hover:text-background disabled:opacity-30"
+                >
+                  <MinusIcon weight="bold" className="size-2.5" />
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  value={block.meta?.marks ?? 0}
+                  onChange={(e) =>
+                    onUpdate(block.id, {
+                      meta: { ...block.meta, marks: Number(e.target.value) },
+                    })
+                  }
+                  aria-label="Marks"
+                  className="h-5 w-6 [appearance:textfield] bg-transparent text-center text-[11px] font-semibold text-background tabular-nums outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  aria-label="One mark more"
+                  onClick={() =>
+                    onUpdate(block.id, {
+                      meta: {
+                        ...block.meta,
+                        marks: (block.meta?.marks ?? 0) + 1,
+                      },
+                    })
+                  }
+                  className="flex h-5 w-5 items-center justify-center text-background/70 transition-colors hover:bg-background/20 hover:text-background"
+                >
+                  <PlusIcon weight="bold" className="size-2.5" />
+                </button>
+              </span>
+            </span>
+
+            {block.meta?.options && block.meta.options.length > 0 && (
+              <>
+                <span className="h-4 w-px bg-background/20" />
+                <span className="flex items-center gap-0.5 px-0.5">
+                  {([1, 2] as const).map((n) => {
+                    const on = (block.meta?.optionsPerRow ?? 2) === n
+                    return (
+                      <Tooltip key={n}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdate(block.id, {
+                                meta: { ...block.meta, optionsPerRow: n },
+                              })
+                            }
+                            aria-pressed={on}
+                            className={cn(
+                              "rounded-md px-1.5 py-0.5 transition-colors",
+                              on
+                                ? "bg-background font-semibold text-foreground"
+                                : "text-background/70 hover:bg-background/20 hover:text-background"
+                            )}
+                          >
+                            {n}×
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {n} option{n === 1 ? "" : "s"} per row
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })}
+                </span>
+              </>
+            )}
           </div>
         )}
 
-        <div className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            onClick={() => onRemove(block.id)}
-            className="rounded p-0.5 text-muted-foreground transition-colors hover:text-destructive"
-            title="Remove block"
-          >
-            <Trash2Icon className="size-3.5" />
-          </button>
-        </div>
+        <span className="h-4 w-px bg-background/20" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => onRemove(block.id)}
+              className="rounded-md p-1 text-background/70 transition-colors hover:bg-destructive hover:text-white"
+              aria-label="Remove block"
+            >
+              <TrashIcon className="size-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Remove block</TooltipContent>
+        </Tooltip>
       </div>
 
-      {/* Inline-editable content */}
-      <div className="px-3 pb-2.5">
+      {/* Content — set like the printed page so what you see is what prints */}
+      <div className={cn("px-4 py-1.5", isStructural && "py-1")}>
         {block.type === "spacer" ? (
-          <div className="flex h-6 items-center justify-center text-[10px] text-muted-foreground">
-            — spacing —
+          <div className="flex h-5 items-center gap-2 text-[10px] text-muted-foreground/60">
+            <span className="h-px flex-1 border-t border-dashed border-border" />
+            <ArrowsOutLineVerticalIcon className="size-3" />
+            space
+            <span className="h-px flex-1 border-t border-dashed border-border" />
           </div>
         ) : block.type === "page-break" ? (
-          <div className="flex h-4 items-center justify-center">
-            <div className="flex-1 border-t border-dashed border-red-300" />
-            <span className="px-3 text-[10px] font-medium text-red-400">PAGE BREAK</span>
-            <div className="flex-1 border-t border-dashed border-red-300" />
+          <div className="flex h-5 items-center gap-2 text-[10px] font-medium text-muted-foreground">
+            <span className="h-px flex-1 border-t-2 border-dashed border-border" />
+            <ScissorsIcon className="size-3" />
+            new page
+            <span className="h-px flex-1 border-t-2 border-dashed border-border" />
           </div>
         ) : block.type === "header" ? (
           <input
             value={block.content}
             onChange={(e) => handleContentChange(e.target.value)}
-            className="w-full border-none bg-transparent text-center text-base font-bold outline-none ring-0 focus:ring-0"
-            placeholder="School Name"
+            className="w-full border-none bg-transparent text-center text-lg font-bold tracking-tight text-foreground outline-none placeholder:text-muted-foreground/50"
+            placeholder="School name"
           />
         ) : block.type === "section-title" ? (
           <input
             value={block.content}
             onChange={(e) => handleContentChange(e.target.value)}
-            className="w-full border-none bg-transparent text-sm font-bold underline outline-none ring-0 focus:ring-0"
-            placeholder="Section Title"
+            className="w-full border-none bg-transparent text-sm font-bold text-foreground underline underline-offset-4 outline-none placeholder:text-muted-foreground/50"
+            placeholder="Section title"
           />
         ) : block.type === "question" ? (
           <div>
-            <div className="flex items-start gap-0.5">
-              <span className="shrink-0 pt-0.5 text-xs font-semibold text-foreground">
+            <div className="flex items-start gap-2">
+              <span className="w-6 shrink-0 text-right text-[13.5px] leading-[1.55] font-semibold text-foreground tabular-nums">
                 {block.meta?.questionNumber}.
               </span>
-              <textarea
+              <AutoGrowTextarea
                 value={stripQuestionMarkupForPreview(block.content)}
-                onChange={(e) => handleContentChange(
-                  reassembleQuestionContent(block.content, e.target.value),
-                )}
-                rows={Math.max(2, Math.ceil(stripQuestionMarkupForPreview(block.content).length / 80))}
-                className="w-full resize-none border-none bg-transparent text-xs leading-relaxed outline-none ring-0 focus:ring-0"
-                placeholder="Question text..."
+                onChange={(e) =>
+                  handleContentChange(
+                    reassembleQuestionContent(block.content, e.target.value)
+                  )
+                }
+                className="w-full border-none bg-transparent text-[13.5px] leading-[1.55] text-foreground outline-none"
+                placeholder="Question text…"
               />
-              <span className="shrink-0 pt-0.5 text-[10px] text-muted-foreground">
+              <span className="w-8 shrink-0 text-right text-xs leading-[1.9] text-muted-foreground tabular-nums">
                 [{block.meta?.marks}]
               </span>
             </div>
             {extractImageUrls(block.content).length > 0 && (
-              <div className="ml-6 mt-2 flex flex-wrap gap-3">
+              <div className="mt-2 ml-8 flex flex-wrap gap-3">
                 {extractImageUrls(block.content).map((url, i) => {
-                  const box: ImageBox = block.meta?.imageBoxes?.[i] ?? DEFAULT_IMAGE_BOX
+                  const box: ImageBox =
+                    block.meta?.imageBoxes?.[i] ?? DEFAULT_IMAGE_BOX
                   const setBox = (next: ImageBox) => {
                     const current = block.meta?.imageBoxes ?? []
                     const nextBoxes = [...current]
                     for (let k = 0; k <= i; k++) {
-                      if (nextBoxes[k] === undefined) nextBoxes[k] = DEFAULT_IMAGE_BOX
+                      if (nextBoxes[k] === undefined)
+                        nextBoxes[k] = DEFAULT_IMAGE_BOX
                     }
                     nextBoxes[i] = next
-                    onUpdate(block.id, { meta: { ...block.meta, imageBoxes: nextBoxes } })
+                    onUpdate(block.id, {
+                      meta: { ...block.meta, imageBoxes: nextBoxes },
+                    })
                   }
                   return (
                     <ResizableImage
@@ -489,81 +704,45 @@ function SortableBlock({
               </div>
             )}
             {block.meta?.options && block.meta.options.length > 0 && (
-              <div className="mt-2">
-                {/* Layout toggle */}
-                <div className="mb-1.5 flex items-center gap-2">
-                  <span className="text-[8px] font-medium uppercase tracking-wider text-muted-foreground/50">
-                    Options layout
-                  </span>
-                  <div className="flex rounded border bg-muted/30">
-                    <button
-                      onClick={() =>
-                        onUpdate(block.id, { meta: { ...block.meta, optionsPerRow: 1 } })
-                      }
-                      className={cn(
-                        "px-2 py-0.5 text-[9px] font-medium transition-colors",
-                        (block.meta?.optionsPerRow ?? 2) === 1
-                          ? "bg-primary text-primary-foreground rounded"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      1 per row
-                    </button>
-                    <button
-                      onClick={() =>
-                        onUpdate(block.id, { meta: { ...block.meta, optionsPerRow: 2 } })
-                      }
-                      className={cn(
-                        "px-2 py-0.5 text-[9px] font-medium transition-colors",
-                        (block.meta?.optionsPerRow ?? 2) === 2
-                          ? "bg-primary text-primary-foreground rounded"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      2 per row
-                    </button>
-                  </div>
-                </div>
-
-                {/* Options */}
+              <div className="mt-1.5 ml-8">
                 <div
                   className={cn(
-                    "grid gap-1.5 pl-5",
-                    (block.meta?.optionsPerRow ?? 2) === 1 ? "grid-cols-1" : "grid-cols-2",
+                    "grid gap-x-8 gap-y-0",
+                    (block.meta?.optionsPerRow ?? 2) === 1
+                      ? "grid-cols-1"
+                      : "grid-cols-2"
                   )}
                 >
                   {block.meta.options.map((opt, i) => (
-                    <textarea
+                    <AutoGrowTextarea
                       key={i}
                       value={opt}
                       onChange={(e) => {
                         const updated = [...(block.meta?.options || [])]
                         updated[i] = e.target.value
-                        onUpdate(block.id, { meta: { ...block.meta, options: updated } })
+                        onUpdate(block.id, {
+                          meta: { ...block.meta, options: updated },
+                        })
                       }}
-                      rows={1}
-                      className="resize-none rounded border border-transparent bg-transparent px-1.5 py-0.5 text-[11px] text-muted-foreground outline-none transition-colors focus:border-border focus:bg-background focus:text-foreground"
-                      onInput={(e) => {
-                        const el = e.target as HTMLTextAreaElement
-                        el.style.height = "auto"
-                        el.style.height = el.scrollHeight + "px"
-                      }}
+                      aria-label={`Option ${String.fromCharCode(65 + i)}`}
+                      className="rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-[13px] leading-[1.5] text-secondary-foreground transition-colors outline-none focus:border-border focus:bg-background focus:text-foreground"
                     />
                   ))}
                 </div>
               </div>
             )}
-            <p className="mt-1 text-[8px] italic text-muted-foreground/40">
-              Editing here won't change saved questions
-            </p>
           </div>
         ) : (
-          <textarea
+          <AutoGrowTextarea
             value={block.content}
             onChange={(e) => handleContentChange(e.target.value)}
-            rows={Math.max(1, Math.ceil(block.content.length / 80))}
-            className="w-full resize-none border-none bg-transparent text-xs leading-relaxed outline-none ring-0 focus:ring-0"
-            placeholder="Type here..."
+            className={cn(
+              "w-full border-none bg-transparent leading-[1.55] text-foreground outline-none placeholder:text-muted-foreground/50",
+              block.type === "instruction"
+                ? "text-xs text-secondary-foreground"
+                : "text-center text-sm"
+            )}
+            placeholder="Type here…"
           />
         )}
       </div>
@@ -575,23 +754,49 @@ function SortableBlock({
 
 const pdfStyles = StyleSheet.create({
   page: { padding: 40, fontFamily: "Helvetica", fontSize: 11 },
-  header: { fontSize: 16, fontFamily: "Helvetica-Bold", textAlign: "center", marginBottom: 4 },
+  header: {
+    fontSize: 16,
+    fontFamily: "Helvetica-Bold",
+    textAlign: "center",
+    marginBottom: 4,
+  },
   text: { fontSize: 11, textAlign: "center", marginBottom: 3 },
   instruction: { fontSize: 9, marginBottom: 2, color: "#333", lineHeight: 1.6 },
-  sectionTitle: { fontSize: 12, fontFamily: "Helvetica-Bold", marginTop: 14, marginBottom: 4, textDecoration: "underline" },
+  sectionTitle: {
+    fontSize: 12,
+    fontFamily: "Helvetica-Bold",
+    marginTop: 14,
+    marginBottom: 4,
+    textDecoration: "underline",
+  },
   questionRow: { flexDirection: "row", marginBottom: 6 },
   questionNumber: { width: 30, fontFamily: "Helvetica-Bold", fontSize: 10 },
   questionContent: { flex: 1, fontSize: 10, lineHeight: 1.5 },
   marksText: { fontSize: 9, color: "#555", textAlign: "right", width: 40 },
-  optionsRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 2, marginLeft: 30, marginBottom: 2 },
+  optionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 2,
+    marginLeft: 30,
+    marginBottom: 2,
+  },
   optionItem2Col: { width: "48%", fontSize: 9, marginBottom: 3 },
   optionItem1Col: { width: "100%", fontSize: 9, marginBottom: 4 },
-  imageRow: { flexDirection: "column", marginLeft: 30, marginTop: 4, marginBottom: 6 },
+  imageRow: {
+    flexDirection: "column",
+    marginLeft: 30,
+    marginTop: 4,
+    marginBottom: 6,
+  },
   // Width + height are set per-image based on the builder's drag box.
   // objectFit: contain preserves aspect ratio within the box.
   questionImage: { marginBottom: 4, objectFit: "contain" },
   spacer: { height: 16 },
-  divider: { borderBottomWidth: 1, borderBottomColor: "#000", marginVertical: 8 },
+  divider: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#000",
+    marginVertical: 8,
+  },
 })
 
 function PdfDocument({ blocks }: { blocks: Block[] }) {
@@ -618,7 +823,11 @@ function PdfDocument({ blocks }: { blocks: Block[] }) {
                   </View>
                 )
               case "text":
-                return <Text key={block.id} style={pdfStyles.text}>{block.content}</Text>
+                return (
+                  <Text key={block.id} style={pdfStyles.text}>
+                    {block.content}
+                  </Text>
+                )
               case "instruction":
                 return (
                   <Text key={block.id} style={pdfStyles.instruction}>
@@ -649,7 +858,8 @@ function PdfDocument({ blocks }: { blocks: Block[] }) {
                     {imageUrls.length > 0 && (
                       <View style={pdfStyles.imageRow}>
                         {imageUrls.map((url, i) => {
-                          const bx = block.meta?.imageBoxes?.[i] ?? DEFAULT_IMAGE_BOX
+                          const bx =
+                            block.meta?.imageBoxes?.[i] ?? DEFAULT_IMAGE_BOX
                           // Convert on-screen pixel height to PDF points
                           // (1 pt ≈ 1.333 px at 96 dpi).
                           const heightPt = Math.round(bx.heightPx * 0.75)
@@ -700,8 +910,63 @@ function PdfDocument({ blocks }: { blocks: Block[] }) {
 
 // ─── Main Component ───────────────────────────────────
 
+/** The page while it loads, in the same frame as the loaded page. */
+function BuilderSkeleton() {
+  return (
+    <div aria-hidden className="flex h-full flex-col overflow-hidden">
+      {/* Top bar: back, eyebrow + title, the Build/Preview switch */}
+      <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2">
+          <Skeleton className="size-7 shrink-0 rounded-full" />
+          <div className="flex flex-col gap-1.5">
+            <Skeleton className="h-2.5 w-16" />
+            <Skeleton className="h-4 w-44" />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Skeleton className="hidden h-8 w-24 sm:block" />
+          <Skeleton className="h-8 w-40 rounded-lg" />
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Insert rail */}
+        <div className="hidden w-[4.5rem] shrink-0 flex-col items-stretch gap-1 border-r border-border bg-sidebar/60 p-2 sm:flex">
+          <Skeleton className="mx-1 mt-1 mb-1.5 h-2.5 w-8" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex flex-col items-center gap-1.5 py-2">
+              <Skeleton className="size-4 rounded" />
+              <Skeleton className="h-2.5 w-8" />
+            </div>
+          ))}
+        </div>
+        {/* Canvas: the sheet on the desk, with a title block and rows */}
+        <div className="flex-1 overflow-hidden bg-sidebar/60 p-4 sm:p-8">
+          <div className="mx-auto flex max-w-4xl flex-col gap-4 rounded-xl border border-border bg-background px-8 py-8 shadow-sm sm:px-14 sm:py-12">
+            <Skeleton className="mx-auto h-6 w-64" />
+            <Skeleton className="mx-auto h-3 w-44" />
+            <Skeleton className="mt-4 h-4 w-32" />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <Skeleton className="h-4 w-6 shrink-0" />
+                <div className="flex flex-1 flex-col gap-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className={i % 2 ? "h-4 w-2/3" : "h-4 w-1/2"} />
+                </div>
+                <Skeleton className="h-4 w-10 shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function PdfBuilderPage() {
-  const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
+  const { classSubjectId, examId } = useParams<{
+    classSubjectId: string
+    examId: string
+  }>()
   const navigate = useNavigate()
   const backUrl = `/class/${classSubjectId}/exams?exam=${examId}`
 
@@ -710,10 +975,12 @@ export function PdfBuilderPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [blocks, setBlocks] = useState<Block[]>([])
   const [mode, setMode] = useState<"builder" | "preview">("builder")
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    new Set()
+  )
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
 
   const fetchExam = useCallback(async () => {
@@ -721,9 +988,13 @@ export function PdfBuilderPage() {
     setIsLoading(true)
     try {
       const res = await apiClient.get<{ exam: Exam; questions: ApiQuestion[] }>(
-        `/api/exams/${examId}`,
+        `/api/exams/${examId}`
       )
-      const initial = buildInitialBlocks(res.exam, res.questions ?? [], school?.name ?? "")
+      const initial = buildInitialBlocks(
+        res.exam,
+        res.questions ?? [],
+        school?.name ?? ""
+      )
       setBlocks(initial)
     } catch (err) {
       console.error("Failed to fetch exam:", err)
@@ -752,9 +1023,13 @@ export function PdfBuilderPage() {
     setBlocks((prev) =>
       prev.map((b) =>
         b.id === id
-          ? { ...b, ...changes, meta: changes.meta ? { ...b.meta, ...changes.meta } : b.meta }
-          : b,
-      ),
+          ? {
+              ...b,
+              ...changes,
+              meta: changes.meta ? { ...b.meta, ...changes.meta } : b.meta,
+            }
+          : b
+      )
     )
   }
 
@@ -795,7 +1070,7 @@ export function PdfBuilderPage() {
           return { ...b, meta: { ...b.meta, questionNumber: String(qNum++) } }
         }
         return b
-      }),
+      })
     )
     toast.success("Questions renumbered")
   }
@@ -804,7 +1079,12 @@ export function PdfBuilderPage() {
 
   type RenderGroup =
     | { kind: "block"; block: Block }
-    | { kind: "section"; titleBlock: Block; instructionBlock: Block | null; questionBlocks: Block[] }
+    | {
+        kind: "section"
+        titleBlock: Block
+        instructionBlock: Block | null
+        questionBlocks: Block[]
+      }
 
   const renderGroups = useMemo<RenderGroup[]>(() => {
     const groups: RenderGroup[] = []
@@ -821,11 +1101,20 @@ export function PdfBuilderPage() {
           i++
         }
         const questionBlocks: Block[] = []
-        while (i < blocks.length && blocks[i].type === "question" && blocks[i].meta?.section === section) {
+        while (
+          i < blocks.length &&
+          blocks[i].type === "question" &&
+          blocks[i].meta?.section === section
+        ) {
           questionBlocks.push(blocks[i])
           i++
         }
-        groups.push({ kind: "section", titleBlock, instructionBlock, questionBlocks })
+        groups.push({
+          kind: "section",
+          titleBlock,
+          instructionBlock,
+          questionBlocks,
+        })
       } else {
         groups.push({ kind: "block", block })
         i++
@@ -834,9 +1123,15 @@ export function PdfBuilderPage() {
     return groups
   }, [blocks])
 
-  const swapQuestions = (sectionName: string, activeId: string, overId: string) => {
+  const swapQuestions = (
+    sectionName: string,
+    activeId: string,
+    overId: string
+  ) => {
     setBlocks((prev) => {
-      const sectionQs = prev.filter((b) => b.type === "question" && b.meta?.section === sectionName)
+      const sectionQs = prev.filter(
+        (b) => b.type === "question" && b.meta?.section === sectionName
+      )
       const oldIdx = sectionQs.findIndex((b) => b.id === activeId)
       const newIdx = sectionQs.findIndex((b) => b.id === overId)
       if (oldIdx < 0 || newIdx < 0) return prev
@@ -858,273 +1153,378 @@ export function PdfBuilderPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-full w-full items-center justify-center">
-        <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
-      </div>
+      <LoadingSwap loading skeleton={<BuilderSkeleton />} className="h-full">
+        {null}
+      </LoadingSwap>
     )
   }
 
+  const insertables: { type: BlockType; icon: Icon; label: string }[] = [
+    { type: "text", icon: TextTIcon, label: "Text" },
+    { type: "instruction", icon: NoteIcon, label: "Note" },
+    { type: "section-title", icon: TextHOneIcon, label: "Section" },
+    { type: "spacer", icon: ArrowsOutLineVerticalIcon, label: "Space" },
+    { type: "page-break", icon: ScissorsIcon, label: "Page" },
+  ]
+
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* Top bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5 sm:px-5">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            onClick={() => navigate(backUrl)}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <ArrowLeftIcon className="size-4" />
-          </button>
-          <h1 className="text-sm font-semibold">PDF Builder</h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {mode === "builder" && (
-            <Button variant="outline" size="sm" className="text-xs" onClick={renumberQuestions}>
-              Re-number
+    <LoadingSwap
+      loading={false}
+      skeleton={<BuilderSkeleton />}
+      className="h-full"
+    >
+      <div className="flex h-full flex-col overflow-hidden">
+        {/* Top bar */}
+        <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4 sm:px-5">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => navigate(backUrl)}
+              className="shrink-0 rounded-full text-muted-foreground"
+              aria-label="Back to exam"
+            >
+              <ArrowLeftIcon className="size-4" />
             </Button>
-          )}
-
-          <div className="flex rounded-lg border bg-muted p-0.5">
-            <button
-              onClick={() => setMode("builder")}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3",
-                mode === "builder"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <PencilIcon className="mr-1 inline-block size-3 sm:mr-1.5" />
-              Builder
-            </button>
-            <button
-              onClick={() => setMode("preview")}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:px-3",
-                mode === "preview"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <EyeIcon className="mr-1 inline-block size-3 sm:mr-1.5" />
-              Preview
-            </button>
-          </div>
-
-          {mode === "preview" && (
-            <PDFDownloadLink
-              document={<PdfDocument blocks={blocks} />}
-              fileName="Question-Paper.pdf"
-            >
-              {({ loading }) => (
-                <Button size="sm" disabled={loading} className="text-xs">
-                  {loading ? (
-                    <Loader2Icon className="mr-1 size-3.5 animate-spin" />
-                  ) : (
-                    <DownloadIcon className="mr-1 size-3.5" />
-                  )}
-                  <span className="hidden sm:inline">Download</span> PDF
-                </Button>
-              )}
-            </PDFDownloadLink>
-          )}
-        </div>
-      </div>
-
-      {/* Content */}
-      {mode === "builder" ? (
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* Insert toolbar */}
-          <div className="hidden w-14 shrink-0 flex-col items-center gap-2 border-r bg-muted/20 py-4 sm:flex">
-            <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-muted-foreground [writing-mode:vertical-lr]">
-              Insert
-            </p>
-            {[
-              { type: "text" as BlockType, icon: TypeIcon, label: "Text" },
-              { type: "instruction" as BlockType, icon: AlertTriangleIcon, label: "Note" },
-              { type: "section-title" as BlockType, icon: TypeIcon, label: "Section" },
-              { type: "spacer" as BlockType, icon: SpaceIcon, label: "Space" },
-              { type: "page-break" as BlockType, icon: ScissorsIcon, label: "Page" },
-            ].map(({ type, icon: Icon, label }) => (
-              <button
-                key={type}
-                onClick={() => insertBlock(type)}
-                className="flex flex-col items-center gap-0.5 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title={`Add ${label}`}
-              >
-                <Icon className="size-4" />
-                <span className="text-[8px]">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Blocks area */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-6">
-            <div className="mx-auto max-w-2xl space-y-2">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext items={blockIds} strategy={verticalListSortingStrategy}>
-                  {renderGroups.map((group) => {
-                    if (group.kind === "block") {
-                      const block = group.block
-                      return (
-                        <div key={block.id}>
-                          <SortableBlock
-                            block={block}
-                            onUpdate={updateBlock}
-                            onRemove={removeBlock}
-                          />
-                          <div className="flex h-4 items-center justify-center opacity-0 transition-opacity hover:opacity-100">
-                            <button
-                              onClick={() => insertBlock("spacer", block.id)}
-                              className="flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[9px] text-muted-foreground shadow-sm transition-colors hover:text-foreground"
-                            >
-                              <PlusIcon className="size-2.5" />
-                              Insert
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    }
-
-                    const { titleBlock, instructionBlock, questionBlocks } = group
-                    const sectionName = titleBlock.meta?.section || ""
-                    const qIds = questionBlocks.map((q) => q.id)
-
-                    const isCollapsed = collapsedSections.has(sectionName)
-                    const toggleCollapse = () => {
-                      setCollapsedSections((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(sectionName)) next.delete(sectionName)
-                        else next.add(sectionName)
-                        return next
-                      })
-                    }
-                    const totalMarks = questionBlocks.reduce((s, q) => s + (q.meta?.marks || 0), 0)
-
-                    return (
-                      <div
-                        key={titleBlock.id}
-                        className="rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-950/10"
-                      >
-                        {/* Section header bar */}
-                        <div
-                          className={cn(
-                            "flex items-center justify-between bg-blue-100/60 px-4 py-2.5 dark:bg-blue-900/30",
-                            isCollapsed ? "rounded-xl" : "rounded-t-xl",
-                          )}
-                        >
-                          <div className="flex flex-1 items-center gap-2">
-                            <button
-                              onClick={toggleCollapse}
-                              className="rounded p-0.5 text-blue-500 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800"
-                            >
-                              {isCollapsed ? (
-                                <ChevronRightIcon className="size-4" />
-                              ) : (
-                                <ChevronDownIcon className="size-4" />
-                              )}
-                            </button>
-                            <div className="flex size-6 items-center justify-center rounded-md bg-blue-500 text-[10px] font-bold text-white">
-                              {sectionName}
-                            </div>
-                            <input
-                              value={titleBlock.content}
-                              onChange={(e) => updateBlock(titleBlock.id, { content: e.target.value })}
-                              className="flex-1 border-none bg-transparent text-sm font-semibold outline-none ring-0 focus:ring-0"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                            <span>{questionBlocks.length} Qs</span>
-                            <span>{totalMarks} marks</span>
-                            <button
-                              onClick={() => removeBlock(titleBlock.id)}
-                              className="rounded p-0.5 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                            >
-                              <Trash2Icon className="size-3" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Collapsible body */}
-                        {!isCollapsed && (
-                          <>
-                            {/* Section instruction */}
-                            {instructionBlock && (
-                              <div className="border-b border-blue-200 px-4 py-1.5 dark:border-blue-800">
-                                <input
-                                  value={instructionBlock.content}
-                                  onChange={(e) => updateBlock(instructionBlock.id, { content: e.target.value })}
-                                  className="w-full border-none bg-transparent text-[11px] italic text-muted-foreground outline-none ring-0 focus:ring-0"
-                                  placeholder="Section instruction..."
-                                />
-                              </div>
-                            )}
-
-                            {/* Questions — sortable within section */}
-                            <div className="space-y-1.5 p-3">
-                              <DndContext
-                                sensors={sensors}
-                                collisionDetection={closestCenter}
-                                onDragEnd={(event) => {
-                                  const { active, over } = event
-                                  if (!over || active.id === over.id) return
-                                  swapQuestions(sectionName, active.id as string, over.id as string)
-                                }}
-                              >
-                                <SortableContext items={qIds} strategy={verticalListSortingStrategy}>
-                                  {questionBlocks.map((q) => (
-                                    <SortableBlock
-                                      key={q.id}
-                                      block={q}
-                                      onUpdate={updateBlock}
-                                      onRemove={removeBlock}
-                                    />
-                                  ))}
-                                </SortableContext>
-                              </DndContext>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
-                </SortableContext>
-              </DndContext>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                PDF builder
+              </span>
+              <h1 className="truncate text-sm font-semibold text-foreground">
+                "Question paper"
+              </h1>
             </div>
           </div>
-        </div>
-      ) : (
-        /* Preview mode */
-        <div className="flex flex-1 items-start justify-center overflow-auto bg-zinc-100 p-4 dark:bg-zinc-900 sm:p-8">
-          <BlobProvider document={<PdfDocument blocks={blocks} />}>
-            {({ url, loading }) => {
-              if (loading) {
+
+          <div className="flex shrink-0 items-center gap-2">
+            {mode === "builder" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={renumberQuestions}>
+                    <ListNumbersIcon className="size-3.5" />
+                    <span className="hidden sm:inline">Re-number</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Number every question from 1 in order
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            <div className="flex rounded-lg bg-sidebar p-0.5 ring-1 ring-border/60">
+              {(
+                [
+                  { key: "builder", label: "Build", icon: PencilIcon },
+                  { key: "preview", label: "Preview", icon: EyeIcon },
+                ] as const
+              ).map((m) => {
+                const on = mode === m.key
                 return (
-                  <div className="flex h-[80vh] w-full max-w-[595px] items-center justify-center rounded-lg bg-white shadow-lg sm:h-[842px]">
-                    <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
-                  </div>
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => setMode(m.key)}
+                    aria-pressed={on}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors",
+                      on
+                        ? "bg-background font-medium text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <m.icon
+                      weight={on ? "fill" : "regular"}
+                      className="size-3.5"
+                    />
+                    {m.label}
+                  </button>
                 )
-              }
-              if (url) {
-                return (
-                  <iframe
-                    src={url}
-                    className="h-[80vh] w-full max-w-[595px] rounded-lg bg-white shadow-lg sm:h-[842px]"
-                    title="PDF Preview"
-                  />
-                )
-              }
-              return null
-            }}
-          </BlobProvider>
+              })}
+            </div>
+
+            {mode === "preview" && (
+              <PDFDownloadLink
+                document={<PdfDocument blocks={blocks} />}
+                fileName="Question-Paper.pdf"
+              >
+                {({ loading }) => (
+                  <Button size="sm" disabled={loading}>
+                    {loading ? (
+                      <CircleNotchIcon className="size-3.5 animate-spin" />
+                    ) : (
+                      <DownloadIcon className="size-3.5" />
+                    )}
+                    Download PDF
+                  </Button>
+                )}
+              </PDFDownloadLink>
+            )}
+          </div>
         </div>
-      )}
-    </div>
+
+        {/* Content */}
+        {mode === "builder" ? (
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            {/* Insert rail */}
+            <div className="hidden w-[4.5rem] shrink-0 flex-col items-stretch gap-1 border-r border-border bg-sidebar/60 p-2 sm:flex">
+              <p className="px-1 pt-1 pb-1.5 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                Insert
+              </p>
+              {insertables.map(({ type, icon: InsertIcon, label }) => (
+                <Tooltip key={type}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => insertBlock(type)}
+                      className="flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground hover:shadow-xs"
+                    >
+                      <InsertIcon className="size-4" />
+                      {label}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    Add {label.toLowerCase()}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+
+            {/* Canvas — the sheet sits on the ground like paper on a desk */}
+            <div className="flex-1 overflow-y-auto bg-sidebar/60 p-4 sm:p-8">
+              <div className="mx-auto max-w-4xl rounded-xl border border-border bg-background px-8 py-8 shadow-sm sm:px-14 sm:py-12">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={blockIds}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {renderGroups.map((group) => {
+                      if (group.kind === "block") {
+                        const block = group.block
+                        return (
+                          <div key={block.id}>
+                            <SortableBlock
+                              block={block}
+                              onUpdate={updateBlock}
+                              onRemove={removeBlock}
+                            />
+                            {/* Insert-between seam: a hairline that grows a + on hover */}
+                            <div className="group/seam relative flex h-3 items-center justify-center">
+                              <span className="absolute inset-x-6 h-px bg-border opacity-0 transition-opacity group-hover/seam:opacity-100" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      insertBlock("spacer", block.id)
+                                    }
+                                    aria-label="Insert space here"
+                                    className="relative flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground opacity-0 shadow-xs transition-all group-hover/seam:opacity-100 hover:text-foreground"
+                                  >
+                                    <PlusIcon className="size-3" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Insert space here
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      const { titleBlock, instructionBlock, questionBlocks } =
+                        group
+                      const sectionName = titleBlock.meta?.section || ""
+                      const qIds = questionBlocks.map((q) => q.id)
+
+                      const isCollapsed = collapsedSections.has(sectionName)
+                      const toggleCollapse = () => {
+                        setCollapsedSections((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(sectionName)) next.delete(sectionName)
+                          else next.add(sectionName)
+                          return next
+                        })
+                      }
+                      const totalMarks = questionBlocks.reduce(
+                        (s, q) => s + (q.meta?.marks || 0),
+                        0
+                      )
+
+                      return (
+                        <section
+                          key={titleBlock.id}
+                          className="group/section mt-6 first:mt-0"
+                        >
+                          {/* Section heading — the pill used for every group
+                            heading in the app; the title is editable inline */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-sidebar py-1 pr-3 pl-1 ring-1 ring-border/60">
+                              <button
+                                type="button"
+                                onClick={toggleCollapse}
+                                aria-expanded={!isCollapsed}
+                                aria-label={
+                                  isCollapsed
+                                    ? "Expand section"
+                                    : "Collapse section"
+                                }
+                                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[10px] font-semibold text-background"
+                              >
+                                {sectionName}
+                              </button>
+                              <CaretRightIcon
+                                weight="bold"
+                                onClick={toggleCollapse}
+                                className={cn(
+                                  "size-3 shrink-0 cursor-pointer text-muted-foreground transition-transform duration-200",
+                                  !isCollapsed && "rotate-90"
+                                )}
+                              />
+                              <input
+                                value={titleBlock.content}
+                                onChange={(e) =>
+                                  updateBlock(titleBlock.id, {
+                                    content: e.target.value,
+                                  })
+                                }
+                                aria-label="Section title"
+                                className="min-w-0 flex-1 border-none bg-transparent text-xs font-medium text-foreground outline-none"
+                              />
+                            </div>
+                            <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                              {questionBlocks.length}{" "}
+                              {questionBlocks.length === 1
+                                ? "question"
+                                : "questions"}
+                              <span className="mx-1.5 text-border">·</span>
+                              {totalMarks} marks
+                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => removeBlock(titleBlock.id)}
+                                  className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity group-hover/section:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+                                  aria-label="Remove section"
+                                >
+                                  <TrashIcon className="size-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Remove section</TooltipContent>
+                            </Tooltip>
+                          </div>
+
+                          {/* Collapsible body — height animates so a section
+                            folds up rather than vanishing */}
+                          <AnimatePresence initial={false}>
+                            {!isCollapsed && (
+                              <motion.div
+                                key="body"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{
+                                  duration: 0.22,
+                                  ease: [0.4, 0, 0.2, 1],
+                                }}
+                                className="overflow-hidden"
+                              >
+                                <div className="mt-2 ml-4 border-l border-border pl-[calc(0.75rem-1px)]">
+                                  {instructionBlock && (
+                                    <input
+                                      value={instructionBlock.content}
+                                      onChange={(e) =>
+                                        updateBlock(instructionBlock.id, {
+                                          content: e.target.value,
+                                        })
+                                      }
+                                      className="w-full border-none bg-transparent px-4 py-1 text-xs text-muted-foreground italic outline-none placeholder:text-muted-foreground/50"
+                                      placeholder="Section instruction…"
+                                    />
+                                  )}
+
+                                  {/* Questions — sortable within section */}
+                                  <div className="flex flex-col gap-0.5">
+                                    <DndContext
+                                      sensors={sensors}
+                                      collisionDetection={closestCenter}
+                                      onDragEnd={(event) => {
+                                        const { active, over } = event
+                                        if (!over || active.id === over.id)
+                                          return
+                                        swapQuestions(
+                                          sectionName,
+                                          active.id as string,
+                                          over.id as string
+                                        )
+                                      }}
+                                    >
+                                      <SortableContext
+                                        items={qIds}
+                                        strategy={verticalListSortingStrategy}
+                                      >
+                                        {questionBlocks.map((q) => (
+                                          <SortableBlock
+                                            key={q.id}
+                                            block={q}
+                                            onUpdate={updateBlock}
+                                            onRemove={removeBlock}
+                                          />
+                                        ))}
+                                      </SortableContext>
+                                    </DndContext>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </section>
+                      )
+                    })}
+                  </SortableContext>
+                </DndContext>
+              </div>
+              <p className="mx-auto mt-4 max-w-4xl text-center text-[11px] text-muted-foreground">
+                Drag the handle to reorder. Hover a block for its controls.
+                Edits here change the printout only.
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* Preview mode */
+          <div className="flex flex-1 items-start justify-center overflow-auto bg-sidebar/60 p-4 sm:p-8">
+            <BlobProvider document={<PdfDocument blocks={blocks} />}>
+              {({ url, loading }) => {
+                if (loading) {
+                  return (
+                    <div className="flex h-[80vh] w-full max-w-[595px] flex-col items-center justify-center gap-3 rounded-xl border border-border bg-background shadow-lg sm:h-[842px]">
+                      <PaperhintMark className="size-6 animate-spin text-primary [animation-duration:1.8s]" />
+                      <span className="text-xs text-muted-foreground">
+                        Laying out the pages…
+                      </span>
+                    </div>
+                  )
+                }
+                if (url) {
+                  return (
+                    <iframe
+                      src={url}
+                      className="h-[80vh] w-full max-w-[595px] rounded-xl border border-border bg-white shadow-lg sm:h-[842px]"
+                      title="PDF preview"
+                    />
+                  )
+                }
+                return null
+              }}
+            </BlobProvider>
+          </div>
+        )}
+      </div>
+    </LoadingSwap>
   )
 }

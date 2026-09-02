@@ -1,28 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CameraIcon,
-  CheckCircle2Icon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  EditIcon,
+  ExamIcon,
+  CheckCircleIcon,
+  CaretRightIcon,
+  PencilSimpleIcon,
   EyeIcon,
-  FileOutputIcon,
+  ExportIcon,
   FileTextIcon,
-  KeyRoundIcon,
-  Loader2Icon,
+  KeyIcon,
+  CircleNotchIcon,
   PlusIcon,
-  RefreshCwIcon,
-  SearchIcon,
-  SparklesIcon,
-  Trash2Icon,
+  ArrowsClockwiseIcon,
+  SparkleIcon,
+  TrashIcon,
   UploadIcon,
   UserIcon,
-  XIcon,
-} from "lucide-react"
+  CheckIcon,
+  CopyIcon,
+} from "@phosphor-icons/react"
 import dayjs from "dayjs"
+import { AnimatePresence, motion } from "motion/react"
 import { toast } from "sonner"
 import "katex/dist/katex.min.css"
 import ReactMarkdown from "react-markdown"
@@ -35,23 +35,34 @@ import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { ClassPageHeader } from "@/components/layout/class-page-header"
+import {
+  PageToolbar,
+  PageToolbarSkeleton,
+} from "@/components/shared/page-toolbar"
+import { LoadingSwap } from "@/components/shared/loading-swap"
+import { Sticker } from "@/components/shared/sticker"
+import { countSummary, tameCaps } from "@/lib/format"
 import {
   Sheet,
-  SheetClose,
   SheetContent,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -88,8 +99,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { CheckIcon, CopyIcon } from "lucide-react"
-
 /**
  * MCQ answers arrive from the AI in a few shapes:
  *   "(A) 22338"   parenthesised
@@ -99,20 +108,11 @@ import { CheckIcon, CopyIcon } from "lucide-react"
  * so pull the first A-D out of the answer key and compare on that. Case-
  * insensitive because some models return lowercase.
  */
-function matchesOptionLetter(
-  answerKey: string | null | undefined,
-  label: string
-): boolean {
-  if (!answerKey) return false
-  // Match the first A-D that appears near the start (optionally wrapped in
-  // parens). This deliberately does NOT scan the whole string, so an "A" that
-  // appears inside the answer text (e.g. "A perimeter of ...") isn't picked
-  // up as the option letter.
-  const m = answerKey.match(/^\s*\(?\s*([A-Da-d])\s*[).:\s]/)
-  if (!m) return false
-  return m[1].toUpperCase() === label.toUpperCase()
-}
 import { ScanPagesModal } from "@/modules/grading/components/scan-pages-modal"
+import {
+  matchesOptionLetter,
+  stripOptionPrefix,
+} from "@/modules/exams/lib/options"
 
 /* ─── Types ─────────────────────────────────────────────── */
 
@@ -200,17 +200,12 @@ const DEFAULT_BLUEPRINT: BlueprintSection[] = [
  * an option that genuinely starts with the letter ("A rational number…")
  * is left alone.
  */
-function stripOptionPrefix(opt: string, label: string): string {
-  const re = new RegExp(`^\\s*(?:\\(${label}\\)|${label}\\s*[.):])\\s*`, "i")
-  const stripped = opt.replace(re, "").trim()
-  return stripped || opt
-}
-
 /* ─── Chapter chip label ────────────────────────────────── */
 
 /**
  * Chapters extracted from a syllabus often arrive as full outline lines:
  *   "1. Real Numbers: Fundamental Theorem of Arithmetic."
+
  * For the card chips only the chapter name matters — strip the leading
  * numbering, anything after a colon or a spaced dash, and a trailing dot.
  * Falls back to the raw string if trimming would leave nothing.
@@ -269,8 +264,124 @@ function compressForUpload(file: File): Promise<File> {
 
 /* ─── Main component ─────────────────────────────────────── */
 
+// ── Loading silhouettes ────────────────────────────────────────────────────
+// Each mirrors the real markup it stands in for, so the page doesn't reflow
+// when the data lands.
+
+/** One row of the exam list: calendar tile, name + chapters, the @3xl cells,
+ *  status pill, action slot. */
+function ExamRowSkeleton() {
+  return (
+    <div className="relative flex items-center gap-4 rounded-lg px-3 py-3 after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-border last:after:hidden">
+      <Skeleton className="size-10 shrink-0 rounded-lg" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <Skeleton className="h-4 w-1/3 max-w-64" />
+        <Skeleton className="h-3 w-1/2 max-w-80" />
+      </div>
+      <div className="hidden shrink-0 items-center gap-5 @3xl:flex">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+      <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+      <div className="flex w-16 shrink-0 justify-end">
+        <Skeleton className="size-4 rounded-full" />
+      </div>
+    </div>
+  )
+}
+
+function ExamListSkeleton() {
+  return (
+    <div aria-hidden className="-mx-3 flex flex-col">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <ExamRowSkeleton key={i} />
+      ))}
+    </div>
+  )
+}
+
+/** A question card as rendered in the paper view: numbered tile, type pill,
+ *  marks on the right, two lines of text and a 2×2 option grid. */
+function QuestionCardSkeleton({ options = true }: { options?: boolean }) {
+  return (
+    <div className="rounded-xl border border-border bg-background p-4">
+      <div className="flex items-center gap-2.5">
+        <Skeleton className="size-7 shrink-0 rounded-lg" />
+        <Skeleton className="h-4 w-14 rounded-full" />
+        <Skeleton className="ml-auto h-3 w-14" />
+      </div>
+      <div className="mt-3 flex flex-col gap-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
+      {options && (
+        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 rounded-lg" />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The paper body: a section pill with its hairline and count, then cards. */
+function QuestionPaperSkeleton() {
+  return (
+    <div aria-hidden className="mx-auto w-full max-w-3xl p-5 pb-12 md:p-6">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-7 w-28 rounded-full" />
+        <span className="h-px flex-1 bg-border" />
+        <Skeleton className="h-3 w-28" />
+      </div>
+      <div className="flex flex-col gap-3 pt-4">
+        <QuestionCardSkeleton />
+        <QuestionCardSkeleton options={false} />
+        <QuestionCardSkeleton />
+      </div>
+    </div>
+  )
+}
+
+/** The answer-sheets rail: roll number, avatar, name over status. */
+function StudentRailSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col p-2">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="flex h-12 items-center gap-2.5 rounded-lg px-2">
+          <Skeleton className="h-3 w-4 shrink-0" />
+          <Skeleton className="size-7 shrink-0 rounded-full" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-2.5 w-16" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Clone-sheet rows: name and facts beside a small Clone button. */
+function CloneListSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col gap-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="rounded-xl border p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+            <Skeleton className="h-7 w-16 shrink-0" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function ExamsPage() {
-  const isMobile = useIsMobile()
   const { user } = useAuth()
   const { assignments } = useTeacherAssignments()
   const navigate = useNavigate()
@@ -758,265 +869,281 @@ export function ExamsPage() {
     <>
       {!selectedExamId ? (
         /* ── Card grid view ── */
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6">
-          {/* Header — same shape as the other class tabs */}
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">
-                Exams
-                {exams.length > 0 && (
-                  <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-                    ({exams.length})
-                  </span>
-                )}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Question papers for this class — generate with AI or upload your
-                own.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => setCloneOpen(true)}
-              >
-                <CopyIcon className="size-3.5" />
-                Clone from another section
-              </Button>
-              <Button size="sm" onClick={openCreate} className="gap-1.5">
-                <PlusIcon className="size-3.5" />
-                New Exam
-              </Button>
-            </div>
-          </div>
+        <div
+          className={cn(
+            PAGE_GUTTER,
+            PAGE_TOP,
+            "@container flex min-h-full flex-col gap-5 pb-12"
+          )}
+        >
+          <ClassPageHeader
+            icon={ExamIcon}
+            title="Exams"
+            count={exams.length || undefined}
+            description="Question papers for this class. Build one with Hint or upload your own."
+            actions={
+              <>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => setCloneOpen(true)}
+                >
+                  <CopyIcon className="size-3.5" />
+                  <span className="hidden sm:inline">Clone from a section</span>
+                </Button>
+                <Button size="lg" onClick={openCreate}>
+                  <PlusIcon className="size-3.5" />
+                  New exam
+                </Button>
+              </>
+            }
+          />
 
-          {/* Search */}
+          {isLoadingExams && exams.length === 0 && (
+            <PageToolbarSkeleton filters={false} />
+          )}
           {exams.length > 0 && (
-            <div className="relative min-w-0 sm:max-w-72">
-              <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search exams…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 rounded-full pl-9"
-              />
-            </div>
+            <PageToolbar
+              className="animate-in duration-300 fade-in-0"
+              search={{
+                value: searchQuery,
+                onChange: setSearchQuery,
+                placeholder: "Search papers…",
+              }}
+              summary={countSummary(
+                filteredExams.length,
+                exams.length,
+                "paper",
+                searchQuery.trim().length > 0
+              )}
+            />
           )}
 
           {/* Exam list */}
-          {isLoadingExams ? (
-            <div className="overflow-hidden rounded-xl border">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="border-b p-4 last:border-b-0">
-                  <Skeleton className="h-5 w-full" />
-                </div>
-              ))}
-            </div>
-          ) : filteredExams.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-14 text-center">
-              <FileTextIcon className="size-10 text-muted-foreground/25" />
-              <div>
-                <p className="text-sm font-medium text-secondary-foreground">
-                  {searchQuery ? "No exams match your search" : "No exams yet"}
-                </p>
-                {!searchQuery && (
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    Create a question paper from scratch or clone one from
-                    another section.
+          <LoadingSwap
+            loading={isLoadingExams}
+            skeleton={<ExamListSkeleton />}
+            className="flex-1"
+          >
+            {filteredExams.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+                <Sticker
+                  name={searchQuery ? "lost" : "idea"}
+                  size={searchQuery ? 120 : 96}
+                />
+                <div className="flex max-w-[380px] flex-col items-center gap-1 text-center">
+                  <p className="text-base font-medium text-secondary-foreground">
+                    {searchQuery ? "No paper matches that" : "No papers yet"}
                   </p>
+                  <p className="text-sm text-muted-foreground">
+                    {searchQuery
+                      ? "Try a different name."
+                      : "Build a question paper from this class's sources, or clone one you already made for another section."}
+                  </p>
+                </div>
+                {!searchQuery && (
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button onClick={openCreate}>
+                      <PlusIcon className="size-3.5" />
+                      New exam
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCloneOpen(true)}
+                    >
+                      <CopyIcon className="size-3.5" />
+                      Clone from a section
+                    </Button>
+                  </div>
                 )}
               </div>
-              {!searchQuery && (
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button size="sm" variant="outline" onClick={openCreate}>
-                    <PlusIcon className="mr-1.5 size-3.5" />
-                    Create your first exam
-                  </Button>
-                  <span className="text-xs text-muted-foreground">or</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCloneOpen(true)}
-                  >
-                    <CopyIcon className="mr-1.5 size-3.5" />
-                    Clone from another section
-                  </Button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-sidebar hover:bg-sidebar">
-                    <TableHead className="pl-4">Exam</TableHead>
-                    <TableHead className="hidden md:table-cell">
-                      Chapters
-                    </TableHead>
-                    <TableHead className="hidden whitespace-nowrap sm:table-cell">
-                      Date
-                    </TableHead>
-                    <TableHead className="text-right">Questions</TableHead>
-                    <TableHead className="text-right">Marks</TableHead>
-                    <TableHead className="hidden text-right whitespace-nowrap lg:table-cell">
-                      Pass mark
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-24" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredExams.map((exam) => {
-                    const hasQuestions = exam.question_count > 0
-                    const chapters = exam.chapters_selected ?? []
-                    return (
-                      <TableRow
-                        key={exam.id}
-                        onClick={() => selectExam(exam.id)}
-                        className="group cursor-pointer"
-                      >
-                        <TableCell className="max-w-60 pl-4">
-                          <p className="truncate text-sm font-medium">
-                            {exam.exam_name}
-                          </p>
-                        </TableCell>
-                        <TableCell className="hidden max-w-64 md:table-cell">
-                          {chapters.length > 0 ? (
-                            <p
-                              title={chapters.join("\n")}
-                              className="truncate text-xs text-muted-foreground"
-                            >
-                              {chapters
-                                .slice(0, 2)
-                                .map(chapterChipLabel)
-                                .join(", ")}
-                              {chapters.length > 2 && (
-                                <span className="text-muted-foreground/60">
-                                  {" "}
-                                  +{chapters.length - 2} more
-                                </span>
-                              )}
-                            </p>
-                          ) : (
-                            <span className="text-xs text-muted-foreground/40">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="hidden text-xs whitespace-nowrap text-muted-foreground sm:table-cell">
-                          {dayjs(exam.created_at).format("MMM D, YYYY")}
-                        </TableCell>
-                        <TableCell className="text-right text-sm tabular-nums">
-                          {exam.question_count}
-                        </TableCell>
-                        <TableCell className="text-right text-sm tabular-nums">
-                          {exam.total_marks}
-                        </TableCell>
-                        <TableCell className="hidden text-right text-sm whitespace-nowrap tabular-nums lg:table-cell">
+            ) : (
+              <div className="-mx-3 flex flex-col">
+                {filteredExams.map((exam) => {
+                  const hasQuestions = exam.question_count > 0
+                  const chapters = exam.chapters_selected ?? []
+                  const when = dayjs(exam.created_at)
+                  const passPct =
+                    exam.pass_marks != null && exam.total_marks > 0
+                      ? Math.round((exam.pass_marks / exam.total_marks) * 100)
+                      : null
+                  return (
+                    <div
+                      key={exam.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => selectExam(exam.id)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && selectExam(exam.id)
+                      }
+                      className="group relative flex cursor-pointer items-center gap-4 rounded-lg px-3 py-3 transition-colors outline-none after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-border last:after:hidden hover:bg-muted/50 focus-visible:bg-muted/50"
+                    >
+                      {/* Calendar tile */}
+                      <span className="flex size-10 shrink-0 flex-col items-center justify-center rounded-lg border border-border bg-sidebar leading-none">
+                        <span className="text-sm font-semibold text-foreground tabular-nums">
+                          {when.format("D")}
+                        </span>
+                        <span className="text-[9px] tracking-wider text-muted-foreground uppercase">
+                          {when.format("MMM")}
+                        </span>
+                      </span>
+
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {tameCaps(exam.exam_name)}
+                        </span>
+                        {chapters.length > 0 ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {chapters
+                                  .slice(0, 3)
+                                  .map(chapterChipLabel)
+                                  .join(" · ") +
+                                  (chapters.length > 3
+                                    ? ` · +${chapters.length - 3} more`
+                                    : "")}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="whitespace-pre-line">
+                              {chapters.join("\n")}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="truncate text-xs text-muted-foreground">
+                            No chapters chosen
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Aligned cells */}
+                      <div className="hidden shrink-0 items-center gap-5 text-xs text-muted-foreground @3xl:flex">
+                        <span className="w-24 truncate tabular-nums">
+                          <span className="font-medium text-foreground">
+                            {exam.question_count}
+                          </span>{" "}
+                          {exam.question_count === 1 ? "question" : "questions"}
+                        </span>
+                        <span className="w-20 truncate tabular-nums">
+                          <span className="font-medium text-foreground">
+                            {exam.total_marks}
+                          </span>{" "}
+                          marks
+                        </span>
+                        <span className="w-24 truncate tabular-nums">
                           {exam.pass_marks != null ? (
                             <>
-                              {exam.pass_marks}
-                              {exam.total_marks > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                  {" "}
-                                  (
-                                  {Math.round(
-                                    (exam.pass_marks / exam.total_marks) * 100
-                                  )}
-                                  %)
-                                </span>
-                              )}
+                              pass{" "}
+                              <span className="font-medium text-foreground">
+                                {exam.pass_marks}
+                              </span>
+                              {passPct != null && ` (${passPct}%)`}
                             </>
                           ) : (
-                            <span className="text-muted-foreground/40">—</span>
+                            "no pass mark"
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
-                              hasQuestions
-                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                                : "bg-muted text-muted-foreground"
-                            )}
-                          >
-                            {hasQuestions ? "Ready" : "Draft"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="pr-3">
-                          <div className="flex items-center justify-end gap-0.5">
-                            {!hasQuestions && (
-                              <>
+                        </span>
+                      </div>
+
+                      <span
+                        className={cn(
+                          "flex w-16 shrink-0 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          hasQuestions
+                            ? "bg-primary/10 text-primary"
+                            : "border border-dashed border-border text-muted-foreground"
+                        )}
+                      >
+                        {hasQuestions ? "Ready" : "Draft"}
+                      </span>
+
+                      <div className="flex w-16 shrink-0 items-center justify-end gap-0.5">
+                        {!hasQuestions && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
                                 <button
-                                  title="Edit exam"
+                                  type="button"
+                                  aria-label="Edit exam"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     openEdit(exam)
                                   }}
-                                  className="rounded p-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+                                  className="rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
                                 >
-                                  <EditIcon className="size-3.5" />
+                                  <PencilSimpleIcon className="size-3.5" />
                                 </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit exam</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
                                 <button
-                                  title="Delete exam"
+                                  type="button"
+                                  aria-label="Delete exam"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setDeleteExamConfirm(exam)
                                   }}
-                                  className="rounded p-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+                                  className="rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100"
                                 >
-                                  <Trash2Icon className="size-3.5" />
+                                  <TrashIcon className="size-3.5" />
                                 </button>
-                              </>
-                            )}
-                            <ChevronRightIcon className="size-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                              </TooltipTrigger>
+                              <TooltipContent>Delete exam</TooltipContent>
+                            </Tooltip>
+                          </>
+                        )}
+                        <CaretRightIcon className="size-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </LoadingSwap>
         </div>
       ) : (
         /* ── Detail view ── */
         <div className="flex h-full min-h-0 overflow-hidden">
           {/* ── Centre: question paper ── */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r">
-            {/* Header — fixed h-14 so its bottom border lines up with the
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-border">
+            {/* Header — fixed h-16 so its bottom border lines up with the
                 students-rail header across the vertical split. */}
-            <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4">
+            <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
               <div className="flex min-w-0 items-center gap-2">
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="icon-sm"
                   onClick={() => setSelectedExamId(null)}
-                  className="size-7 shrink-0 text-muted-foreground"
-                  title="Back to exams"
+                  className="shrink-0 rounded-full text-muted-foreground"
                   aria-label="Back to exams"
                 >
                   <ArrowLeftIcon className="size-4" />
                 </Button>
-                <div className="min-w-0">
-                  <p className="truncate text-sm leading-tight font-semibold">
-                    {selectedExam?.exam_name}
+                <div className="flex min-w-0 flex-col">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {selectedExam ? tameCaps(selectedExam.exam_name) : ""}
                   </p>
-                  <p className="text-[11px] leading-tight text-muted-foreground">
-                    {selectedExam?.total_marks} marks ·{" "}
-                    {selectedExam?.question_count} question
-                    {selectedExam?.question_count !== 1 ? "s" : ""}
+                  <p className="truncate text-xs text-muted-foreground">
+                    {selectedExam &&
+                      dayjs(selectedExam.created_at).format("D MMM YYYY")}
+                    <span className="mx-1.5 text-border">·</span>
+                    {selectedExam?.question_count}{" "}
+                    {selectedExam?.question_count === 1
+                      ? "question"
+                      : "questions"}
+                    <span className="mx-1.5 text-border">·</span>
+                    {selectedExam?.total_marks} marks
+                    {selectedExam?.pass_marks != null && (
+                      <>
+                        <span className="mx-1.5 text-border">·</span>
+                        pass {selectedExam.pass_marks}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {/* Copy-to-sections is available in both empty-exam and ready-exam
-                  states. Copying an empty exam clones the setup (chapters,
-                  blueprint, marks); the target starts empty and the teacher
-                  generates/uploads independently. */}
                 <DuplicateExamPopover
                   sourceExam={selectedExam}
                   currentClassSubjectId={classSubjectId ?? null}
@@ -1032,24 +1159,23 @@ export function ExamsPage() {
                       variant="outline"
                       onClick={() =>
                         navigate(
-                          `/class/${classSubjectId}/exams/${selectedExamId}/generate`
-                        )
-                      }
-                    >
-                      <SparklesIcon className="mr-1.5 size-3.5" />
-                      AI Generate
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        navigate(
                           `/class/${classSubjectId}/exams/${selectedExamId}/upload`
                         )
                       }
                     >
-                      <UploadIcon className="mr-1.5 size-3.5" />
-                      Upload Paper
+                      <UploadIcon className="size-3.5" />
+                      Upload paper
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        navigate(
+                          `/class/${classSubjectId}/exams/${selectedExamId}/generate`
+                        )
+                      }
+                    >
+                      <SparkleIcon weight="fill" className="size-3.5" />
+                      Generate with Hint
                     </Button>
                   </>
                 ) : (
@@ -1058,24 +1184,28 @@ export function ExamsPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => setShowAnswers((v) => !v)}
+                      aria-pressed={showAnswers}
                       className={cn(
+                        "transition-colors",
                         showAnswers &&
-                          "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+                          "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
                       )}
                     >
-                      <KeyRoundIcon className="mr-1.5 size-3.5" />
-                      {showAnswers ? "Hide Answers" : "Show Answers"}
+                      <KeyIcon
+                        weight={showAnswers ? "fill" : "regular"}
+                        className="size-3.5"
+                      />
+                      {showAnswers ? "Answers shown" : "Show answers"}
                     </Button>
                     <Button
                       size="sm"
-                      variant="outline"
                       onClick={() =>
                         navigate(
                           `/class/${classSubjectId}/exams/${selectedExamId}/pdf-builder`
                         )
                       }
                     >
-                      <FileOutputIcon className="mr-1.5 size-3.5" />
+                      <ExportIcon className="size-3.5" />
                       Export PDF
                     </Button>
                   </>
@@ -1085,183 +1215,176 @@ export function ExamsPage() {
 
             {/* Questions body */}
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {isLoadingQuestions ? (
-                <div className="space-y-3 p-5">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-28 w-full rounded-lg" />
-                  ))}
-                </div>
-              ) : selectedExam?.question_count === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-                  <FileTextIcon className="size-10 text-muted-foreground/20" />
-                  <p className="text-sm text-muted-foreground">
-                    No questions yet
-                  </p>
-                  <p className="max-w-xs text-xs text-muted-foreground/60">
-                    Generate with AI or upload an existing paper to get started.
-                  </p>
-                </div>
-              ) : questions.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <div className="mx-auto w-full max-w-3xl p-5 pb-10 md:p-6">
-                  {(() => {
-                    let globalIdx = 0
-                    return sortedSections.map((section) => {
-                      const qs = [...sectionGroups[section]].sort(
-                        (a, b) => a.question_order - b.question_order
-                      )
-                      const isExpanded = expandedSections.has(section)
-                      const sectionMarks = qs.reduce((s, q) => s + q.marks, 0)
-                      const startIdx = globalIdx
-                      globalIdx += qs.length
+              <LoadingSwap
+                loading={isLoadingQuestions}
+                skeleton={<QuestionPaperSkeleton />}
+                className="h-full"
+              >
+                {selectedExam?.question_count === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                    <Sticker name="idea" size={96} />
+                    <div className="flex max-w-sm flex-col gap-1">
+                      <p className="text-base font-medium text-secondary-foreground">
+                        This paper is empty
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Let Hint draft the questions from this class's sources,
+                        or upload a paper you already have.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={() =>
+                          navigate(
+                            `/class/${classSubjectId}/exams/${selectedExamId}/generate`
+                          )
+                        }
+                      >
+                        <SparkleIcon weight="fill" className="size-3.5" />
+                        Generate with Hint
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          navigate(
+                            `/class/${classSubjectId}/exams/${selectedExamId}/upload`
+                          )
+                        }
+                      >
+                        <UploadIcon className="size-3.5" />
+                        Upload paper
+                      </Button>
+                    </div>
+                  </div>
+                ) : questions.length === 0 ? (
+                  <div className="flex h-full items-center justify-center">
+                    <CircleNotchIcon className="size-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="mx-auto w-full max-w-3xl p-5 pb-12 md:p-6">
+                    {(() => {
+                      let globalIdx = 0
+                      return sortedSections.map((section, sIdx) => {
+                        const qs = [...sectionGroups[section]].sort(
+                          (a, b) => a.question_order - b.question_order
+                        )
+                        const isExpanded = expandedSections.has(section)
+                        const sectionMarks = qs.reduce((s, q) => s + q.marks, 0)
+                        const startIdx = globalIdx
+                        globalIdx += qs.length
 
-                      return (
-                        <div key={section} className="mb-6 last:mb-0">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpandedSections((prev) => {
-                                const next = new Set(prev)
-                                if (next.has(section)) next.delete(section)
-                                else next.add(section)
-                                return next
-                              })
-                            }
-                            className="mb-3 flex w-full items-center gap-2 text-left"
-                          >
-                            {isExpanded ? (
-                              <ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                            ) : (
-                              <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                        return (
+                          <section
+                            key={section}
+                            className={cn(
+                              "flex flex-col",
+                              sIdx > 0 && "mt-6 border-t border-border pt-6"
                             )}
-                            <div className="flex flex-1 items-center gap-2">
-                              <span className="text-xs font-bold tracking-widest text-foreground uppercase">
+                          >
+                            {/* Section heading — a pill, like every other group
+                              heading in the app, with the caret inside it */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedSections((prev) => {
+                                  const next = new Set(prev)
+                                  if (next.has(section)) next.delete(section)
+                                  else next.add(section)
+                                  return next
+                                })
+                              }
+                              aria-expanded={isExpanded}
+                              className="group/section flex w-full items-center gap-3 text-left"
+                            >
+                              <span className="inline-flex items-center gap-2 rounded-full bg-sidebar py-1 pr-3 pl-2 text-xs font-medium text-secondary-foreground ring-1 ring-border/60 transition-colors group-hover/section:bg-muted">
+                                <CaretRightIcon
+                                  weight="bold"
+                                  className={cn(
+                                    "size-3 text-muted-foreground transition-transform duration-200",
+                                    isExpanded && "rotate-90"
+                                  )}
+                                />
                                 Section {section}
                               </span>
-                              <Separator className="flex-1" />
-                              <span className="shrink-0 text-[11px] text-muted-foreground">
-                                {qs.length} question{qs.length !== 1 ? "s" : ""}{" "}
-                                · {sectionMarks} marks
+                              <span className="h-px flex-1 bg-border" />
+                              <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                                {qs.length}{" "}
+                                {qs.length === 1 ? "question" : "questions"}
+                                <span className="mx-1.5 text-border">·</span>
+                                {sectionMarks} marks
                               </span>
-                            </div>
-                          </button>
+                            </button>
 
-                          {isExpanded && (
-                            <div className="space-y-2.5 pl-5">
-                              {qs.map((q, i) => {
-                                const qNum = startIdx + i + 1
-                                const hasAnswerKey = !!q.answer_key
-                                return (
-                                  <div
-                                    key={q.id}
-                                    className="overflow-hidden rounded-lg border bg-card"
-                                  >
-                                    <div className="flex items-center gap-2 border-b bg-muted/30 px-3.5 py-2">
-                                      <span className="text-xs font-bold text-muted-foreground">
-                                        {qNum}.
-                                      </span>
-                                      {q.type && (
-                                        <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-border">
-                                          {q.type}
-                                        </span>
-                                      )}
-                                      <span className="ml-auto text-[11px] font-semibold text-muted-foreground">
-                                        {q.marks}{" "}
-                                        {q.marks === 1 ? "mark" : "marks"}
-                                      </span>
-                                      {/* Per-question edit — routes to the full questions editor
-                                        (paperhint-web/src/modules/exams/pages/questions-page.tsx)
-                                        rather than duplicating an inline editor here. Hidden
-                                        once the backend reports the exam is locked for editing
-                                        (see exams.controller.js -> isExamLockedForEditing). */}
-                                      {!selectedExamLocked && (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            navigate(
-                                              `/class/${classSubjectId}/exams/${selectedExamId}/questions?edit=${q.id}`
-                                            )
-                                          }
-                                          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                          aria-label={`Edit question ${qNum}`}
-                                          title="Edit question"
+                            <AnimatePresence initial={false}>
+                              {isExpanded && (
+                                <motion.div
+                                  key="questions"
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{
+                                    duration: 0.22,
+                                    ease: [0.4, 0, 0.2, 1],
+                                  }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="flex flex-col gap-3 pt-4">
+                                    {qs.map((q, i) => {
+                                      const qNum = startIdx + i + 1
+                                      const hasAnswerKey = !!q.answer_key
+                                      return (
+                                        <article
+                                          key={q.id}
+                                          style={{
+                                            animationDelay: `${Math.min(i, 6) * 40}ms`,
+                                          }}
+                                          className="group/q animate-in rounded-xl border border-border bg-background p-4 transition-shadow duration-300 fade-in-0 fill-mode-backwards slide-in-from-bottom-2 hover:shadow-sm"
                                         >
-                                          <EditIcon className="size-3.5" />
-                                        </button>
-                                      )}
-                                    </div>
-                                    <div className="px-4 py-3">
-                                      <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed">
-                                        <ReactMarkdown
-                                          remarkPlugins={[
-                                            remarkGfm,
-                                            remarkMath,
-                                          ]}
-                                          rehypePlugins={[
-                                            rehypeKatex,
-                                            rehypeRaw,
-                                          ]}
-                                        >
-                                          {q.question_text}
-                                        </ReactMarkdown>
-                                      </div>
+                                          {/* Question header */}
+                                          <div className="flex items-center gap-2.5">
+                                            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar text-xs font-semibold text-foreground tabular-nums ring-1 ring-border/60">
+                                              {qNum}
+                                            </span>
+                                            {q.type && (
+                                              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                                                {q.type}
+                                              </span>
+                                            )}
+                                            <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                                              <span className="font-medium text-foreground">
+                                                {q.marks}
+                                              </span>{" "}
+                                              {q.marks === 1 ? "mark" : "marks"}
+                                            </span>
+                                            {/* Per-question edit — routes to the full questions
+                                              editor rather than duplicating an inline editor here.
+                                              Hidden once the backend reports the exam is locked
+                                              (see exams.controller.js -> isExamLockedForEditing). */}
+                                            {!selectedExamLocked && (
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      navigate(
+                                                        `/class/${classSubjectId}/exams/${selectedExamId}/questions?edit=${q.id}`
+                                                      )
+                                                    }
+                                                    className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity group-hover/q:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
+                                                    aria-label={`Edit question ${qNum}`}
+                                                  >
+                                                    <PencilSimpleIcon className="size-3.5" />
+                                                  </button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  Edit question
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            )}
+                                          </div>
 
-                                      {q.options && q.options.length > 0 && (
-                                        <div className="mt-3 space-y-1.5">
-                                          {q.options.map((opt, oi) => {
-                                            const label = String.fromCharCode(
-                                              65 + oi
-                                            )
-                                            const isCorrect =
-                                              showAnswers &&
-                                              matchesOptionLetter(
-                                                q.answer_key,
-                                                label
-                                              )
-                                            return (
-                                              <div
-                                                key={oi}
-                                                className={cn(
-                                                  "flex items-start gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-                                                  isCorrect
-                                                    ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300"
-                                                    : "bg-muted/40"
-                                                )}
-                                              >
-                                                <span
-                                                  className={cn(
-                                                    "mt-px shrink-0 text-xs font-semibold",
-                                                    isCorrect
-                                                      ? "text-emerald-700 dark:text-emerald-400"
-                                                      : "text-muted-foreground"
-                                                  )}
-                                                >
-                                                  {label}.
-                                                </span>
-                                                <span className="flex-1">
-                                                  {stripOptionPrefix(
-                                                    opt,
-                                                    label
-                                                  )}
-                                                </span>
-                                                {isCorrect && (
-                                                  <CheckCircle2Icon className="mt-px size-3.5 shrink-0 text-emerald-600" />
-                                                )}
-                                              </div>
-                                            )
-                                          })}
-                                        </div>
-                                      )}
-
-                                      {showAnswers && hasAnswerKey && (
-                                        <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800/40 dark:bg-emerald-900/15">
-                                          <p className="mb-1 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase dark:text-emerald-400">
-                                            Answer Key
-                                          </p>
-                                          <div className="prose prose-sm dark:prose-invert max-w-none text-sm text-emerald-900 dark:text-emerald-200">
+                                          {/* Question text */}
+                                          <div className="prose prose-sm dark:prose-invert mt-3 max-w-none text-sm leading-relaxed text-foreground">
                                             <ReactMarkdown
                                               remarkPlugins={[
                                                 remarkGfm,
@@ -1272,49 +1395,148 @@ export function ExamsPage() {
                                                 rehypeRaw,
                                               ]}
                                             >
-                                              {q.answer_key!}
+                                              {q.question_text}
                                             </ReactMarkdown>
                                           </div>
-                                        </div>
-                                      )}
-                                    </div>
+
+                                          {/* Options */}
+                                          {q.options &&
+                                            q.options.length > 0 && (
+                                              <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                                                {q.options.map((opt, oi) => {
+                                                  const label =
+                                                    String.fromCharCode(65 + oi)
+                                                  const isCorrect =
+                                                    showAnswers &&
+                                                    matchesOptionLetter(
+                                                      q.answer_key,
+                                                      label
+                                                    )
+                                                  return (
+                                                    <div
+                                                      key={oi}
+                                                      className={cn(
+                                                        "flex items-start gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors",
+                                                        isCorrect
+                                                          ? "border-primary/40 bg-primary/5 text-foreground"
+                                                          : "border-border bg-background text-secondary-foreground"
+                                                      )}
+                                                    >
+                                                      <span
+                                                        className={cn(
+                                                          "mt-px flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                                                          isCorrect
+                                                            ? "bg-primary text-primary-foreground"
+                                                            : "bg-sidebar text-muted-foreground ring-1 ring-border/60"
+                                                        )}
+                                                      >
+                                                        {label}
+                                                      </span>
+                                                      <span className="min-w-0 flex-1 leading-relaxed">
+                                                        {stripOptionPrefix(
+                                                          opt,
+                                                          label
+                                                        )}
+                                                      </span>
+                                                      {isCorrect && (
+                                                        <CheckCircleIcon
+                                                          weight="fill"
+                                                          className="mt-0.5 size-4 shrink-0 text-primary"
+                                                        />
+                                                      )}
+                                                    </div>
+                                                  )
+                                                })}
+                                              </div>
+                                            )}
+
+                                          {/* Answer key */}
+                                          <AnimatePresence initial={false}>
+                                            {showAnswers && hasAnswerKey && (
+                                              <motion.div
+                                                key="answer"
+                                                initial={{
+                                                  height: 0,
+                                                  opacity: 0,
+                                                }}
+                                                animate={{
+                                                  height: "auto",
+                                                  opacity: 1,
+                                                }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="overflow-hidden"
+                                              >
+                                                <div className="mt-3 rounded-lg border-l-2 border-primary bg-primary/5 px-3 py-2">
+                                                  <p className="mb-1 flex items-center gap-1.5 text-[10px] font-medium tracking-wider text-primary uppercase">
+                                                    <KeyIcon
+                                                      weight="fill"
+                                                      className="size-3"
+                                                    />
+                                                    Answer
+                                                  </p>
+                                                  <div className="prose prose-sm dark:prose-invert max-w-none text-sm text-foreground">
+                                                    <ReactMarkdown
+                                                      remarkPlugins={[
+                                                        remarkGfm,
+                                                        remarkMath,
+                                                      ]}
+                                                      rehypePlugins={[
+                                                        rehypeKatex,
+                                                        rehypeRaw,
+                                                      ]}
+                                                    >
+                                                      {q.answer_key!}
+                                                    </ReactMarkdown>
+                                                  </div>
+                                                </div>
+                                              </motion.div>
+                                            )}
+                                          </AnimatePresence>
+                                        </article>
+                                      )
+                                    })}
                                   </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                  })()}
-                </div>
-              )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </section>
+                        )
+                      })
+                    })()}
+                  </div>
+                )}
+              </LoadingSwap>
             </div>
           </div>
 
-          {/* ── Right panel: students (wider) ── */}
-          <div className="flex w-[300px] shrink-0 flex-col">
-            {/* Same fixed h-14 as the question-pane header so the two
-                bottom borders read as one continuous divider. */}
-            <div className="flex h-14 shrink-0 flex-col justify-center border-b px-4">
+          {/* ── Right panel: students ── */}
+          <div className="flex w-[320px] shrink-0 flex-col bg-sidebar/40">
+            {/* Same fixed h-16 as the question-pane header so the two bottom
+                borders read as one continuous divider. */}
+            <div className="flex h-16 shrink-0 flex-col justify-center gap-1.5 border-b border-border px-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                  Students
+                <span className="flex items-center gap-1.5 text-xs font-medium text-secondary-foreground">
+                  <UserIcon className="size-3.5 text-muted-foreground" />
+                  Answer sheets
                 </span>
                 {students.length > 0 && !isLoadingStudents && (
-                  <span className="text-[11px] text-muted-foreground">
-                    {gradedCount}/{students.length} graded
+                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                    <span className="font-medium text-foreground">
+                      {gradedCount}
+                    </span>{" "}
+                    of {students.length} graded
                   </span>
                 )}
               </div>
               {students.length > 0 && !isLoadingStudents && (
-                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
+                <div className="h-1 overflow-hidden rounded-full bg-muted">
                   <div
                     className={cn(
-                      "h-full transition-all",
+                      "h-full rounded-full transition-[width] duration-500",
                       gradedCount === students.length
-                        ? "bg-emerald-500"
-                        : "bg-blue-500"
+                        ? "bg-primary"
+                        : "bg-primary/60"
                     )}
                     style={{
                       width: `${Math.min(100, Math.round((gradedCount / students.length) * 100))}%`,
@@ -1325,133 +1547,192 @@ export function ExamsPage() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {isLoadingStudents ? (
-                <div className="space-y-1 px-3 pt-2">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Skeleton key={i} className="h-[52px] w-full rounded-md" />
-                  ))}
-                </div>
-              ) : students.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                  <UserIcon className="size-7 text-muted-foreground/20" />
-                  <p className="text-xs text-muted-foreground">No students</p>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {students
-                    .sort((a, b) => a.roll_number - b.roll_number)
-                    .map((student) => {
-                      const sub = submissions.find(
-                        (s) => s.student_id === student.id
-                      )
-                      const isGraded = sub?.status === "graded"
-                      const isProcessing =
-                        sub?.status === "uploaded" ||
-                        sub?.status === "processing"
-                      const isFailed = sub?.status === "failed"
-                      const isUploading = uploadingSet.has(student.id)
+              <LoadingSwap
+                loading={isLoadingStudents}
+                skeleton={<StudentRailSkeleton />}
+              >
+                {students.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+                    <Sticker name="peek" size={56} />
+                    <p className="text-xs text-muted-foreground">
+                      No students in this class yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col p-2">
+                    {students
+                      .sort((a, b) => a.roll_number - b.roll_number)
+                      .map((student, i) => {
+                        const sub = submissions.find(
+                          (s) => s.student_id === student.id
+                        )
+                        const isGraded = sub?.status === "graded"
+                        const isProcessing =
+                          sub?.status === "uploaded" ||
+                          sub?.status === "processing"
+                        const isFailed = sub?.status === "failed"
+                        const isUploading = uploadingSet.has(student.id)
+                        const initials = student.full_name
+                          .split(" ")
+                          .filter(Boolean)
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)
 
-                      return (
-                        <div
-                          key={student.id}
-                          className="flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-muted/30"
-                        >
-                          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
-                            {student.roll_number}
+                        return (
+                          <div
+                            key={student.id}
+                            style={{
+                              animationDelay: `${Math.min(i, 10) * 25}ms`,
+                            }}
+                            className="group/row flex h-12 animate-in items-center gap-2.5 rounded-lg px-2 transition-colors duration-300 fade-in-0 fill-mode-backwards slide-in-from-right-2 hover:bg-background"
+                          >
+                            <span className="w-4 shrink-0 text-right text-[10px] text-muted-foreground tabular-nums">
+                              {student.roll_number}
+                            </span>
+                            <Avatar className="size-7">
+                              <AvatarFallback className="text-[10px]">
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex min-w-0 flex-1 flex-col">
+                              <p className="truncate text-xs leading-snug font-medium text-foreground">
+                                {student.full_name}
+                              </p>
+                              {isGraded ? (
+                                <p className="text-[11px] leading-snug font-medium text-primary tabular-nums">
+                                  {sub!.total_final_marks}
+                                  <span className="font-normal text-muted-foreground">
+                                    /{selectedExam?.total_marks}
+                                  </span>
+                                </p>
+                              ) : isProcessing ? (
+                                <p className="flex items-center gap-1 text-[11px] leading-snug text-violet-600 dark:text-violet-400">
+                                  <CircleNotchIcon className="size-3 animate-spin" />
+                                  {sub!.status === "processing"
+                                    ? "Grading…"
+                                    : "Uploaded"}
+                                </p>
+                              ) : isFailed ? (
+                                <p className="text-[11px] leading-snug text-destructive">
+                                  Failed
+                                </p>
+                              ) : isUploading ? (
+                                <p className="flex items-center gap-1 text-[11px] leading-snug text-muted-foreground">
+                                  <CircleNotchIcon className="size-3 animate-spin" />
+                                  Uploading…
+                                </p>
+                              ) : (
+                                <p className="text-[11px] leading-snug text-muted-foreground/70">
+                                  No sheet yet
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Actions — revealed on hover, always there for keyboard */}
+                            <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
+                              {isGraded ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        navigate(
+                                          `/class/${classSubjectId}/grading/${sub!.id}/review`
+                                        )
+                                      }
+                                      className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                      aria-label="Open review"
+                                    >
+                                      <EyeIcon className="size-3.5" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Open review</TooltipContent>
+                                </Tooltip>
+                              ) : isProcessing ||
+                                isUploading ? null : isFailed ? (
+                                <>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleUploadClick(student.id)
+                                        }
+                                        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        aria-label="Re-upload"
+                                      >
+                                        <ArrowsClockwiseIcon className="size-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Re-upload</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setDeleteSubmissionConfirm({
+                                            submissionId: sub!.id,
+                                            studentName: student.full_name,
+                                          })
+                                        }
+                                        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
+                                        aria-label="Remove"
+                                      >
+                                        <TrashIcon className="size-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Remove</TooltipContent>
+                                  </Tooltip>
+                                </>
+                              ) : (
+                                <>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleUploadClick(student.id)
+                                        }
+                                        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        aria-label="Upload answer sheet"
+                                      >
+                                        <UploadIcon className="size-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Upload answer sheet
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setScanModal({
+                                            studentId: student.id,
+                                            studentName: student.full_name,
+                                          })
+                                        }
+                                        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        aria-label="Scan pages"
+                                      >
+                                        <CameraIcon className="size-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Scan pages</TooltipContent>
+                                  </Tooltip>
+                                </>
+                              )}
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[12px] leading-snug font-medium">
-                              {student.full_name}
-                            </p>
-                            {isGraded ? (
-                              <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                {sub!.total_final_marks}/
-                                {selectedExam?.total_marks}
-                              </p>
-                            ) : isProcessing ? (
-                              <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                                {sub!.status === "processing"
-                                  ? "Grading…"
-                                  : "Uploaded"}
-                              </p>
-                            ) : isFailed ? (
-                              <p className="text-[11px] text-destructive">
-                                Failed
-                              </p>
-                            ) : (
-                              <p className="text-[11px] text-muted-foreground/50">
-                                Not submitted
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 items-center gap-0.5">
-                            {isGraded ? (
-                              <button
-                                onClick={() =>
-                                  navigate(
-                                    `/class/${classSubjectId}/grading/${sub!.id}/review`
-                                  )
-                                }
-                                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                title="View review"
-                              >
-                                <EyeIcon className="size-3.5" />
-                              </button>
-                            ) : isProcessing ? (
-                              <Loader2Icon className="size-3.5 animate-spin text-amber-500" />
-                            ) : isFailed ? (
-                              <>
-                                <button
-                                  onClick={() => handleUploadClick(student.id)}
-                                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                  title="Re-upload"
-                                >
-                                  <RefreshCwIcon className="size-3.5" />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    setDeleteSubmissionConfirm({
-                                      submissionId: sub!.id,
-                                      studentName: student.full_name,
-                                    })
-                                  }
-                                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
-                                  title="Remove"
-                                >
-                                  <Trash2Icon className="size-3.5" />
-                                </button>
-                              </>
-                            ) : isUploading ? (
-                              <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => handleUploadClick(student.id)}
-                                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                  title="Upload answer sheet"
-                                >
-                                  <UploadIcon className="size-3.5" />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    setScanModal({
-                                      studentId: student.id,
-                                      studentName: student.full_name,
-                                    })
-                                  }
-                                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                  title="Scan pages"
-                                >
-                                  <CameraIcon className="size-3.5" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
+                        )
+                      })}
+                  </div>
+                )}
+              </LoadingSwap>
             </div>
           </div>
         </div>
@@ -1507,7 +1788,7 @@ export function ExamsPage() {
               className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             >
               {deletingSubmissionId ? (
-                <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+                <CircleNotchIcon className="mr-1.5 size-3.5 animate-spin" />
               ) : null}
               Delete
             </AlertDialogAction>
@@ -1524,265 +1805,294 @@ export function ExamsPage() {
       />
 
       {/* Create / Edit exam drawer */}
-      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent
-          side={isMobile ? "bottom" : "right"}
-          size={isMobile ? "full" : "lg"}
-          showCloseButton={false}
-          className="flex h-full w-full flex-col p-0"
-        >
-          <SheetHeader className="flex-row items-center justify-between border-b bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
-            <SheetTitle className="text-base font-medium text-secondary-foreground">
-              {editExam ? "Edit Exam" : "Create Exam"}
-            </SheetTitle>
-            <SheetClose asChild>
-              <button className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                <XIcon className="size-5" />
-              </button>
-            </SheetClose>
-          </SheetHeader>
+      <Dialog
+        open={drawerOpen}
+        onOpenChange={(o) => {
+          setDrawerOpen(o)
+          if (!o) resetForm()
+        }}
+      >
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="px-6 pt-6 pb-4">
+            <DialogTitle>
+              {editExam ? "Edit paper" : "New question paper"}
+            </DialogTitle>
+            <DialogDescription>
+              Name it, say what it covers, and set the blueprint. Hint drafts
+              the questions from this class's sources to match.
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="no-scrollbar flex-1 overflow-y-auto">
-            <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
-              {/* Name */}
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-sm">Exam Name</Label>
-                <Input
-                  placeholder="e.g., Mid-Term Examination 2026"
-                  value={examName}
-                  onChange={(e) => setExamName(e.target.value)}
-                />
-              </div>
+          <div className="flex flex-col gap-6 overflow-y-auto px-6 pb-6">
+            {/* 1 · Name */}
+            <section className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-secondary-foreground">
+                <span className="mr-1.5 text-muted-foreground">1</span>
+                Name
+              </p>
+              <Input
+                autoFocus
+                placeholder="e.g. Mid-term examination 2026"
+                value={examName}
+                onChange={(e) => setExamName(e.target.value)}
+                className="h-10"
+              />
+            </section>
 
-              {/* Chapters / Topics — sourced from the curriculum extracted per
-                material (see knowledge.controller.js -> getCurriculum, and
-                migration 005). Manual "+ Add" is preserved inside the picker
-                for chapters not yet in the catalog. */}
+            {/* 2 · Chapters — sourced from the curriculum extracted per
+                material (see knowledge.controller.js -> getCurriculum). */}
+            <section className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-secondary-foreground">
+                <span className="mr-1.5 text-muted-foreground">2</span>
+                What it covers
+              </p>
               <ChapterTopicPicker
                 classSubjectId={classSubjectId ?? ""}
                 value={chapters}
                 onChange={setChapters}
               />
+            </section>
 
-              {/* Blueprint */}
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-sm">Blueprint</Label>
-                {savedBlueprints.length === 0 ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-1.5 text-xs"
-                    onClick={() => setBlueprintModalOpen(true)}
-                  >
-                    <PlusIcon className="size-3.5" /> Create Blueprint
-                  </Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Select
-                      value={selectedBlueprintId || undefined}
-                      onValueChange={handleBlueprintSelect}
-                    >
-                      <SelectTrigger className="h-9 flex-1 text-xs">
-                        <SelectValue placeholder="Select a blueprint" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {savedBlueprints.map((bp) => (
-                          <SelectItem key={bp.id} value={bp.id}>
-                            {bp.name} ({bp.total_marks} marks)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0 text-xs text-primary"
-                      onClick={() => setBlueprintModalOpen(true)}
-                    >
-                      <PlusIcon className="mr-1 size-3" /> New
-                    </Button>
-                  </div>
-                )}
+            {/* 3 · Blueprint */}
+            <section className="flex flex-col gap-2">
+              <div className="flex items-baseline justify-between">
+                <p className="text-xs font-medium text-secondary-foreground">
+                  <span className="mr-1.5 text-muted-foreground">3</span>
+                  Blueprint
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setBlueprintModalOpen(true)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <PlusIcon className="size-3" />
+                  New blueprint
+                </button>
+              </div>
 
-                {showBlueprintSections && (
-                  <>
-                    <div className="flex justify-end">
-                      <button
-                        onClick={() => {
-                          setBlueprint((prev) => [
-                            ...prev,
-                            {
-                              section: String.fromCharCode(65 + prev.length),
-                              type: "",
-                              num_questions: 1,
-                              marks_per_question: 1,
-                            },
-                          ])
-                          setBlueprintEdited(true)
-                        }}
-                        className="text-xs font-medium text-primary hover:underline"
-                      >
-                        + Add Section
-                      </button>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      {blueprint.map((sec, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-start gap-2 rounded-lg border bg-muted/20 p-3"
-                        >
-                          <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
-                            {[
-                              {
-                                label: "Section",
-                                field: "section" as keyof BlueprintSection,
-                                value: sec.section,
-                              },
-                              {
-                                label: "Type",
-                                field: "type" as keyof BlueprintSection,
-                                value: sec.type,
-                                placeholder: "e.g., MCQ",
-                              },
-                              {
-                                label: "Questions",
-                                field:
-                                  "num_questions" as keyof BlueprintSection,
-                                value: sec.num_questions,
-                                type: "number",
-                              },
-                              {
-                                label: "Marks each",
-                                field:
-                                  "marks_per_question" as keyof BlueprintSection,
-                                value: sec.marks_per_question,
-                                type: "number",
-                              },
-                            ].map(
-                              ({ label, field, value, placeholder, type }) => (
-                                <div key={field}>
-                                  <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
-                                    {label}
-                                  </label>
-                                  <Input
-                                    type={type || "text"}
-                                    min={type === "number" ? 1 : undefined}
-                                    value={value as string | number}
-                                    placeholder={placeholder}
-                                    onChange={(e) =>
-                                      updateBlueprint(
-                                        idx,
-                                        field,
-                                        type === "number"
-                                          ? Number(e.target.value)
-                                          : e.target.value
-                                      )
-                                    }
-                                    className="h-8 text-xs"
-                                  />
-                                </div>
-                              )
-                            )}
-                          </div>
-                          {blueprint.length > 1 && (
-                            <button
-                              onClick={() => {
-                                setBlueprint((prev) =>
-                                  prev.filter((_, i) => i !== idx)
-                                )
-                                setBlueprintEdited(true)
-                              }}
-                              className="mt-5 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2Icon className="size-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-primary/5 px-4 py-2.5">
-                      <span className="text-sm font-medium">Total Marks</span>
-                      <span className="text-lg font-bold text-primary">
-                        {totalMarks}
-                      </span>
-                    </div>
-
-                    {/* Pass mark — optional. When set, the grading tab renders
-                      a "Failing" count using this threshold; when left blank,
-                      that metric is omitted (see exam-cards-grid.tsx). */}
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-sm">
-                        Pass mark{" "}
-                        <span className="text-xs font-normal text-muted-foreground">
-                          (optional)
+              {savedBlueprints.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setBlueprintModalOpen(true)}
+                  className="flex items-center gap-3 rounded-xl border border-dashed border-border px-4 py-4 text-left transition-colors hover:border-foreground/25 hover:bg-muted/40"
+                >
+                  <Sticker name="idea" size={40} />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium text-foreground">
+                      Create your first blueprint
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      A blueprint is the shape of the paper: sections, how many
+                      questions in each, and marks per question. Save one and
+                      reuse it every term.
+                    </span>
+                  </span>
+                </button>
+              ) : (
+                <Select
+                  value={selectedBlueprintId || undefined}
+                  onValueChange={handleBlueprintSelect}
+                >
+                  <SelectTrigger className="h-10 w-full text-sm">
+                    <SelectValue placeholder="Choose a blueprint" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {savedBlueprints.map((bp) => (
+                      <SelectItem key={bp.id} value={bp.id}>
+                        {bp.name}
+                        <span className="ml-1.5 text-muted-foreground">
+                          · {bp.total_marks} marks
                         </span>
-                      </Label>
-                      <div className="flex items-center gap-2">
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {showBlueprintSections && (
+                <div className="flex flex-col gap-3 rounded-xl border border-border bg-sidebar/60 p-3">
+                  {/* Section rows */}
+                  <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-[3rem_1fr_5rem_5rem_1.75rem] items-end gap-2 px-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                      <span>Sec</span>
+                      <span>Type</span>
+                      <span>Questions</span>
+                      <span>Marks each</span>
+                      <span />
+                    </div>
+                    {blueprint.map((sec, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[3rem_1fr_5rem_5rem_1.75rem] items-center gap-2 rounded-lg border border-border bg-background p-1.5"
+                      >
+                        <Input
+                          value={sec.section}
+                          onChange={(e) =>
+                            updateBlueprint(idx, "section", e.target.value)
+                          }
+                          aria-label="Section"
+                          className="h-8 text-center text-xs font-semibold"
+                        />
+                        <Input
+                          value={sec.type}
+                          placeholder="e.g. MCQ, Short answer"
+                          onChange={(e) =>
+                            updateBlueprint(idx, "type", e.target.value)
+                          }
+                          aria-label="Question type"
+                          className="h-8 text-xs"
+                        />
                         <Input
                           type="number"
                           min={1}
-                          max={totalMarks || undefined}
-                          step="0.5"
-                          value={passMarks ?? ""}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            setPassMarks(v === "" ? null : Number(v))
-                          }}
-                          placeholder={`e.g. ${Math.round(totalMarks * 0.33)} (33%)`}
-                          className="h-9 flex-1 text-xs"
+                          value={sec.num_questions}
+                          onChange={(e) =>
+                            updateBlueprint(
+                              idx,
+                              "num_questions",
+                              Number(e.target.value)
+                            )
+                          }
+                          aria-label="Number of questions"
+                          className="h-8 text-xs tabular-nums"
                         />
-                        <span className="text-xs whitespace-nowrap text-muted-foreground">
-                          {passMarks != null && totalMarks > 0
-                            ? `${Math.round((passMarks / totalMarks) * 100)}% of ${totalMarks}`
-                            : `of ${totalMarks}`}
-                        </span>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={sec.marks_per_question}
+                          onChange={(e) =>
+                            updateBlueprint(
+                              idx,
+                              "marks_per_question",
+                              Number(e.target.value)
+                            )
+                          }
+                          aria-label="Marks per question"
+                          className="h-8 text-xs tabular-nums"
+                        />
+                        <button
+                          type="button"
+                          disabled={blueprint.length <= 1}
+                          onClick={() => {
+                            setBlueprint((prev) =>
+                              prev.filter((_, i) => i !== idx)
+                            )
+                            setBlueprintEdited(true)
+                          }}
+                          aria-label="Remove section"
+                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                          <TrashIcon className="size-3.5" />
+                        </button>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Leave blank if this exam has no pass threshold (e.g.
-                        weekly practice tests for JEE / NEET coaching).
-                      </p>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBlueprint((prev) => [
+                          ...prev,
+                          {
+                            section: String.fromCharCode(65 + prev.length),
+                            type: "",
+                            num_questions: 1,
+                            marks_per_question: 1,
+                          },
+                        ])
+                        setBlueprintEdited(true)
+                      }}
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground"
+                    >
+                      <PlusIcon className="size-3.5" />
+                      Add a section
+                    </button>
+                  </div>
+
+                  {/* Totals + pass mark */}
+                  <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+                    <div className="flex items-center justify-between rounded-lg bg-background px-3 py-2">
+                      <span className="text-xs text-muted-foreground">
+                        Total
+                      </span>
+                      <span className="text-sm font-semibold text-foreground tabular-nums">
+                        {blueprint.reduce((n, s) => n + s.num_questions, 0)}{" "}
+                        <span className="font-normal text-muted-foreground">
+                          questions ·
+                        </span>{" "}
+                        {totalMarks}{" "}
+                        <span className="font-normal text-muted-foreground">
+                          marks
+                        </span>
+                      </span>
                     </div>
-                    {blueprintEdited && selectedBlueprintId && (
-                      <button
-                        onClick={handleSaveEditedAsBlueprint}
-                        className="text-xs font-medium text-primary hover:underline"
-                      >
-                        Save changes as new blueprint
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+                    <div className="flex items-center gap-2 rounded-lg bg-background px-3 py-2">
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        Pass mark
+                      </span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={totalMarks || undefined}
+                        step="0.5"
+                        value={passMarks ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setPassMarks(v === "" ? null : Number(v))
+                        }}
+                        placeholder="optional"
+                        aria-label="Pass mark"
+                        className="h-7 w-20 text-xs tabular-nums"
+                      />
+                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                        {passMarks != null && totalMarks > 0
+                          ? `${Math.round((passMarks / totalMarks) * 100)}%`
+                          : "none"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {blueprintEdited && selectedBlueprintId && (
+                    <button
+                      type="button"
+                      onClick={handleSaveEditedAsBlueprint}
+                      className="self-start text-xs font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Save these changes as a new blueprint
+                    </button>
+                  )}
+                </div>
+              )}
+            </section>
           </div>
 
-          <SheetFooter className="flex-col border-t bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              {isSaving && (
-                <Loader2Icon className="mr-1.5 size-4 animate-spin" />
-              )}
-              {editExam ? "Update Exam" : "Create Exam"}
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full"
-              onClick={() => {
-                setDrawerOpen(false)
-                resetForm()
-              }}
-            >
-              Cancel
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          <DialogFooter className="flex-row items-center border-t border-border bg-sidebar px-6 py-3 sm:justify-between">
+            <span className="text-xs text-muted-foreground">
+              {!examName.trim()
+                ? "Give the paper a name"
+                : !showBlueprintSections
+                  ? "Pick a blueprint"
+                  : `${blueprint.reduce((n, s) => n + s.num_questions, 0)} questions · ${totalMarks} marks${passMarks != null ? ` · pass ${passMarks}` : ""}`}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setDrawerOpen(false)
+                  resetForm()
+                }}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving && (
+                  <CircleNotchIcon className="size-3.5 animate-spin" />
+                )}
+                {editExam ? "Save changes" : "Create paper"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <BlueprintModal
         open={blueprintModalOpen}
@@ -1938,7 +2248,7 @@ function DuplicateExamPopover({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 rounded-full text-xs"
+                  className="h-7 text-xs"
                   onClick={() => setOpen(false)}
                   disabled={busy}
                 >
@@ -1946,7 +2256,7 @@ function DuplicateExamPopover({
                 </Button>
                 <Button
                   size="sm"
-                  className="h-7 rounded-full text-xs"
+                  className="h-7 text-xs"
                   disabled={picked.size === 0 || busy}
                   onClick={handleApply}
                 >
@@ -2059,88 +2369,88 @@ function CloneFromSectionSheet({
             editing them won&apos;t affect the original.
           </p>
 
-          {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : exams.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <FileTextIcon className="size-10 text-muted-foreground/20" />
-              <p className="text-sm text-muted-foreground">
-                No exams available to clone yet.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                When you or another teacher creates an exam in another section
-                of this grade + subject, it will show up here.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {exams.map((e) => (
-                <div key={e.id} className="rounded-xl border p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-sm font-medium">
-                        {e.exam_name}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {e.total_marks} marks · {e.question_count} question
-                        {e.question_count !== 1 ? "s" : ""}
-                        {e.pass_marks != null ? ` · pass ${e.pass_marks}` : ""}
-                      </p>
+          <LoadingSwap loading={loading} skeleton={<CloneListSkeleton />}>
+            {exams.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-16 text-center">
+                <FileTextIcon className="size-10 text-muted-foreground/20" />
+                <p className="text-sm text-muted-foreground">
+                  No exams available to clone yet.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  When you or another teacher creates an exam in another section
+                  of this grade + subject, it will show up here.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {exams.map((e) => (
+                  <div key={e.id} className="rounded-xl border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm font-medium">
+                          {e.exam_name}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {e.total_marks} marks · {e.question_count} question
+                          {e.question_count !== 1 ? "s" : ""}
+                          {e.pass_marks != null
+                            ? ` · pass ${e.pass_marks}`
+                            : ""}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 shrink-0 gap-1 text-xs"
+                        onClick={() => handleClone(e)}
+                        disabled={cloningId === e.id}
+                      >
+                        {cloningId === e.id ? (
+                          <CircleNotchIcon className="size-3 animate-spin" />
+                        ) : (
+                          <CopyIcon className="size-3" />
+                        )}
+                        Clone
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 shrink-0 gap-1 text-xs"
-                      onClick={() => handleClone(e)}
-                      disabled={cloningId === e.id}
-                    >
-                      {cloningId === e.id ? (
-                        <Loader2Icon className="size-3 animate-spin" />
-                      ) : (
-                        <CopyIcon className="size-3" />
-                      )}
-                      Clone
-                    </Button>
-                  </div>
 
-                  {e.chapters_selected.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {e.chapters_selected.slice(0, 4).map((c) => (
-                        <span
-                          key={c}
-                          className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                        >
-                          {c}
-                        </span>
-                      ))}
-                      {e.chapters_selected.length > 4 && (
-                        <span className="text-[10px] text-muted-foreground/60">
-                          +{e.chapters_selected.length - 4} more
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span>{e.section_label ?? "Class"}</span>
-                    <span>·</span>
-                    <span className="truncate">
-                      {e.is_mine
-                        ? "Your section"
-                        : `by ${e.uploader?.full_name ?? "another teacher"}`}
-                    </span>
-                    {!e.is_mine && (
-                      <span className="ml-auto rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                        Shared
-                      </span>
+                    {e.chapters_selected.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {e.chapters_selected.slice(0, 4).map((c) => (
+                          <span
+                            key={c}
+                            className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                        {e.chapters_selected.length > 4 && (
+                          <span className="text-[10px] text-muted-foreground/60">
+                            +{e.chapters_selected.length - 4} more
+                          </span>
+                        )}
+                      </div>
                     )}
+
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span>{e.section_label ?? "Class"}</span>
+                      <span>·</span>
+                      <span className="truncate">
+                        {e.is_mine
+                          ? "Your section"
+                          : `by ${e.uploader?.full_name ?? "another teacher"}`}
+                      </span>
+                      {!e.is_mine && (
+                        <span className="ml-auto rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                          Shared
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </LoadingSwap>
         </div>
       </SheetContent>
     </Sheet>

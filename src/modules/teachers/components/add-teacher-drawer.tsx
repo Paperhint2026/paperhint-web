@@ -3,15 +3,15 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import {
   CalendarIcon,
   CameraIcon,
-  Loader2Icon,
+  CircleNotchIcon,
   LinkIcon,
-  MailIcon,
+  EnvelopeIcon,
   PencilIcon,
   PhoneIcon,
   PlusIcon,
-  Trash2Icon,
+  TrashIcon,
   XIcon,
-} from "lucide-react"
+} from "@phosphor-icons/react"
 import { format } from "date-fns"
 
 import {
@@ -23,6 +23,11 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -105,7 +110,6 @@ const emptyForm: TeacherFormData = {
   existingAssignments: [],
 }
 
-
 export function AddTeacherDrawer({
   open,
   onOpenChange,
@@ -169,7 +173,7 @@ export function AddTeacherDrawer({
       setForm((prev) => ({
         ...prev,
         existingAssignments: prev.existingAssignments.filter(
-          (a) => a.classSubjectId !== confirmDisassociate.classSubjectId,
+          (a) => a.classSubjectId !== confirmDisassociate.classSubjectId
         ),
       }))
     } catch (err) {
@@ -182,7 +186,7 @@ export function AddTeacherDrawer({
 
   const updateField = <K extends keyof TeacherFormData>(
     key: K,
-    value: TeacherFormData[K],
+    value: TeacherFormData[K]
   ) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
@@ -301,7 +305,12 @@ export function AddTeacherDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side={isMobile ? "bottom" : "right"} size={isMobile ? "full" : "xl"} showCloseButton={false} className="flex h-full w-full flex-col p-0">
+      <SheetContent
+        side={isMobile ? "bottom" : "right"}
+        size={isMobile ? "full" : "xl"}
+        showCloseButton={false}
+        className="flex h-full w-full flex-col p-0"
+      >
         {/* Header */}
         <SheetHeader className="border-b bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-start justify-between gap-3">
@@ -327,10 +336,15 @@ export function AddTeacherDrawer({
         </SheetHeader>
 
         {/* Body */}
-        <div ref={bodyScrollRef} className="no-scrollbar flex-1 overflow-y-auto">
+        <div
+          ref={bodyScrollRef}
+          className="no-scrollbar flex-1 overflow-y-auto"
+        >
           <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
             {/* Basic Info */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Basic Info</p>
+            <p className="text-xs font-medium text-muted-foreground">
+              Basic Info
+            </p>
 
             {/* Avatar + Full Name */}
             <div className="flex items-end gap-4">
@@ -367,16 +381,16 @@ export function AddTeacherDrawer({
                         setPreviewSrc("")
                         updateField("profileUrl", "")
                       }}
-                      className="flex size-6 items-center justify-center rounded-full bg-background text-destructive shadow hover:bg-destructive hover:text-destructive-foreground"
+                      className="hover:text-destructive-foreground flex size-6 items-center justify-center rounded-full bg-background text-destructive shadow hover:bg-destructive"
                       aria-label="Remove photo"
                     >
-                      <Trash2Icon className="size-3" />
+                      <TrashIcon className="size-3" />
                     </button>
                   </div>
                 )}
                 {isUploading && (
                   <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                    <Loader2Icon className="size-4 animate-spin" />
+                    <CircleNotchIcon className="size-4 animate-spin" />
                   </div>
                 )}
               </div>
@@ -388,7 +402,10 @@ export function AddTeacherDrawer({
                 onChange={handleFileChange}
               />
               <div className="flex flex-1 flex-col gap-1.5">
-                <Label className="text-sm">Teacher&apos;s Full Name <span className="text-destructive">*</span></Label>
+                <Label className="text-sm">
+                  Teacher&apos;s Full Name{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   placeholder="e.g. Sarah Johnson"
                   value={form.fullName}
@@ -398,9 +415,11 @@ export function AddTeacherDrawer({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-sm">Work Email Address <span className="text-destructive">*</span></Label>
+              <Label className="text-sm">
+                Work Email Address <span className="text-destructive">*</span>
+              </Label>
               <div className="relative">
-                <MailIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <EnvelopeIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-9"
                   placeholder="Enter Work Email Address"
@@ -420,7 +439,7 @@ export function AddTeacherDrawer({
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">Phone Number</Label>
               <div className="relative">
-                <PhoneIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <PhoneIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-9"
                   placeholder="Enter Phone Number"
@@ -434,10 +453,14 @@ export function AddTeacherDrawer({
             <Separator />
 
             {/* Professional Details */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Professional Details</p>
+            <p className="text-xs font-medium text-muted-foreground">
+              Professional Details
+            </p>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-sm">Department <span className="text-destructive">*</span></Label>
+              <Label className="text-sm">
+                Department <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.departmentId}
                 onValueChange={(v) => updateField("departmentId", v)}
@@ -474,9 +497,11 @@ export function AddTeacherDrawer({
                       className="w-full justify-start text-left font-normal data-[empty=true]:text-muted-foreground"
                     >
                       <CalendarIcon className="size-4" />
-                      {form.dateOfJoining
-                        ? format(form.dateOfJoining, "PPP")
-                        : <span>Pick a date</span>}
+                      {form.dateOfJoining ? (
+                        format(form.dateOfJoining, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -494,7 +519,9 @@ export function AddTeacherDrawer({
             <Separator />
 
             {/* Classes & Subjects */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Classes & Subjects</p>
+            <p className="text-xs font-medium text-muted-foreground">
+              Classes & Subjects
+            </p>
             <p className="text-xs text-muted-foreground">
               {isEditMode
                 ? "Manage class-subject assignments for this teacher."
@@ -521,13 +548,19 @@ export function AddTeacherDrawer({
                       <span className="text-muted-foreground">
                         {a.subjectName}
                       </span>
-                      <button
-                        className="ml-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => setConfirmDisassociate(a)}
-                        title="Disassociate"
-                      >
-                        <XIcon className="size-3" />
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="ml-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setConfirmDisassociate(a)}
+                            aria-label="Disassociate"
+                          >
+                            <XIcon className="size-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Disassociate</TooltipContent>
+                      </Tooltip>
                     </div>
                   ))}
                 </div>
@@ -564,7 +597,7 @@ export function AddTeacherDrawer({
                     onClick={handleDisassociate}
                   >
                     {isDisassociating && (
-                      <Loader2Icon className="size-3 animate-spin" />
+                      <CircleNotchIcon className="size-3 animate-spin" />
                     )}
                     Yes, Disassociate
                   </Button>
@@ -582,10 +615,10 @@ export function AddTeacherDrawer({
             <div className="flex flex-col gap-3">
               {form.classSubjects.map((entry, index) => {
                 const availableSubjects = entry.classId
-                  ? subjectsByClass[entry.classId] ?? []
+                  ? (subjectsByClass[entry.classId] ?? [])
                   : []
                 const isLoadingSubs = entry.classId
-                  ? loadingSubjects[entry.classId] ?? false
+                  ? (loadingSubjects[entry.classId] ?? false)
                   : false
 
                 const isFirst = index === 0
@@ -615,7 +648,9 @@ export function AddTeacherDrawer({
                         <div className="h-9 animate-pulse rounded-4xl bg-muted" />
                       ) : (
                         <Select
-                          disabled={!entry.classId || availableSubjects.length === 0}
+                          disabled={
+                            !entry.classId || availableSubjects.length === 0
+                          }
                           value={entry.classSubjectId}
                           onValueChange={(v) => handleSubjectChange(index, v)}
                         >
@@ -652,7 +687,7 @@ export function AddTeacherDrawer({
                       disabled={form.classSubjects.length === 1}
                       aria-label="Remove row"
                     >
-                      <Trash2Icon className="size-4" />
+                      <TrashIcon className="size-4" />
                     </Button>
                   </div>
                 )
@@ -679,7 +714,7 @@ export function AddTeacherDrawer({
             disabled={!isFormValid || isSaving}
             onClick={handleSave}
           >
-            {isSaving && <Loader2Icon className="animate-spin" />}
+            {isSaving && <CircleNotchIcon className="animate-spin" />}
             {isSaving
               ? isEditMode
                 ? "Saving..."

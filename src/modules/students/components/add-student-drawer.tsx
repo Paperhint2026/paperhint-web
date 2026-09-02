@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { format } from "date-fns"
-import { CalendarIcon, Loader2Icon, XIcon } from "lucide-react"
-
+import { CalendarIcon, CircleNotchIcon, XIcon } from "@phosphor-icons/react"
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -137,9 +136,9 @@ export function AddStudentDrawer({
   const gradeOptions = useMemo(
     () =>
       [...new Set(classes.map((c) => String(c.grade)))].sort(
-        (a, b) => Number(a) - Number(b),
+        (a, b) => Number(a) - Number(b)
       ),
-    [classes],
+    [classes]
   )
 
   const sectionOptions = useMemo(() => {
@@ -152,7 +151,7 @@ export function AddStudentDrawer({
   const selectedClassId = useMemo(() => {
     if (!entry.grade || !entry.section) return null
     const cls = classes.find(
-      (c) => String(c.grade) === entry.grade && c.section === entry.section,
+      (c) => String(c.grade) === entry.grade && c.section === entry.section
     )
     return cls?.id ?? null
   }, [classes, entry.grade, entry.section])
@@ -168,7 +167,7 @@ export function AddStudentDrawer({
 
     apiClient
       .get<ClassSubjectsResponse>(
-        `/api/class-subjects/class/${selectedClassId}`,
+        `/api/class-subjects/class/${selectedClassId}`
       )
       .then((res) => {
         if (cancelled) return
@@ -204,11 +203,11 @@ export function AddStudentDrawer({
 
   const handleElectiveChoice = (
     electiveGroupId: string,
-    classSubjectId: string,
+    classSubjectId: string
   ) => {
     setEntry((prev) => {
       const existing = (prev.elective_choices ?? []).filter(
-        (c) => c.elective_group_id !== electiveGroupId,
+        (c) => c.elective_group_id !== electiveGroupId
       )
       return {
         ...prev,
@@ -226,7 +225,7 @@ export function AddStudentDrawer({
   const getSelectedElective = (electiveGroupId: string): string => {
     return (
       entry.elective_choices?.find(
-        (c) => c.elective_group_id === electiveGroupId,
+        (c) => c.elective_group_id === electiveGroupId
       )?.class_subject_id ?? ""
     )
   }
@@ -235,9 +234,7 @@ export function AddStudentDrawer({
     entry.full_name.trim() !== "" &&
     entry.date_of_birth !== "" &&
     entry.gender !== "" &&
-    electiveGroups.every(
-      (g) => getSelectedElective(g.elective_group_id) !== "",
-    )
+    electiveGroups.every((g) => getSelectedElective(g.elective_group_id) !== "")
 
   const handleSave = () => {
     if (!isFormValid) return
@@ -286,7 +283,7 @@ export function AddStudentDrawer({
         <div className="no-scrollbar flex-1 overflow-y-auto">
           <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
             {/* Personal Information */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Personal Information
             </p>
 
@@ -318,7 +315,7 @@ export function AddStudentDrawer({
                       {entry.date_of_birth ? (
                         format(
                           new Date(entry.date_of_birth + "T00:00:00"),
-                          "PPP",
+                          "PPP"
                         )
                       ) : (
                         <span>Pick a date</span>
@@ -336,7 +333,7 @@ export function AddStudentDrawer({
                       onSelect={(d) =>
                         update(
                           "date_of_birth",
-                          d ? format(d, "yyyy-MM-dd") : "",
+                          d ? format(d, "yyyy-MM-dd") : ""
                         )
                       }
                       captionLayout="dropdown"
@@ -388,7 +385,7 @@ export function AddStudentDrawer({
             <Separator />
 
             {/* Academic Details */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Academic Details
             </p>
 
@@ -405,10 +402,7 @@ export function AddStudentDrawer({
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-sm">Grade</Label>
-                <Select
-                  value={entry.grade}
-                  onValueChange={handleGradeChange}
-                >
+                <Select value={entry.grade} onValueChange={handleGradeChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select grade" />
                   </SelectTrigger>
@@ -444,21 +438,19 @@ export function AddStudentDrawer({
             {/* Elective Subjects — only shown when the class has elective groups */}
             {isLoadingElectives && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2Icon className="size-3.5 animate-spin" />
+                <CircleNotchIcon className="size-3.5 animate-spin" />
                 Loading elective options…
               </div>
             )}
 
             {!isLoadingElectives && electiveGroups.length > 0 && (
               <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-800 dark:bg-amber-950/20">
-                <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
                   Elective Subjects
                 </p>
 
                 {electiveGroups.map((group) => {
-                  const selected = getSelectedElective(
-                    group.elective_group_id,
-                  )
+                  const selected = getSelectedElective(group.elective_group_id)
                   return (
                     <div
                       key={group.elective_group_id}
@@ -470,8 +462,7 @@ export function AddStudentDrawer({
                       </Label>
                       <div className="flex flex-wrap gap-1.5">
                         {group.options.map((opt) => {
-                          const isSelected =
-                            selected === opt.class_subject_id
+                          const isSelected = selected === opt.class_subject_id
                           return (
                             <button
                               key={opt.class_subject_id}
@@ -479,13 +470,13 @@ export function AddStudentDrawer({
                               onClick={() =>
                                 handleElectiveChoice(
                                   group.elective_group_id,
-                                  opt.class_subject_id,
+                                  opt.class_subject_id
                                 )
                               }
                               className={
                                 isSelected
-                                  ? "inline-flex items-center rounded-full border border-amber-500 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors dark:border-amber-600 dark:bg-amber-900 dark:text-amber-200"
-                                  : "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                                  ? "inline-flex items-center rounded-md border border-amber-500 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors dark:border-amber-600 dark:bg-amber-900 dark:text-amber-200"
+                                  : "inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
                               }
                             >
                               {opt.subject_name}
@@ -541,9 +532,7 @@ export function AddStudentDrawer({
             <Separator />
 
             {/* Address */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Address
-            </p>
+            <p className="text-xs font-medium text-muted-foreground">Address</p>
 
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">Street / House No.</Label>
@@ -576,7 +565,7 @@ export function AddStudentDrawer({
             <Separator />
 
             {/* Emergency Contact */}
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Emergency Contact
             </p>
 
@@ -626,7 +615,7 @@ export function AddStudentDrawer({
             disabled={!isFormValid || isSaving}
             onClick={handleSave}
           >
-            {isSaving && <Loader2Icon className="animate-spin" />}
+            {isSaving && <CircleNotchIcon className="animate-spin" />}
             {isSaving
               ? "Saving..."
               : isEdit

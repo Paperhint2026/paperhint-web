@@ -11,7 +11,7 @@ export function getPageTitleFromPath(pathname: string): string {
   if (path.includes("/students")) return "Students"
   if (path.startsWith("/settings")) return "Settings"
   if (path.startsWith("/help")) return "Help"
-  if (path.startsWith("/ask")) return "Ask Hint AI"
+  if (path.startsWith("/ask")) return "Ask Hint"
   if (path.includes("/grading/") && path.includes("/review")) return "Review"
   if (path.includes("/grading")) return "Grading"
   if (path.includes("/pdf-builder")) return "PDF builder"

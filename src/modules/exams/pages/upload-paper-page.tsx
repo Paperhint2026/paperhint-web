@@ -1,27 +1,17 @@
 import { useCallback, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import {
-  ArrowLeftIcon,
-  CheckCircle2Icon,
-  FileTextIcon,
-  Loader2Icon,
-  ScanTextIcon,
-  SearchIcon,
-  SparklesIcon,
-  UploadCloudIcon,
-  XIcon,
-} from "lucide-react"
+import { ArrowLeftIcon, CheckCircleIcon, FileTextIcon, CircleNotchIcon, ScanIcon, MagnifyingGlassIcon, SparkleIcon, CloudArrowUpIcon, XIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 const PROCESSING_STEPS = [
-  { label: "Uploading question paper...", icon: UploadCloudIcon },
-  { label: "Extracting text from paper...", icon: ScanTextIcon },
+  { label: "Uploading question paper...", icon: CloudArrowUpIcon },
+  { label: "Extracting text from paper...", icon: ScanIcon },
   { label: "Identifying questions & sections...", icon: FileTextIcon },
-  { label: "Searching knowledge base for answer keys...", icon: SearchIcon },
-  { label: "Generating answer keys with AI...", icon: SparklesIcon },
+  { label: "Searching knowledge base for answer keys...", icon: MagnifyingGlassIcon },
+  { label: "Generating answer keys with AI...", icon: SparkleIcon },
 ]
 
 const ACCEPTED_TYPES = [
@@ -138,7 +128,7 @@ export function UploadPaperPage() {
           <>
             <div className="flex flex-col items-center gap-3 text-center">
               <div className="flex size-20 items-center justify-center rounded-2xl bg-sky-500/10">
-                <UploadCloudIcon className="size-10 text-sky-600" />
+                <CloudArrowUpIcon className="size-10 text-sky-600" />
               </div>
               <h1 className="text-2xl font-bold">Upload Question Paper</h1>
               <p className="max-w-md text-sm text-muted-foreground">
@@ -198,7 +188,7 @@ export function UploadPaperPage() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
-                  <UploadCloudIcon className="size-10 text-muted-foreground/40" />
+                  <CloudArrowUpIcon className="size-10 text-muted-foreground/40" />
                   <p className="text-sm text-muted-foreground">
                     Drag & drop your question paper here, or{" "}
                     <span className="font-medium text-foreground underline underline-offset-4">
@@ -218,7 +208,7 @@ export function UploadPaperPage() {
               disabled={!file}
               className="w-full max-w-sm"
             >
-              <UploadCloudIcon className="mr-2 size-5" />
+              <CloudArrowUpIcon className="mr-2 size-5" />
               Upload & Process
             </Button>
           </>
@@ -229,11 +219,11 @@ export function UploadPaperPage() {
               {!isDone ? (
                 <div className="relative flex size-24 items-center justify-center">
                   <div className="absolute inset-0 animate-spin rounded-full border-4 border-sky-200 border-t-sky-600" />
-                  <ScanTextIcon className="size-10 text-sky-600" />
+                  <ScanIcon className="size-10 text-sky-600" />
                 </div>
               ) : (
                 <div className="flex size-24 items-center justify-center rounded-full bg-green-500/10">
-                  <CheckCircle2Icon className="size-12 text-green-500" />
+                  <CheckCircleIcon className="size-12 text-green-500" />
                 </div>
               )}
               <h2 className="text-xl font-bold">
@@ -273,9 +263,9 @@ export function UploadPaperPage() {
                       )}
                     >
                       {isActive ? (
-                        <Loader2Icon className="size-5 animate-spin" />
+                        <CircleNotchIcon className="size-5 animate-spin" />
                       ) : isCompleted ? (
-                        <CheckCircle2Icon className="size-5" />
+                        <CheckCircleIcon className="size-5" />
                       ) : (
                         <StepIcon className="size-5" />
                       )}

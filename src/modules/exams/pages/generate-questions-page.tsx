@@ -3,18 +3,23 @@ import { useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   BookOpenIcon,
-  BrainCircuitIcon,
-  CheckCircle2Icon,
+  BrainIcon,
+  CheckCircleIcon,
   FileTextIcon,
-  Loader2Icon,
-  SearchIcon,
-  SparklesIcon,
-  WandIcon,
-} from "lucide-react"
+  CircleNotchIcon,
+  MagnifyingGlassIcon,
+  SparkleIcon,
+  MagicWandIcon,
+} from "@phosphor-icons/react"
 import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 interface Question {
@@ -29,14 +34,17 @@ interface Question {
 
 const GENERATION_STEPS = [
   { label: "Analyzing exam blueprint...", icon: FileTextIcon },
-  { label: "Searching uploaded materials...", icon: SearchIcon },
-  { label: "Reviewing previous papers...", icon: BrainCircuitIcon },
-  { label: "Generating questions with AI...", icon: SparklesIcon },
-  { label: "Validating & formatting output...", icon: WandIcon },
+  { label: "Searching uploaded materials...", icon: MagnifyingGlassIcon },
+  { label: "Reviewing previous papers...", icon: BrainIcon },
+  { label: "Generating questions with AI...", icon: SparkleIcon },
+  { label: "Validating & formatting output...", icon: MagicWandIcon },
 ]
 
 export function GenerateQuestionsPage() {
-  const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
+  const { classSubjectId, examId } = useParams<{
+    classSubjectId: string
+    examId: string
+  }>()
   const navigate = useNavigate()
   const backUrl = `/class/${classSubjectId}/exams`
 
@@ -54,7 +62,9 @@ export function GenerateQuestionsPage() {
   useEffect(() => {
     if (!examId) return
     apiClient
-      .get<{ exam: { exam_name: string; chapters_selected: string[] } }>(`/api/exams/${examId}`)
+      .get<{ exam: { exam_name: string; chapters_selected: string[] } }>(
+        `/api/exams/${examId}`
+      )
       .then((res) => {
         setSelectedChapters(res.exam?.chapters_selected ?? [])
         setExamName(res.exam?.exam_name ?? "")
@@ -95,13 +105,18 @@ export function GenerateQuestionsPage() {
     try {
       const res = await apiClient.post<{ questions: Question[] }>(
         "/api/exams/generate",
-        { exam_id: examId, prompt: prompt || "Generate a well-balanced question paper" },
+        {
+          exam_id: examId,
+          prompt: prompt || "Generate a well-balanced question paper",
+        }
       )
       clearInterval(stepInterval)
       setCurrentStep(GENERATION_STEPS.length - 1)
       setGeneratedQuestions(res.questions ?? [])
       setIsDone(true)
-      toast.success(`${(res.questions ?? []).length} questions generated successfully!`)
+      toast.success(
+        `${(res.questions ?? []).length} questions generated successfully!`
+      )
 
       setTimeout(() => {
         navigate(`/class/${classSubjectId}/exams/${examId}/questions`)
@@ -133,14 +148,19 @@ export function GenerateQuestionsPage() {
             {/* Pre-generation view */}
             <div className="flex flex-col items-center gap-1.5 text-center">
               <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
-                <SparklesIcon className="size-6 text-primary" />
+                <SparkleIcon className="size-6 text-primary" />
               </div>
               <h1 className="text-xl font-bold">
                 Generate Question Paper
-                {examName ? <span className="ml-1 font-normal text-muted-foreground">· {examName}</span> : null}
+                {examName ? (
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    · {examName}
+                  </span>
+                ) : null}
               </h1>
               <p className="max-w-md text-xs text-muted-foreground">
-                Uses the chapters selected at exam setup and their materials. Tell the AI how the paper should feel.
+                Uses the chapters selected at exam setup and their materials.
+                Tell the AI how the paper should feel.
               </p>
             </div>
 
@@ -150,7 +170,10 @@ export function GenerateQuestionsPage() {
             {selectedChapters.length > 0 && (
               <div className="w-full space-y-1.5 rounded-lg border bg-muted/20 px-3 py-2">
                 <div className="flex items-center gap-2 text-xs font-medium">
-                  <BookOpenIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                  <BookOpenIcon
+                    className="size-3.5 text-muted-foreground"
+                    aria-hidden="true"
+                  />
                   Chapters &amp; topics
                   <span className="ml-auto text-[11px] font-normal text-muted-foreground">
                     from exam setup
@@ -166,7 +189,7 @@ export function GenerateQuestionsPage() {
                           "rounded-md px-2.5 py-1 text-xs",
                           isTopic
                             ? "bg-muted text-foreground"
-                            : "bg-primary/10 font-medium text-primary",
+                            : "bg-primary/10 font-medium text-primary"
                         )}
                       >
                         {c}
@@ -180,36 +203,45 @@ export function GenerateQuestionsPage() {
             {/* Prompt input */}
             <div className="w-full space-y-2">
               <label className="text-xs font-medium">
-                Instructions for AI <span className="text-muted-foreground font-normal">(optional)</span>
+                Instructions for AI{" "}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="e.g., emphasise application-based questions with real-world context; include diagram-based long answers…"
                 rows={2}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               />
 
               {/* Example prompts — 2 per row so 6 chips fit in 3 lines */}
               <div className="space-y-1">
-                <p className="text-[11px] font-medium text-muted-foreground">Try these:</p>
+                <p className="text-[11px] font-medium text-muted-foreground">
+                  Try these:
+                </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {EXAMPLE_PROMPTS.map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPrompt(p)}
-                      className="truncate rounded-md border bg-muted/50 px-2.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
-                      title={p}
-                    >
-                      {p}
-                    </button>
+                    <Tooltip key={p}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setPrompt(p)}
+                          className="truncate rounded-md border bg-muted/50 px-2.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+                        >
+                          {p}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{p}</TooltipContent>
+                    </Tooltip>
                   ))}
                 </div>
               </div>
             </div>
 
             <Button onClick={handleGenerate} className="w-full max-w-sm">
-              <SparklesIcon className="mr-2 size-4" />
+              <SparkleIcon className="mr-2 size-4" />
               Generate Questions
             </Button>
           </>
@@ -220,15 +252,17 @@ export function GenerateQuestionsPage() {
               {!isDone ? (
                 <div className="relative flex size-24 items-center justify-center">
                   <div className="absolute inset-0 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-                  <SparklesIcon className="size-10 text-primary" />
+                  <SparkleIcon className="size-10 text-primary" />
                 </div>
               ) : (
                 <div className="flex size-24 items-center justify-center rounded-full bg-green-500/10">
-                  <CheckCircle2Icon className="size-12 text-green-500" />
+                  <CheckCircleIcon className="size-12 text-green-500" />
                 </div>
               )}
               <h2 className="text-xl font-bold">
-                {isDone ? "Questions Generated!" : "Generating Question Paper..."}
+                {isDone
+                  ? "Questions Generated!"
+                  : "Generating Question Paper..."}
               </h2>
               {isDone && (
                 <p className="text-sm text-muted-foreground">
@@ -250,8 +284,11 @@ export function GenerateQuestionsPage() {
                     className={cn(
                       "flex items-center gap-4 rounded-xl border px-5 py-3.5 transition-all duration-500",
                       isActive && "border-primary/40 bg-primary/5 shadow-sm",
-                      isCompleted && "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20",
-                      !isActive && !isCompleted && "border-transparent bg-muted/30 opacity-40",
+                      isCompleted &&
+                        "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20",
+                      !isActive &&
+                        !isCompleted &&
+                        "border-transparent bg-muted/30 opacity-40"
                     )}
                   >
                     <div
@@ -259,13 +296,15 @@ export function GenerateQuestionsPage() {
                         "flex size-9 shrink-0 items-center justify-center rounded-lg transition-all",
                         isActive && "bg-primary/10 text-primary",
                         isCompleted && "bg-green-500/10 text-green-500",
-                        !isActive && !isCompleted && "bg-muted text-muted-foreground",
+                        !isActive &&
+                          !isCompleted &&
+                          "bg-muted text-muted-foreground"
                       )}
                     >
                       {isActive ? (
-                        <Loader2Icon className="size-5 animate-spin" />
+                        <CircleNotchIcon className="size-5 animate-spin" />
                       ) : isCompleted ? (
-                        <CheckCircle2Icon className="size-5" />
+                        <CheckCircleIcon className="size-5" />
                       ) : (
                         <StepIcon className="size-5" />
                       )}
@@ -275,7 +314,7 @@ export function GenerateQuestionsPage() {
                         "text-sm font-medium transition-colors",
                         isActive && "text-foreground",
                         isCompleted && "text-green-600 dark:text-green-400",
-                        !isActive && !isCompleted && "text-muted-foreground",
+                        !isActive && !isCompleted && "text-muted-foreground"
                       )}
                     >
                       {step.label}

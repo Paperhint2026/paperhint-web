@@ -1,8 +1,14 @@
 import dayjs from "dayjs"
-import { BriefcaseIcon, CalendarIcon, CheckIcon, GraduationCapIcon, MoreHorizontalIcon, PencilIcon, Trash2Icon, UserRoundIcon } from "lucide-react"
-
+import {
+  BriefcaseIcon,
+  CalendarBlankIcon,
+  DotsThreeIcon,
+  EnvelopeSimpleIcon,
+  PencilIcon,
+  TrashIcon,
+  type Icon,
+} from "@phosphor-icons/react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 
 export type TeacherStatus = "invited" | "active" | "inactive"
 
@@ -33,10 +40,10 @@ const STATUS_LABEL: Record<TeacherStatus, string> = {
   inactive: "Inactive",
 }
 
-const STATUS_CLASSES: Record<TeacherStatus, string> = {
-  invited: "bg-amber-50 text-amber-700 border-amber-500 dark:bg-amber-950 dark:text-amber-400",
-  active: "bg-green-200 text-green-900 border-green-700 dark:bg-green-950 dark:text-green-400",
-  inactive: "bg-slate-100 text-slate-600 border-slate-400 dark:bg-slate-800 dark:text-slate-400",
+const STATUS_DOT: Record<TeacherStatus, string> = {
+  invited: "bg-amber-500",
+  active: "bg-emerald-500",
+  inactive: "bg-slate-400 dark:bg-slate-500",
 }
 
 interface TeacherCardProps {
@@ -56,32 +63,83 @@ function getInitials(name: string) {
     .slice(0, 2)
 }
 
-export function TeacherCard({ teacher, departmentName, onView, onEdit, onDelete }: TeacherCardProps) {
+function joinedLabel(joined: Teacher["date_of_joining"]) {
+  if (!joined) return null
+  const start = dayjs(joined)
+  if (!start.isValid()) return null
+  const years = dayjs().diff(start, "year")
+  const date = start.format("MMM YYYY")
+  if (years < 1) return date
+  return `${date} · ${years} ${years === 1 ? "yr" : "yrs"}`
+}
+
+/** One record row on the card back — the same shape as the student desk
+ *  card: icon and label on the left, value on the right, 11px throughout. */
+function Field({
+  icon: FieldIcon,
+  label,
+  value,
+  muted,
+}: {
+  icon: Icon
+  label: string
+  value: string
+  muted?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+        <FieldIcon className="size-3.5" />
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "truncate",
+          muted ? "text-muted-foreground" : "text-secondary-foreground"
+        )}
+      >
+        {value}
+      </dd>
+    </div>
+  )
+}
+
+export function TeacherCard({
+  teacher,
+  departmentName,
+  onView,
+  onEdit,
+  onDelete,
+}: TeacherCardProps) {
   const showMore = Boolean(onEdit || onDelete)
+  const joined = joinedLabel(teacher.date_of_joining)
+
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={() => onView?.(teacher.id)}
       onKeyDown={(e) => e.key === "Enter" && onView?.(teacher.id)}
-      className="group relative flex cursor-pointer flex-col gap-5 overflow-hidden rounded-lg border border-border bg-sidebar p-5 transition-colors hover:bg-sidebar-accent"
+      className="group relative flex cursor-pointer flex-col rounded-xl border border-border bg-background transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
-      {/* Top-right slot: badge always visible, edit button expands in on hover */}
-      <div className="absolute right-4 top-4 flex items-center">
-        {/* Badge — always visible */}
+      {/* Top-right: status badge always visible, more menu slides in on hover */}
+      <div className="absolute top-2.5 right-2.5 flex items-center">
         {teacher.status && (
-          <Badge className={`transition-all duration-200 ${STATUS_CLASSES[teacher.status]}`}>
-            {teacher.status === "active" && <CheckIcon />}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                STATUS_DOT[teacher.status]
+              )}
+            />
             {STATUS_LABEL[teacher.status]}
-          </Badge>
+          </span>
         )}
-
-        {/* More button — zero width by default, expands on hover or when menu open */}
         {showMore && (
           <div
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
-            className="w-0 overflow-hidden transition-all duration-200 group-hover:ml-1.5 group-hover:w-6 has-[[data-state=open]]:ml-1.5 has-[[data-state=open]]:w-6"
+            className="w-0 overflow-hidden transition-all duration-200 group-hover:ml-1 group-hover:w-6 focus-within:ml-1 focus-within:w-6 has-[[data-state=open]]:ml-1 has-[[data-state=open]]:w-6"
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -90,7 +148,7 @@ export function TeacherCard({ teacher, departmentName, onView, onEdit, onDelete 
                   variant="ghost"
                   aria-label="More options"
                 >
-                  <MoreHorizontalIcon />
+                  <DotsThreeIcon weight="bold" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
@@ -109,7 +167,7 @@ export function TeacherCard({ teacher, departmentName, onView, onEdit, onDelete 
                       onDelete(teacher.id)
                     }}
                   >
-                    <Trash2Icon className="size-3.5" />
+                    <TrashIcon className="size-3.5" />
                     Delete
                   </DropdownMenuItem>
                 )}
@@ -119,58 +177,47 @@ export function TeacherCard({ teacher, departmentName, onView, onEdit, onDelete 
         )}
       </div>
 
-      {/* Profile section */}
-      <div className="flex flex-col gap-3">
-        <Avatar>
+      {/* Front — photo beside identity */}
+      <div className="flex items-center gap-3.5 px-4 py-4">
+        <Avatar className="size-12 rounded-lg after:rounded-lg">
           {teacher.profile_url ? (
-            <AvatarImage src={teacher.profile_url} alt={teacher.full_name} />
+            <AvatarImage
+              src={teacher.profile_url}
+              alt={teacher.full_name}
+              className="rounded-lg"
+            />
           ) : (
-            <AvatarFallback>{getInitials(teacher.full_name)}</AvatarFallback>
+            <AvatarFallback className="rounded-lg text-sm">
+              {getInitials(teacher.full_name)}
+            </AvatarFallback>
           )}
         </Avatar>
-
-        <div className="flex flex-col gap-0">
-          <p className="truncate text-base font-medium text-secondary-foreground">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 pr-16">
+          <p className="truncate text-sm font-semibold tracking-tight text-foreground">
             {teacher.full_name}
           </p>
           <p className="truncate text-xs text-muted-foreground">
-            {teacher.designation ?? teacher.email}
+            {teacher.designation ?? "Teacher"}
           </p>
         </div>
       </div>
 
-      {/* Details section */}
-      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-        <div className="flex items-center gap-1.5">
-          {departmentName ? (
-            <>
-              <BriefcaseIcon className="size-3 shrink-0 text-muted-foreground" />
-              <span className="truncate text-xs text-foreground">{departmentName}</span>
-            </>
-          ) : (
-            <>
-              <UserRoundIcon className="size-3 shrink-0 text-muted-foreground" />
-              <span className="truncate text-xs text-muted-foreground">No department</span>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {teacher.date_of_joining ? (
-            <>
-              <CalendarIcon className="size-3 shrink-0 text-muted-foreground" />
-              <span className="truncate text-xs text-foreground">
-                Joined {dayjs(teacher.date_of_joining).format("MMM YYYY")}
-              </span>
-            </>
-          ) : (
-            <>
-              <GraduationCapIcon className="size-3 shrink-0 text-muted-foreground" />
-              <span className="truncate text-xs text-muted-foreground">No join date</span>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Back — record rows under a dashed rule, like the student card */}
+      <dl className="flex flex-col gap-1.5 border-t border-dashed border-border px-4 py-3 text-[11px]">
+        <Field
+          icon={BriefcaseIcon}
+          label="Department"
+          value={departmentName ?? "—"}
+          muted={!departmentName}
+        />
+        <Field
+          icon={CalendarBlankIcon}
+          label="Joined"
+          value={joined ?? "—"}
+          muted={!joined}
+        />
+        <Field icon={EnvelopeSimpleIcon} label="Email" value={teacher.email} />
+      </dl>
     </div>
   )
 }

@@ -58,6 +58,59 @@ function disableTransitionsTemporarily() {
   }
 }
 
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)"
+const THEME_FADE_MS = 320
+
+type DocumentWithViewTransition = Document & {
+  startViewTransition?: (update: () => void) => unknown
+}
+
+/**
+ * Swaps the theme class with a whole-page crossfade. Per-element CSS
+ * transitions stay suppressed during the swap so the fade is the only thing
+ * moving — otherwise borders and text would lag the backgrounds. Uses the View
+ * Transitions API where available and falls back to a short window of colour
+ * transitions on every element. Reduced-motion users get an instant swap.
+ */
+function swapThemeClass(
+  root: HTMLElement,
+  resolvedTheme: ResolvedTheme,
+  suppressElementTransitions: boolean
+) {
+  const swap = () => {
+    const restore = suppressElementTransitions
+      ? disableTransitionsTemporarily()
+      : null
+    root.classList.remove("light", "dark")
+    root.classList.add(resolvedTheme)
+    restore?.()
+  }
+
+  const alreadyApplied = root.classList.contains(resolvedTheme)
+  const firstPaint =
+    !root.classList.contains("light") && !root.classList.contains("dark")
+  const reduceMotion = window.matchMedia(REDUCED_MOTION_QUERY).matches
+
+  if (alreadyApplied || firstPaint || reduceMotion) {
+    swap()
+    return
+  }
+
+  const doc = document as DocumentWithViewTransition
+  if (typeof doc.startViewTransition === "function") {
+    doc.startViewTransition(swap)
+    return
+  }
+
+  // No View Transitions: let colours ease on every element for one beat.
+  root.classList.add("theme-transition")
+  root.classList.remove("light", "dark")
+  root.classList.add(resolvedTheme)
+  window.setTimeout(() => {
+    root.classList.remove("theme-transition")
+  }, THEME_FADE_MS)
+}
+
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -106,16 +159,7 @@ export function ThemeProvider({
       const root = document.documentElement
       const resolvedTheme =
         nextTheme === "system" ? getSystemTheme() : nextTheme
-      const restoreTransitions = disableTransitionOnChange
-        ? disableTransitionsTemporarily()
-        : null
-
-      root.classList.remove("light", "dark")
-      root.classList.add(resolvedTheme)
-
-      if (restoreTransitions) {
-        restoreTransitions()
-      }
+      swapThemeClass(root, resolvedTheme, disableTransitionOnChange)
     },
     [disableTransitionOnChange]
   )

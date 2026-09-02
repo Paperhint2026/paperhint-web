@@ -15,14 +15,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Settings2Icon, FileTextIcon, LinkIcon, CopyIcon, CornerUpRightIcon, Trash2Icon, CornerUpLeftIcon, ChartLineIcon, GalleryVerticalEndIcon, TrashIcon, BellIcon, ArrowUpIcon, ArrowDownIcon, StarIcon, MoreHorizontalIcon } from "lucide-react"
-
+import { FadersIcon, FileTextIcon, LinkIcon, CopyIcon, ArrowBendUpRightIcon, TrashIcon, ArrowBendUpLeftIcon, ChartLineIcon, ClockCounterClockwiseIcon, BellIcon, ArrowUpIcon, ArrowDownIcon, StarIcon, DotsThreeIcon } from "@phosphor-icons/react"
 const data = [
   [
     {
       label: "Customize Page",
       icon: (
-        <Settings2Icon
+        <FadersIcon
         />
       ),
     },
@@ -52,14 +51,14 @@ const data = [
     {
       label: "Move to",
       icon: (
-        <CornerUpRightIcon
+        <ArrowBendUpRightIcon
         />
       ),
     },
     {
       label: "Move to Trash",
       icon: (
-        <Trash2Icon
+        <TrashIcon
         />
       ),
     },
@@ -68,7 +67,7 @@ const data = [
     {
       label: "Undo",
       icon: (
-        <CornerUpLeftIcon
+        <ArrowBendUpLeftIcon
         />
       ),
     },
@@ -82,7 +81,7 @@ const data = [
     {
       label: "Version History",
       icon: (
-        <GalleryVerticalEndIcon
+        <ClockCounterClockwiseIcon
         />
       ),
     },
@@ -142,7 +141,7 @@ export function NavActions() {
             size="icon"
             className="h-7 w-7 data-[state=open]:bg-accent"
           >
-            <MoreHorizontalIcon
+            <DotsThreeIcon
             />
           </Button>
         </PopoverTrigger>

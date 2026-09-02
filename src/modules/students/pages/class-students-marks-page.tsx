@@ -3,38 +3,46 @@ import { useNavigate, useParams } from "react-router-dom"
 import {
   ArrowDownIcon,
   ArrowUpIcon,
-  ClipboardListIcon,
+  ChartBarIcon,
+  ExamIcon,
   FileTextIcon,
-  SearchIcon,
-  Users2Icon,
-} from "lucide-react"
+  TrophyIcon,
+  UsersIcon,
+} from "@phosphor-icons/react"
 import dayjs from "dayjs"
 
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
-import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-
-interface ExamCol {
-  id: string
-  exam_name: string
-  total_marks: number
-  created_at: string
-}
-
-interface StudentRow {
-  id: string
-  full_name: string
-  roll_number: number
-  register_number?: string | null
-}
-
-interface MarkCell {
-  final: number | null
-  ai: number | null
-  status: string
-}
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { ClassPageHeader } from "@/components/layout/class-page-header"
+import {
+  PageToolbar,
+  PageToolbarSkeleton,
+} from "@/components/shared/page-toolbar"
+import { LoadingSwap } from "@/components/shared/loading-swap"
+import { Sticker } from "@/components/shared/sticker"
+import { countSummary, tameCaps } from "@/lib/format"
+import { RingGauge } from "../components/ring-gauge"
+import { StudentMarksPreview } from "../components/student-marks-preview"
+import {
+  cellPct,
+  getInitials,
+  isGrading,
+  scoreTone,
+  TONE_BAR,
+  TONE_TEXT,
+  type ExamCol,
+  type MarkCell,
+  type StudentRow,
+} from "../lib/marks"
 
 interface MatrixResponse {
   exams: ExamCol[]
@@ -43,58 +51,6 @@ interface MatrixResponse {
 }
 
 type SortKey = "roll" | "name"
-
-// Deterministic per-student avatar color — solid fills with white initials,
-// matching the solid circular icons on the class home page.
-const AVATAR_COLORS = [
-  "bg-violet-500",
-  "bg-blue-500",
-  "bg-emerald-500",
-  "bg-amber-500",
-  "bg-rose-500",
-  "bg-cyan-500",
-  "bg-orange-500",
-  "bg-pink-500",
-]
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
-}
-
-function getAvatarColor(name: string) {
-  const sum = name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[sum % AVATAR_COLORS.length]
-}
-
-// Performance tone shared by score text, progress bars and the average chip.
-function scoreTone(pct: number): "good" | "ok" | "low" {
-  if (pct >= 80) return "good"
-  if (pct >= 50) return "ok"
-  return "low"
-}
-
-const TONE_TEXT: Record<ReturnType<typeof scoreTone>, string> = {
-  good: "text-emerald-600 dark:text-emerald-400",
-  ok: "text-foreground",
-  low: "text-amber-600 dark:text-amber-400",
-}
-
-const TONE_BAR: Record<ReturnType<typeof scoreTone>, string> = {
-  good: "bg-emerald-500",
-  ok: "bg-blue-500",
-  low: "bg-amber-500",
-}
-
-const TONE_CHIP: Record<ReturnType<typeof scoreTone>, string> = {
-  good: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  ok: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  low: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-}
 
 export function ClassStudentsMarksPage() {
   const { user } = useAuth()
@@ -110,6 +66,8 @@ export function ClassStudentsMarksPage() {
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("roll")
   const [sortAsc, setSortAsc] = useState(true)
+  const [previewId, setPreviewId] = useState<string | null>(null)
+  const previewStudent = students.find((st) => st.id === previewId) ?? null
 
   const fetchMatrix = useCallback(async (csId: string) => {
     setIsLoading(true)
@@ -201,7 +159,7 @@ export function ClassStudentsMarksPage() {
   if (!classSubjectId) {
     return (
       <div className="flex min-h-full w-full flex-col items-center justify-center gap-3 p-8">
-        <Users2Icon className="size-12 text-muted-foreground/40" />
+        <UsersIcon className="size-12 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground">
           Select a class from the sidebar
         </p>
@@ -209,239 +167,370 @@ export function ClassStudentsMarksPage() {
     )
   }
 
-  if (isLoading) {
-    return (
-      <div className="mx-auto w-full max-w-5xl space-y-4 p-4 md:p-6">
-        <Skeleton className="h-9 w-full max-w-xs" />
-        <Skeleton className="h-20 w-full" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-        </div>
-      </div>
-    )
-  }
-
-  if (students.length === 0) {
-    return (
-      <div className="flex h-full flex-col p-4 md:p-6">
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-sidebar p-5">
-          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
-            <Users2Icon className="size-6 text-muted-foreground" />
-          </div>
-          <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
-            <p className="text-base font-medium text-secondary-foreground">
-              No students in this class yet
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Students added to this class will show up here with their exam
-              marks.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const filtering = search.trim().length > 0
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 md:p-6">
-      {/* ── Header — same shape as the other class tabs ── */}
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">
-          Students
-          <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-            ({students.length})
-          </span>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          The classroom roster — every student with their marks across exams.
-        </p>
-      </div>
-
-      {/* ── Class snapshot — the "what's happening in this class" strip ── */}
-      {exams.length > 0 ? (
-        <div className="grid grid-cols-3 gap-4 rounded-xl border bg-card p-4">
-          <Stat
-            label="Exams"
-            value={String(exams.length)}
-            sub={`${snapshot.gradedStudents} of ${students.length} students graded`}
-          />
-          <Stat
-            label="Class average"
-            value={
-              snapshot.classAvg != null
-                ? `${Math.round(snapshot.classAvg)}%`
-                : "—"
-            }
-            sub="across graded exams"
-            tone={
-              snapshot.classAvg != null ? scoreTone(snapshot.classAvg) : "ok"
-            }
-          />
-          <Stat
-            label="Top student"
-            value={snapshot.top ? `${Math.round(snapshot.top.pct)}%` : "—"}
-            sub={snapshot.top?.name ?? "no graded exams yet"}
-            tone={snapshot.top ? scoreTone(snapshot.top.pct) : "ok"}
-          />
-        </div>
-      ) : (
-        <div className="flex items-center gap-3 rounded-xl border border-dashed p-4">
-          <ClipboardListIcon className="size-5 shrink-0 text-muted-foreground/50" />
-          <div>
-            <p className="text-sm text-secondary-foreground">
-              No exams conducted yet
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Marks appear on each student once an exam is graded.
-            </p>
-          </div>
-        </div>
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "@container flex min-h-full flex-col gap-5 pb-12"
       )}
+    >
+      <ClassPageHeader
+        icon={UsersIcon}
+        title="Students"
+        count={students.length || undefined}
+        description="Everyone in this class, with their marks across every paper."
+      />
 
-      {/* ── Toolbar — search + sort ─────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:max-w-72">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, roll no, register no..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 rounded-full pl-9"
-          />
-        </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Sort</span>
-          {(
-            [
-              { key: "roll", label: "Roll" },
-              { key: "name", label: "Name" },
-            ] as { key: SortKey; label: string }[]
-          ).map((chip) => (
-            <button
-              key={chip.key}
-              onClick={() => toggleSort(chip.key)}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors",
-                sortKey === chip.key
-                  ? "border-foreground/20 bg-muted font-medium text-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted/50"
-              )}
-            >
-              {chip.label}
-              {sortKey === chip.key &&
-                (sortAsc ? (
-                  <ArrowUpIcon className="size-3" />
-                ) : (
-                  <ArrowDownIcon className="size-3" />
+      <LoadingSwap
+        loading={isLoading}
+        skeleton={<MarksPageSkeleton />}
+        className="flex-1"
+      >
+        {students.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6">
+            <Sticker name="friends" size={200} />
+            <div className="flex max-w-[400px] flex-col items-center gap-1 text-center">
+              <p className="text-base font-medium text-secondary-foreground">
+                No students in this class yet
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Students added to this class will show up here with their exam
+                marks.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {/* ── Class snapshot — numbers on one hairline row ── */}
+            {exams.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-border py-3">
+                {[
+                  {
+                    icon: ExamIcon,
+                    value: String(exams.length),
+                    label: `${exams.length === 1 ? "paper" : "papers"} · ${snapshot.gradedStudents} of ${students.length} students graded`,
+                    tone: "ok" as const,
+                  },
+                  {
+                    icon: ChartBarIcon,
+                    value:
+                      snapshot.classAvg != null
+                        ? `${Math.round(snapshot.classAvg)}%`
+                        : "—",
+                    label: "class average",
+                    tone:
+                      snapshot.classAvg != null
+                        ? scoreTone(snapshot.classAvg)
+                        : ("ok" as const),
+                  },
+                  {
+                    icon: TrophyIcon,
+                    value: snapshot.top
+                      ? `${Math.round(snapshot.top.pct)}%`
+                      : "—",
+                    label: snapshot.top
+                      ? `top · ${snapshot.top.name}`
+                      : "no graded papers yet",
+                    tone: snapshot.top
+                      ? scoreTone(snapshot.top.pct)
+                      : ("ok" as const),
+                  },
+                ].map((stat) => (
+                  <div key={stat.label} className="flex items-center gap-1.5">
+                    <stat.icon className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span
+                      className={cn(
+                        "text-sm font-semibold tabular-nums",
+                        stat.tone !== "ok"
+                          ? TONE_TEXT[stat.tone]
+                          : "text-foreground"
+                      )}
+                    >
+                      {stat.value}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {stat.label}
+                    </span>
+                  </div>
                 ))}
-            </button>
-          ))}
-        </div>
-      </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 rounded-xl border border-dashed border-border px-4 py-3">
+                <Sticker name="sleep" size={40} />
+                <div className="flex flex-col gap-0.5">
+                  <p className="text-sm font-medium text-secondary-foreground">
+                    No papers graded yet
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Marks appear on each desk once a paper has been graded.
+                  </p>
+                </div>
+              </div>
+            )}
 
-      {/* ── Classroom — one card per student ────────────────── */}
-      {filteredSorted.length === 0 ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-          No students match your search.
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredSorted.map((s) => (
-            <StudentCard
-              key={s.id}
-              student={s}
-              exams={exams}
-              cells={marks[s.id]}
-              averagePct={averages[s.id]}
-              onOpenExam={(examId) =>
-                navigate(`/class/${classSubjectId}/exams?exam=${examId}`)
+            <PageToolbar
+              search={{
+                value: search,
+                onChange: setSearch,
+                placeholder: "Search by name, roll or register number…",
+              }}
+              summary={countSummary(
+                filteredSorted.length,
+                students.length,
+                "student",
+                filtering
+              )}
+              trailing={
+                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                  {(
+                    [
+                      { key: "roll", label: "Roll" },
+                      { key: "name", label: "Name" },
+                    ] as { key: SortKey; label: string }[]
+                  ).map((chip) => {
+                    const on = sortKey === chip.key
+                    return (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => toggleSort(chip.key)}
+                        aria-pressed={on}
+                        className={cn(
+                          "inline-flex h-7 items-center gap-1 rounded-[5px] px-2.5 text-xs transition-colors",
+                          on
+                            ? "bg-muted font-medium text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {chip.label}
+                        {on &&
+                          (sortAsc ? (
+                            <ArrowUpIcon className="size-3" />
+                          ) : (
+                            <ArrowDownIcon className="size-3" />
+                          ))}
+                      </button>
+                    )
+                  })}
+                </div>
               }
             />
-          ))}
-        </div>
-      )}
+
+            {/* ── Classroom — one desk per student ── */}
+            {filteredSorted.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
+                <Sticker
+                  name={filtering ? "lost" : "friends"}
+                  size={filtering ? 120 : 200}
+                />
+                <div className="flex max-w-[360px] flex-col items-center gap-1 text-center">
+                  <p className="text-base font-medium text-secondary-foreground">
+                    {filtering
+                      ? "Nobody matches that"
+                      : "No students in this class yet"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {filtering
+                      ? "Try a different name or number."
+                      : "Once students are enrolled in this section they'll appear here with their marks."}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
+                {filteredSorted.map((s) => (
+                  <StudentCard
+                    key={s.id}
+                    student={s}
+                    exams={exams}
+                    cells={marks[s.id]}
+                    averagePct={averages[s.id]}
+                    onOpen={() => setPreviewId(s.id)}
+                    onOpenExam={(examId) =>
+                      navigate(`/class/${classSubjectId}/exams?exam=${examId}`)
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </LoadingSwap>
+
+      <StudentMarksPreview
+        student={previewStudent}
+        exams={exams}
+        cells={previewStudent ? marks[previewStudent.id] : undefined}
+        averagePct={previewStudent ? averages[previewStudent.id] : undefined}
+        classSubjectId={classSubjectId}
+        open={!!previewStudent}
+        onOpenChange={(open) => !open && setPreviewId(null)}
+      />
     </div>
   )
 }
 
-// ── Student card ──────────────────────────────────────────────────────────
+// ── Student report card ───────────────────────────────────────────────────
+
+/** The marks page before the class arrives: the snapshot row, the toolbar,
+ *  then desks in the same grid as StudentCard — roll tag, avatar, two identity
+ *  lines and the average ring, a few paper rows, and the graded footer. */
+function MarksPageSkeleton() {
+  return (
+    <div aria-hidden className="contents">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-border py-3">
+        {[40, 28, 36].map((w, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <Skeleton className="size-3.5 rounded" />
+            <Skeleton className="h-4 w-8" />
+            <Skeleton className="h-3" style={{ width: `${w * 4}px` }} />
+          </div>
+        ))}
+      </div>
+
+      <PageToolbarSkeleton filters={false} />
+
+      <div className="grid gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex flex-col rounded-xl border border-border bg-background"
+          >
+            <div className="flex items-center gap-3 p-4">
+              <Skeleton className="h-6 w-6 rounded-md" />
+              <Skeleton className="size-10 rounded-full" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+              <Skeleton className="size-10 rounded-full" />
+            </div>
+            <div className="flex flex-1 flex-col gap-2.5 border-t border-dashed border-border px-4 py-3">
+              {Array.from({ length: 3 }).map((_, j) => (
+                <div
+                  key={j}
+                  className="grid grid-cols-[minmax(0,1fr)_4.5rem_3.75rem] items-center gap-3"
+                >
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-1.5 w-full rounded-full" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-b-xl border-t border-border bg-sidebar/60 px-4 py-2">
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function StudentCard({
   student,
   exams,
   cells,
   averagePct,
+  onOpen,
   onOpenExam,
 }: {
   student: StudentRow
   exams: ExamCol[]
   cells: Record<string, MarkCell> | undefined
   averagePct: number | undefined
+  onOpen: () => void
   onOpenExam: (examId: string) => void
 }) {
+  const gradedCount = exams.filter(
+    (ex) => cells?.[ex.id]?.status === "graded"
+  ).length
   const hasAnyCell = exams.some((ex) => cells?.[ex.id])
 
+  // Best paper by percentage — the one line worth calling out in the footer.
+  let best: { name: string; pct: number } | null = null
+  for (const ex of exams) {
+    const cell = cells?.[ex.id]
+    if (cell?.status === "graded" && ex.total_marks > 0) {
+      const pct = ((cell.final ?? 0) / ex.total_marks) * 100
+      if (!best || pct > best.pct) best = { name: ex.exam_name, pct }
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-foreground/20">
-      {/* Identity */}
-      <div className="flex items-center gap-3">
-        <div
-          className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white",
-            getAvatarColor(student.full_name)
-          )}
-        >
-          {getInitials(student.full_name)}
-        </div>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
+      aria-label={`Preview marks for ${student.full_name}`}
+      className="group flex cursor-pointer flex-col rounded-xl border border-border bg-background transition-all outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {/* Identity row — roll, who, and the average as a ring */}
+      <div className="flex items-center gap-3 p-4">
+        <span className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-sidebar px-1.5 text-[11px] font-semibold text-secondary-foreground tabular-nums ring-1 ring-border/60">
+          {String(student.roll_number).padStart(2, "0")}
+        </span>
+        <Avatar className="size-10">
+          <AvatarFallback className="bg-muted text-xs text-foreground/70">
+            {getInitials(student.full_name)}
+          </AvatarFallback>
+        </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{student.full_name}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            Roll {student.roll_number}
-            {student.register_number ? ` · ${student.register_number}` : ""}
+          <p className="truncate text-sm font-medium text-foreground">
+            {student.full_name}
+          </p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {student.register_number ?? "No register number"}
           </p>
         </div>
-        {averagePct != null && (
-          <span
-            title="Average across graded exams"
-            className={cn(
-              "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
-              TONE_CHIP[scoreTone(averagePct)]
-            )}
-          >
-            Avg {Math.round(averagePct)}%
-          </span>
+        <RingGauge pct={averagePct ?? null} />
+      </div>
+
+      {/* Papers — one line each with an inline meter */}
+      <div className="flex flex-1 flex-col gap-2.5 border-t border-dashed border-border px-4 py-3">
+        {exams.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">No papers yet</p>
+        ) : !hasAnyCell ? (
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <FileTextIcon className="size-3.5 shrink-0" />
+            No sheets uploaded yet
+          </div>
+        ) : (
+          exams.map((ex) => (
+            <ExamMarkRow
+              key={ex.id}
+              exam={ex}
+              cell={cells?.[ex.id]}
+              onOpen={() => onOpenExam(ex.id)}
+            />
+          ))
         )}
       </div>
 
-      {/* Marks */}
+      {/* Footer — how much is graded, and the best paper */}
       {exams.length > 0 && (
-        <div className="flex flex-col gap-2.5 border-t pt-3">
-          {!hasAnyCell ? (
-            <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2.5">
-              <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
-              <p className="text-xs text-muted-foreground">
-                No exam sheets uploaded yet
-              </p>
-            </div>
-          ) : (
-            <>
-              <p className="text-[10px] font-medium tracking-wider text-muted-foreground/70 uppercase">
-                Exam marks
-              </p>
-              {exams.map((ex) => (
-                <ExamMarkRow
-                  key={ex.id}
-                  exam={ex}
-                  cell={cells?.[ex.id]}
-                  onOpen={() => onOpenExam(ex.id)}
-                />
-              ))}
-            </>
+        <div className="flex items-center justify-between gap-3 rounded-b-xl border-t border-border bg-sidebar/60 px-4 py-2 text-[11px] text-muted-foreground tabular-nums">
+          <span>
+            <span className="font-medium text-secondary-foreground">
+              {gradedCount}
+            </span>{" "}
+            of {exams.length} {exams.length === 1 ? "paper" : "papers"} graded
+          </span>
+          {best && (
+            <span className="flex min-w-0 items-center gap-1">
+              <TrophyIcon className="size-3 shrink-0" />
+              <span className="truncate">{tameCaps(best.name)}</span>
+            </span>
           )}
         </div>
       )}
@@ -459,94 +548,83 @@ function ExamMarkRow({
   onOpen: () => void
 }) {
   const graded = cell?.status === "graded"
-  const pct =
-    graded && exam.total_marks > 0
-      ? ((cell.final ?? 0) / exam.total_marks) * 100
-      : null
+  const grading = isGrading(cell)
+  const pct = cellPct(exam, cell)
 
   return (
-    <div>
-      <div className="flex items-center justify-between gap-3">
-        <button
-          onClick={onOpen}
-          title={`${exam.exam_name} · ${dayjs(exam.created_at).format("MMM D")} · ${exam.total_marks} marks`}
-          className="min-w-0 truncate text-left text-xs text-muted-foreground transition-colors hover:text-primary"
-        >
-          {exam.exam_name}
-        </button>
-
-        {!cell ? (
-          <span className="shrink-0 text-[11px] text-muted-foreground/50">
-            Not uploaded
-          </span>
-        ) : graded ? (
-          <span
-            className={cn(
-              "shrink-0 text-xs font-semibold tabular-nums",
-              TONE_TEXT[scoreTone(pct ?? 0)]
-            )}
+    <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_3.75rem] items-center gap-3">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen()
+            }}
+            className="min-w-0 truncate text-left text-xs text-secondary-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"
           >
-            {cell.final ?? 0}
-            <span className="font-normal text-muted-foreground">
-              /{exam.total_marks}
-            </span>
-          </span>
-        ) : (
-          <span
-            className={cn(
-              "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium",
-              cell.status === "uploaded" || cell.status === "processing"
-                ? "bg-blue-500/15 text-blue-700 dark:text-blue-400"
-                : "bg-amber-500/15 text-amber-700 dark:text-amber-400"
-            )}
-          >
-            {cell.status === "uploaded" || cell.status === "processing"
-              ? "Pending"
-              : cell.status}
-          </span>
-        )}
-      </div>
+            {tameCaps(exam.exam_name)}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {exam.exam_name} · {dayjs(exam.created_at).format("D MMM")} ·{" "}
+          {exam.total_marks} marks
+        </TooltipContent>
+      </Tooltip>
 
-      {pct != null && (
-        <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn("h-full", TONE_BAR[scoreTone(pct)])}
-            style={{ width: `${Math.min(100, pct)}%` }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Snapshot stat — mirrors the Metric block used on grading cards ────────
-
-function Stat({
-  label,
-  value,
-  sub,
-  tone = "ok",
-}: {
-  label: string
-  value: string
-  sub?: string
-  tone?: ReturnType<typeof scoreTone>
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+      {/* Meter */}
       <div
         className={cn(
-          "mt-0.5 text-lg leading-tight font-medium tabular-nums",
-          tone !== "ok" && TONE_TEXT[tone]
+          "h-1.5 overflow-hidden rounded-full",
+          !cell
+            ? "border border-dashed border-border"
+            : grading
+              ? "bg-violet-100 dark:bg-violet-900/40"
+              : "bg-muted"
         )}
       >
-        {value}
+        {pct != null && (
+          <div
+            className={cn(
+              "h-full rounded-full transition-[width] duration-700 ease-out",
+              TONE_BAR[scoreTone(pct)]
+            )}
+            style={{ width: `${Math.min(100, pct)}%` }}
+          />
+        )}
+        {grading && (
+          <div className="h-full w-1/3 animate-pulse rounded-full bg-violet-400" />
+        )}
       </div>
-      {sub && (
-        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-          {sub}
-        </div>
+
+      {/* Score */}
+      {!cell ? (
+        <span className="text-right text-[11px] text-muted-foreground/60">
+          —
+        </span>
+      ) : graded ? (
+        <span
+          className={cn(
+            "text-right text-xs font-semibold tabular-nums",
+            TONE_TEXT[scoreTone(pct ?? 0)]
+          )}
+        >
+          {cell.final ?? 0}
+          <span className="font-normal text-muted-foreground">
+            /{exam.total_marks}
+          </span>
+        </span>
+      ) : (
+        <span
+          className={cn(
+            "justify-self-end rounded-full px-1.5 py-px text-[10px] font-medium",
+            grading
+              ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+          )}
+        >
+          {grading ? "Grading" : tameCaps(cell.status)}
+        </span>
       )}
     </div>
   )

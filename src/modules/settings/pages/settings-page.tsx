@@ -1,35 +1,53 @@
-import { useRef, useState } from "react"
-import dayjs from "dayjs"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
+import { AnimatePresence } from "motion/react"
 import {
-  BadgeCheckIcon,
-  CalendarIcon,
-  CameraIcon,
-  KeyIcon,
-  Loader2Icon,
-  MailIcon,
-  PhoneIcon,
-  ShieldIcon,
-  UserIcon,
-} from "lucide-react"
-
-import { toast } from "sonner"
+  PaletteIcon,
+  ShieldCheckIcon,
+  UserCircleIcon,
+} from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
-import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
-import { useAppDispatch } from "@/store"
-import { updateUser } from "@/store/auth-slice"
+import { useAppSelector } from "@/store"
+import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Separator } from "@/components/ui/separator"
+  SettingsNav,
+  type SettingsSection,
+  type SettingsSectionId,
+} from "@/modules/settings/components/settings-nav"
+import { ProfileSection } from "@/modules/settings/components/profile-section"
+import { SecuritySection } from "@/modules/settings/components/security-section"
+import { AppearanceSection } from "@/modules/settings/components/appearance-section"
+
+const SECTIONS: SettingsSection[] = [
+  {
+    id: "profile",
+    label: "Profile",
+    hint: "Photo, name and contact",
+    icon: UserCircleIcon,
+  },
+  {
+    id: "security",
+    label: "Security",
+    hint: "Password",
+    icon: ShieldCheckIcon,
+  },
+  {
+    id: "appearance",
+    label: "Appearance",
+    hint: "Light, dark or system",
+    icon: PaletteIcon,
+  },
+]
+
+const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id))
+
+function isSectionId(v: string): v is SettingsSectionId {
+  return SECTION_IDS.has(v)
+}
 
 function getInitials(name: string) {
   return name
@@ -40,366 +58,148 @@ function getInitials(name: string) {
     .slice(0, 2)
 }
 
+/**
+ * Settings: a section rail on the left, one section at a time on the right.
+ * The open section lives in the URL hash (`/settings#security`) so a reload
+ * or a shared link lands on the same place, and the sections swap with a
+ * short rise so the change of subject is felt without a page flash.
+ */
 export function SettingsPage() {
   const { user } = useAuth()
-  const dispatch = useAppDispatch()
+  const school = useAppSelector((s) => s.school.school)
+  const location = useLocation()
+  const navigate = useNavigate()
 
-  const [fullName, setFullName] = useState(user?.full_name ?? "")
-  const [phone, setPhone] = useState(user?.phone_number ?? "")
-  const [designation] = useState(user?.designation ?? "")
-  const [dateOfJoining, setDateOfJoining] = useState<Date | undefined>(
-    user?.date_of_joining ? new Date(user.date_of_joining) : undefined,
+  const fromHash = location.hash.replace(/^#/, "")
+  const [active, setActive] = useState<SettingsSectionId>(
+    isSectionId(fromHash) ? fromHash : "profile"
   )
-  const [profileUrl, setProfileUrl] = useState(user?.profile_url ?? "")
-  const [previewSrc, setPreviewSrc] = useState(user?.profile_url ?? "")
 
-  const [isSaving, setIsSaving] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // Back/forward through hashes keeps the rail in step.
+  useEffect(() => {
+    const h = location.hash.replace(/^#/, "")
+    if (isSectionId(h) && h !== active) setActive(h)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.hash])
 
-  const [currentPassword, setCurrentPassword] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [isResetting, setIsResetting] = useState(false)
-
-  const handlePhotoUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setPreviewSrc(URL.createObjectURL(file))
-    setIsUploading(true)
-
-    try {
-      const formData = new FormData()
-      formData.append("image", file)
-
-      const token = localStorage.getItem("access_token")
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-
-      const res = await fetch(`${BASE_URL}/api/auth/upload-profile`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-
-      if (!res.ok) throw new Error("Upload failed")
-
-      const data = (await res.json()) as { preview_url: string }
-      setProfileUrl(data.preview_url)
-      setPreviewSrc(data.preview_url)
-      dispatch(updateUser({ profile_url: data.preview_url }))
-    } catch {
-      setPreviewSrc(profileUrl)
-      toast.error("Failed to upload photo. Please try again.")
-    } finally {
-      setIsUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ""
+  // Edge fades only where there is more to scroll to: a fade over content
+  // that is already fully in view just hides the card's border.
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ top: false, bottom: false })
+  const measure = useCallback(() => {
+    const el = scrollerRef.current
+    if (!el) return
+    const top = el.scrollTop > 2
+    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 2
+    setEdges((prev) =>
+      prev.top === top && prev.bottom === bottom ? prev : { top, bottom }
+    )
+  }, [])
+  useEffect(() => {
+    const el = scrollerRef.current
+    if (!el) return
+    // Content height changes as sections swap and animate in, and as the
+    // window resizes; the observer catches all of it without a resize handler.
+    const ro = new ResizeObserver(() => measure())
+    ro.observe(el)
+    for (const child of Array.from(el.children)) ro.observe(child)
+    const mo = new MutationObserver(() => {
+      for (const child of Array.from(el.children)) ro.observe(child)
+      measure()
+    })
+    mo.observe(el, { childList: true })
+    measure()
+    return () => {
+      ro.disconnect()
+      mo.disconnect()
     }
-  }
+  }, [measure, active])
 
-  const handleSaveProfile = async () => {
-    if (!user) return
-    setIsSaving(true)
-    try {
-      await apiClient.put(`/api/auth/teacher/${user.id}`, {
-        full_name: fullName,
-        designation: designation || undefined,
-        phone_number: phone || undefined,
-        date_of_joining: dateOfJoining
-          ? dayjs(dateOfJoining).valueOf()
-          : undefined,
-        profile_url: profileUrl || undefined,
-      })
-      dispatch(
-        updateUser({
-          full_name: fullName,
-          designation,
-          phone_number: phone,
-          date_of_joining: dateOfJoining
-            ? dayjs(dateOfJoining).valueOf()
-            : undefined,
-          profile_url: profileUrl,
-        }),
-      )
-      toast.success("Profile updated successfully")
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save profile",
-      )
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleResetPassword = async () => {
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters")
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match")
-      return
-    }
-
-    setIsResetting(true)
-    try {
-      await apiClient.post("/api/auth/change-password", {
-        current_password: currentPassword,
-        new_password: newPassword,
-      })
-      toast.success("Password changed successfully")
-      setCurrentPassword("")
-      setNewPassword("")
-      setConfirmPassword("")
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to change password",
-      )
-    } finally {
-      setIsResetting(false)
-    }
+  const select = (id: SettingsSectionId) => {
+    setActive(id)
+    navigate({ hash: id === "profile" ? "" : `#${id}` }, { replace: true })
   }
 
   if (!user) return null
 
   return (
-    <div className="flex min-h-full w-full flex-col">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
-        {/* Profile Card */}
-        <div className="flex flex-col gap-6 rounded-xl border bg-background p-6">
-          <div className="flex items-center gap-2">
-            <UserIcon className="size-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-secondary-foreground">
-              Profile
-            </h2>
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "flex h-full min-h-0 flex-col gap-6 lg:gap-8"
+      )}
+    >
+      {/* ── Page header: who this is ── */}
+      <header className="flex flex-wrap items-center gap-4">
+        <Avatar className="size-12 ring-2 ring-border">
+          {user.profile_url ? (
+            <img
+              src={user.profile_url}
+              alt=""
+              className="aspect-square size-full rounded-full object-cover"
+            />
+          ) : (
+            <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
+          )}
+        </Avatar>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
+              {user.full_name}
+            </h1>
+            {user.role ? (
+              <Badge variant="secondary" className="capitalize">
+                {user.role}
+              </Badge>
+            ) : null}
           </div>
-
-          {/* Avatar + Upload */}
-          <div className="flex items-center gap-5">
-            <div className="relative">
-              <Avatar className="size-20 ring-2 ring-muted">
-                {previewSrc ? (
-                  <img
-                    src={previewSrc}
-                    alt={user.full_name}
-                    className="aspect-square size-full rounded-full object-cover"
-                  />
-                ) : (
-                  <AvatarFallback className="text-xl">
-                    {getInitials(user.full_name)}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              {isUploading && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/60">
-                  <Loader2Icon className="size-5 animate-spin" />
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isUploading}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <CameraIcon className="size-4" />
-                {isUploading ? "Uploading..." : "Change Photo"}
-              </Button>
-              <p className="text-[11px] text-muted-foreground">
-                Recommended: 200 × 200px. JPG, PNG or WebP.
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={handlePhotoUpload}
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Form fields */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label>Full Name</Label>
-              <Input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Your name"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Email</Label>
-              <div className="relative">
-                <MailIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  value={user.email}
-                  disabled
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Phone Number</Label>
-              <div className="relative">
-                <PhoneIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Enter phone number"
-                  type="tel"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Designation</Label>
-              <div className="relative">
-                <BadgeCheckIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  value={designation}
-                  disabled
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Date of Joining</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dateOfJoining && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="size-4" />
-                    {dateOfJoining
-                      ? dayjs(dateOfJoining).format("MM/DD/YYYY")
-                      : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <div className="border-b p-3">
-                    <Input
-                      type="date"
-                      value={
-                        dateOfJoining
-                          ? dayjs(dateOfJoining).format("YYYY-MM-DD")
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const d = e.target.value
-                          ? new Date(e.target.value + "T00:00:00")
-                          : undefined
-                        setDateOfJoining(d)
-                      }}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <Calendar
-                    mode="single"
-                    selected={dateOfJoining}
-                    onSelect={(d) => setDateOfJoining(d)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Role</Label>
-              <div className="relative">
-                <ShieldIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-9 capitalize"
-                  value={user.role ?? ""}
-                  disabled
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Save button */}
-          <div>
-            <Button
-              disabled={isSaving || !fullName.trim()}
-              onClick={handleSaveProfile}
-            >
-              {isSaving && (
-                <Loader2Icon className="size-4 animate-spin" />
-              )}
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
+          <p className="truncate text-sm text-muted-foreground">
+            {[user.designation, school?.name].filter(Boolean).join(" · ") ||
+              user.email}
+          </p>
         </div>
+      </header>
 
-        {/* Change Password Card */}
-        <div className="flex flex-col gap-6 rounded-xl border bg-background p-6">
-          <div className="flex items-center gap-2">
-            <KeyIcon className="size-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-secondary-foreground">
-              Change Password
-            </h2>
-          </div>
+      {/* ── Rail + section ── */}
+      {/* Header and rail stay put; only the section column scrolls, so the
+          rail is always in reach and the save bar pins to this column's edge. */}
+      <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-10">
+        <aside className="lg:self-start">
+          <SettingsNav sections={SECTIONS} active={active} onChange={select} />
+        </aside>
 
-          <div className="flex max-w-sm flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label>Current Password</Label>
-              <Input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter current password"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>New Password</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label>Confirm New Password</Label>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-              />
-            </div>
-
-            <div>
-              <Button
-                disabled={
-                  isResetting ||
-                  !currentPassword ||
-                  !newPassword ||
-                  !confirmPassword
-                }
-                onClick={handleResetPassword}
-              >
-                {isResetting && (
-                  <Loader2Icon className="size-4 animate-spin" />
-                )}
-                {isResetting ? "Changing..." : "Change Password"}
-              </Button>
-            </div>
+        {/* The scroller. Fades at both ends say "there is more" without a
+            hard cut, and the gutter keeps the cards clear of the scrollbar. */}
+        <div className="relative min-h-0 min-w-0 lg:max-w-3xl">
+          <div
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-background to-transparent transition-opacity duration-200",
+              edges.top ? "opacity-100" : "opacity-0"
+            )}
+          />
+          <div
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-gradient-to-t from-background to-transparent transition-opacity duration-200",
+              edges.bottom ? "opacity-100" : "opacity-0"
+            )}
+          />
+          <div
+            ref={scrollerRef}
+            onScroll={measure}
+            className="h-full min-h-0 overflow-y-auto pr-4 pb-16 pl-1 [scrollbar-gutter:stable]"
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {active === "profile" ? (
+                <ProfileSection key="profile" user={user} />
+              ) : active === "security" ? (
+                <SecuritySection key="security" />
+              ) : (
+                <AppearanceSection key="appearance" />
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
