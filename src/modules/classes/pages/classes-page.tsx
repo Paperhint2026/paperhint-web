@@ -39,6 +39,7 @@ interface GroupedClassesResponse {
   classes: Record<string, ClassRecord[]>
   gradeSubjects?: Record<string, SubjectInfo[]>
   studentCounts?: Record<string, number>
+  active_academic_year?: string | null
 }
 
 function toGroupedGrades(
@@ -115,6 +116,9 @@ export function ClassesPage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [grades, setGrades] = useState<GroupedGrade[]>([])
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string | null>(
+    null
+  )
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
@@ -145,6 +149,7 @@ export function ClassesPage() {
       setGrades(
         toGroupedGrades(res.classes ?? {}, res.gradeSubjects, res.studentCounts)
       )
+      setActiveAcademicYear(res.active_academic_year ?? null)
     } catch (err) {
       if (err instanceof Error && err.message !== "Unauthorized") {
         setError(err.message)
@@ -311,6 +316,7 @@ export function ClassesPage() {
               <ClassCard
                 key={grade.grade}
                 data={grade}
+                activeAcademicYear={activeAcademicYear}
                 onClick={() => navigate(`/classes/${grade.grade}/overview`)}
               />
             ))}

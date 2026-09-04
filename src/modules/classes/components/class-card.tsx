@@ -32,9 +32,14 @@ export interface GroupedGrade {
 interface ClassCardProps {
   data: GroupedGrade
   onClick?: () => void
+  /** The school's active academic year — decides the Current/Previous badge.
+   *  Null hides the badge (year not set yet). */
+  activeAcademicYear?: string | null
 }
 
-export function ClassCard({ data, onClick }: ClassCardProps) {
+export function ClassCard({ data, onClick, activeAcademicYear }: ClassCardProps) {
+  const isCurrent =
+    activeAcademicYear != null && data.academicYear === activeAcademicYear
   const subjects = data.subjects ?? []
   const palette = coverFor(data.grade)
 
@@ -63,10 +68,24 @@ export function ClassCard({ data, onClick }: ClassCardProps) {
             <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
               {data.academicYear}
             </span>
-            <span className="flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-              <span className="size-1.5 rounded-full bg-white" />
-              Current batch
-            </span>
+            {activeAcademicYear != null && (
+              <span
+                className={
+                  "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur-sm " +
+                  (isCurrent
+                    ? "bg-white/20 text-white"
+                    : "bg-black/25 text-white/90")
+                }
+              >
+                <span
+                  className={
+                    "size-1.5 rounded-full " +
+                    (isCurrent ? "bg-white" : "bg-amber-300")
+                  }
+                />
+                {isCurrent ? "Current batch" : "Previous batch"}
+              </span>
+            )}
           </div>
 
           <p className="text-xl font-semibold tracking-tight text-white drop-shadow-sm">

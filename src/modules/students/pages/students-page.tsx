@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { differenceInYears } from "date-fns"
 import {
+  ArrowsLeftRightIcon,
   ArrowsSplitIcon,
   CaretLeftIcon,
   CaretRightIcon,
@@ -15,8 +16,19 @@ import {
   PencilIcon,
   PhoneIcon,
   PlusIcon,
+  SignOutIcon,
   TrashIcon,
 } from "@phosphor-icons/react"
+import { toast } from "sonner"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   FilterChip,
   FilterChipGroup,
@@ -55,6 +67,7 @@ import {
   AddStudentDrawer,
   type StudentEntry,
   type ElectiveChoice,
+  type StudentFieldError,
 } from "@/modules/students/components/add-student-drawer"
 import { StudentDetailDrawer } from "@/modules/students/components/student-detail-drawer"
 import {
@@ -184,6 +197,9 @@ export function StudentsPage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveFieldError, setSaveFieldError] = useState<StudentFieldError | null>(
+    null
+  )
 
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
@@ -193,6 +209,15 @@ export function StudentsPage() {
   const [studentToDelete, setStudentToDelete] =
     useState<StudentWithClass | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const [studentToTransfer, setStudentToTransfer] =
+    useState<StudentWithClass | null>(null)
+  const [transferTargetId, setTransferTargetId] = useState("")
+  const [isTransferring, setIsTransferring] = useState(false)
+
+  const [studentToWithdraw, setStudentToWithdraw] =
+    useState<StudentWithClass | null>(null)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   const [editStudentId, setEditStudentId] = useState<string | null>(null)
   const [editInitialData, setEditInitialData] = useState<StudentEntry | null>(
@@ -416,9 +441,17 @@ export function StudentsPage() {
       await saveElectiveChoices(res.student.id, entry.elective_choices)
 
       setDrawerOpen(false)
+      setSaveFieldError(null)
       await fetchAll()
     } catch (err) {
-      console.error("Failed to create student:", err)
+      if (err instanceof Error) {
+        const field = (err as Error & { field?: string }).field
+        if (field) {
+          setSaveFieldError({ field, message: err.message })
+        } else {
+          toast.error(err.message)
+        }
+      }
     } finally {
       setIsSaving(false)
     }
@@ -518,11 +551,55 @@ export function StudentsPage() {
 
       setEditStudentId(null)
       setEditInitialData(null)
+      setSaveFieldError(null)
       await fetchAll()
     } catch (err) {
-      console.error("Failed to update student:", err)
+      if (err instanceof Error) {
+        const field = (err as Error & { field?: string }).field
+        if (field) {
+          setSaveFieldError({ field, message: err.message })
+        } else {
+          toast.error(err.message)
+        }
+      }
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleConfirmTransfer = async () => {
+    if (!studentToTransfer || !transferTargetId) return
+    setIsTransferring(true)
+    try {
+      await apiClient.post(
+        `/api/batches/students/${studentToTransfer.id}/transfer`,
+        { target_class_id: transferTargetId }
+      )
+      toast.success(`${studentToTransfer.full_name} transferred`)
+      setStudentToTransfer(null)
+      setTransferTargetId("")
+      await fetchAll()
+    } catch (err) {
+      if (err instanceof Error) toast.error(err.message)
+    } finally {
+      setIsTransferring(false)
+    }
+  }
+
+  const handleConfirmWithdraw = async () => {
+    if (!studentToWithdraw) return
+    setIsWithdrawing(true)
+    try {
+      await apiClient.post(
+        `/api/batches/students/${studentToWithdraw.id}/withdraw`
+      )
+      toast.success(`${studentToWithdraw.full_name} withdrawn`)
+      setStudentToWithdraw(null)
+      await fetchAll()
+    } catch (err) {
+      if (err instanceof Error) toast.error(err.message)
+    } finally {
+      setIsWithdrawing(false)
     }
   }
 
@@ -978,6 +1055,24 @@ export function StudentsPage() {
                                   <PencilIcon className="size-3.5" />
                                   Edit
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    setTransferTargetId("")
+                                    setStudentToTransfer(student)
+                                  }}
+                                >
+                                  <ArrowsLeftRightIcon className="size-3.5" />
+                                  Transfer class
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={(e) => {
+                                    e.preventDefault()
+                                    setStudentToWithdraw(student)
+                                  }}
+                                >
+                                  <SignOutIcon className="size-3.5" />
+                                  Withdraw
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   variant="destructive"
@@ -1006,10 +1101,14 @@ export function StudentsPage() {
       {isAdmin && (
         <AddStudentDrawer
           open={drawerOpen}
-          onOpenChange={setDrawerOpen}
+          onOpenChange={(open) => {
+            setDrawerOpen(open)
+            if (!open) setSaveFieldError(null)
+          }}
           onSave={handleSaveStudents}
           classes={classes}
           isSaving={isSaving}
+          serverError={saveFieldError}
         />
       )}
 
@@ -1020,6 +1119,7 @@ export function StudentsPage() {
             if (!open) {
               setEditStudentId(null)
               setEditInitialData(null)
+              setSaveFieldError(null)
             }
           }}
           onSave={handleUpdateStudent}
@@ -1027,6 +1127,7 @@ export function StudentsPage() {
           isSaving={isSaving}
           mode="edit"
           initialData={editInitialData}
+          serverError={saveFieldError}
         />
       )}
 
@@ -1044,6 +1145,120 @@ export function StudentsPage() {
           fetchAll()
         }}
       />
+
+      {/* Transfer class */}
+      <Dialog
+        open={!!studentToTransfer}
+        onOpenChange={(open) => {
+          if (!open) {
+            setStudentToTransfer(null)
+            setTransferTargetId("")
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Transfer student</DialogTitle>
+            <DialogDescription>
+              Move{" "}
+              <span className="font-medium text-foreground">
+                {studentToTransfer?.full_name}
+              </span>{" "}
+              from Grade {studentToTransfer?.grade} -{" "}
+              {studentToTransfer?.section} to another class. Their history is
+              preserved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-1.5 px-6 py-4">
+            <Label className="text-xs">Target class</Label>
+            <Select
+              value={transferTargetId || undefined}
+              onValueChange={setTransferTargetId}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select class…" />
+              </SelectTrigger>
+              <SelectContent>
+                {classes
+                  .filter((c) => c.id !== studentToTransfer?.class_id)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      Grade {c.grade} - {c.section} ({c.academic_year})
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setStudentToTransfer(null)}
+              disabled={isTransferring}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmTransfer}
+              disabled={isTransferring || !transferTargetId}
+            >
+              {isTransferring ? (
+                <>
+                  <CircleNotchIcon className="size-3.5 animate-spin" />
+                  Transferring…
+                </>
+              ) : (
+                <>
+                  <ArrowsLeftRightIcon className="size-3.5" />
+                  Transfer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw */}
+      <AlertDialog
+        open={!!studentToWithdraw}
+        onOpenChange={(open) => !open && setStudentToWithdraw(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Withdraw student?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium text-foreground">
+                {studentToWithdraw?.full_name}
+              </span>{" "}
+              will be removed from their class and marked as withdrawn. Their
+              records, marks, and history are kept — this is not a delete.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isWithdrawing}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmWithdraw()
+              }}
+              disabled={isWithdrawing}
+            >
+              {isWithdrawing ? (
+                <>
+                  <CircleNotchIcon className="size-3.5 animate-spin" />
+                  Withdrawing…
+                </>
+              ) : (
+                <>
+                  <SignOutIcon className="size-3.5" />
+                  Withdraw
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!studentToDelete}

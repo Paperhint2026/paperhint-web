@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
+  ArchiveIcon,
   BookOpenIcon,
   BooksIcon,
   ChalkboardIcon,
@@ -113,6 +114,17 @@ export function AppSidebar() {
       isActive: isActivePath("/students"),
       onClick: () => handleNav("/students"),
     },
+    // Batch management is an admin-only, structural operation
+    ...(!isTeacher
+      ? [
+          {
+            title: "Batches",
+            icon: ArchiveIcon,
+            isActive: isActivePath("/batches"),
+            onClick: () => handleNav("/batches"),
+          },
+        ]
+      : []),
   ]
 
   const libraryItems = [

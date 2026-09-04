@@ -9,6 +9,10 @@ import {
   XIcon,
 } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
+import {
+  getCurrentAcademicYear,
+  validateAcademicYear,
+} from "@/lib/academic-year"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -53,16 +57,6 @@ export interface AddClassDrawerProps {
   availableSubjects: { value: string; label: string }[]
   existingGrades?: number[]
   isSaving?: boolean
-}
-
-function getCurrentAcademicYear() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
-  if (month >= 5) {
-    return `${year}-${year + 1}`
-  }
-  return `${year - 1}-${year}`
 }
 
 const emptyForm: ClassFormData = {
@@ -206,7 +200,7 @@ export function AddClassDrawer({
         s.name.trim() !== "" &&
         (s.subjects.length > 0 || s.electives.length > 0)
     ) &&
-    form.academicYear.trim() !== "" &&
+    validateAcademicYear(form.academicYear) === null &&
     form.sections.every((s) =>
       s.electives.every(
         (g) => g.groupName.trim() !== "" && g.subjectIds.length >= 2
@@ -468,9 +462,16 @@ export function AddClassDrawer({
                     }))
                   }
                 />
-                <p className="text-xs text-muted-foreground">
-                  Pre-filled with the current school year. Edit if needed.
-                </p>
+                {form.academicYear.trim() !== "" &&
+                validateAcademicYear(form.academicYear) ? (
+                  <p className="text-xs text-destructive">
+                    {validateAcademicYear(form.academicYear)}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Pre-filled with the current school year. Edit if needed.
+                  </p>
+                )}
               </div>
             </div>
           </div>

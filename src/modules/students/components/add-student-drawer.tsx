@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { format } from "date-fns"
 import { CalendarIcon, CircleNotchIcon, XIcon } from "@phosphor-icons/react"
 import { apiClient } from "@/lib/api-client"
+import {
+  getCurrentAcademicYear,
+  validateAcademicYear,
+} from "@/lib/academic-year"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -56,6 +60,11 @@ export interface StudentEntry {
   elective_choices?: ElectiveChoice[]
 }
 
+export interface StudentFieldError {
+  field: string
+  message: string
+}
+
 interface AddStudentDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -64,6 +73,8 @@ interface AddStudentDrawerProps {
   isSaving?: boolean
   mode?: "create" | "edit"
   initialData?: StudentEntry | null
+  /** A save error the server pinned to one field — highlighted and scrolled to. */
+  serverError?: StudentFieldError | null
 }
 
 interface ElectiveGroupOption {
@@ -90,7 +101,7 @@ const emptyEntry: StudentEntry = {
   gender: "",
   blood_group: "",
   admission_number: "",
-  academic_year: "",
+  academic_year: getCurrentAcademicYear(),
   grade: "",
   section: "",
   roll_number: "",
@@ -115,23 +126,45 @@ export function AddStudentDrawer({
   isSaving = false,
   mode = "create",
   initialData = null,
+  serverError = null,
 }: AddStudentDrawerProps) {
   const isMobile = useIsMobile()
   const [entry, setEntry] = useState<StudentEntry>({ ...emptyEntry })
+  const [fieldError, setFieldError] = useState<StudentFieldError | null>(null)
+  const errorFieldRef = useRef<HTMLDivElement | null>(null)
   const [electiveGroups, setElectiveGroups] = useState<ElectiveGroup[]>([])
   const [isLoadingElectives, setIsLoadingElectives] = useState(false)
 
   useEffect(() => {
     if (open) {
       setEntry(initialData ? { ...initialData } : { ...emptyEntry })
+      setFieldError(null)
     }
   }, [open, initialData])
+
+  // A failed save hands back the field it died on; show it and bring it
+  // into view — the form is long and the field is often scrolled away.
+  useEffect(() => {
+    setFieldError(serverError ?? null)
+    if (serverError) {
+      requestAnimationFrame(() => {
+        errorFieldRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        })
+      })
+    }
+  }, [serverError])
 
   const isEdit = mode === "edit"
 
   const update = (field: keyof StudentEntry, value: string | number | "") => {
     setEntry((prev) => ({ ...prev, [field]: value }))
+    setFieldError((prev) => (prev?.field === field ? null : prev))
   }
+
+  const errorFor = (field: keyof StudentEntry) =>
+    fieldError?.field === field ? fieldError.message : null
 
   const gradeOptions = useMemo(
     () =>
@@ -234,6 +267,7 @@ export function AddStudentDrawer({
     entry.full_name.trim() !== "" &&
     entry.date_of_birth !== "" &&
     entry.gender !== "" &&
+    validateAcademicYear(entry.academic_year) === null &&
     electiveGroups.every((g) => getSelectedElective(g.elective_group_id) !== "")
 
   const handleSave = () => {
@@ -389,13 +423,27 @@ export function AddStudentDrawer({
               Academic Details
             </p>
 
-            <div className="flex flex-col gap-1.5">
+            <div
+              ref={errorFor("admission_number") ? errorFieldRef : undefined}
+              className="flex flex-col gap-1.5"
+            >
               <Label className="text-sm">Admission Number</Label>
               <Input
                 placeholder="e.g. ADM2024001"
+                aria-invalid={!!errorFor("admission_number")}
+                className={
+                  errorFor("admission_number")
+                    ? "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/30"
+                    : undefined
+                }
                 value={entry.admission_number}
                 onChange={(e) => update("admission_number", e.target.value)}
               />
+              {errorFor("admission_number") && (
+                <p className="text-xs text-destructive">
+                  {errorFor("admission_number")}
+                </p>
+              )}
             </div>
 
             {/* Grade + Section — 2 col */}
@@ -498,34 +546,72 @@ export function AddStudentDrawer({
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">Academic Year</Label>
               <Input
-                placeholder="e.g. 2024–2025"
+                placeholder="e.g. 2026-2027"
                 value={entry.academic_year}
                 onChange={(e) => update("academic_year", e.target.value)}
               />
+              {entry.academic_year.trim() !== "" &&
+              validateAcademicYear(entry.academic_year) ? (
+                <p className="text-xs text-destructive">
+                  {validateAcademicYear(entry.academic_year)}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Pre-filled with the current school year. Edit if needed.
+                </p>
+              )}
             </div>
 
             {/* Roll Number + Register Number — 2 col */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
+              <div
+                ref={errorFor("roll_number") ? errorFieldRef : undefined}
+                className="flex flex-col gap-1.5"
+              >
                 <Label className="text-sm">Roll Number</Label>
                 <Input
                   type="number"
                   min={1}
                   placeholder="e.g. 1"
+                  aria-invalid={!!errorFor("roll_number")}
+                  className={
+                    errorFor("roll_number")
+                      ? "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/30"
+                      : undefined
+                  }
                   value={entry.roll_number}
                   onChange={(e) => {
                     const val = e.target.value
                     update("roll_number", val === "" ? "" : parseInt(val, 10))
                   }}
                 />
+                {errorFor("roll_number") && (
+                  <p className="text-xs text-destructive">
+                    {errorFor("roll_number")}
+                  </p>
+                )}
               </div>
-              <div className="flex flex-col gap-1.5">
+              <div
+                ref={errorFor("register_number") ? errorFieldRef : undefined}
+                className="flex flex-col gap-1.5"
+              >
                 <Label className="text-sm">Register Number</Label>
                 <Input
                   placeholder="e.g. REG2024001"
+                  aria-invalid={!!errorFor("register_number")}
+                  className={
+                    errorFor("register_number")
+                      ? "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/30"
+                      : undefined
+                  }
                   value={entry.register_number}
                   onChange={(e) => update("register_number", e.target.value)}
                 />
+                {errorFor("register_number") && (
+                  <p className="text-xs text-destructive">
+                    {errorFor("register_number")}
+                  </p>
+                )}
               </div>
             </div>
 

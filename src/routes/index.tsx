@@ -12,6 +12,7 @@ import { ClassHomePage } from "@/modules/classes/pages/class-home-page"
 import { TeachersPage } from "@/modules/teachers/pages/teachers-page"
 import { TeacherOverviewPage } from "@/modules/teachers/pages/teacher-overview-page"
 import { StudentsPage } from "@/modules/students/pages/students-page"
+import { BatchesPage } from "@/modules/batches/pages/batches-page"
 import { ClassStudentsMarksPage } from "@/modules/students/pages/class-students-marks-page"
 import { KnowledgePage } from "@/modules/knowledge/pages/knowledge-page"
 import { LibraryPage } from "@/modules/knowledge/pages/library-page"
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
           { path: "teachers", element: <TeachersPage /> },
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },
+          { path: "batches", element: <BatchesPage /> },
           { path: "library", element: <LibraryPage /> },
           { path: "library/bank", element: <BankPage /> },
 

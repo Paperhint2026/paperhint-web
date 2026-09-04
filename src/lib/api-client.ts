@@ -44,7 +44,13 @@ async function request<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
-    throw new Error(error.message || error.error || `Request failed: ${response.status}`)
+    const err = new Error(
+      error.message || error.error || `Request failed: ${response.status}`
+    ) as Error & { field?: string }
+    // Some endpoints name the form field a validation error belongs to, so
+    // forms can highlight it instead of only toasting.
+    if (typeof error.field === "string") err.field = error.field
+    throw err
   }
 
   return response.json() as Promise<T>
