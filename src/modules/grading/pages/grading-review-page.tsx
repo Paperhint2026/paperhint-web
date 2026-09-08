@@ -6,6 +6,9 @@ import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import rehypeRaw from "rehype-raw"
+import rehypeSanitize from "rehype-sanitize"
+
+import { sanitizeSchema } from "@/lib/markdown-sanitize"
 import "katex/dist/katex.min.css"
 import {
   ArrowLeftIcon,
@@ -85,7 +88,7 @@ interface SubmissionData {
 }
 
 const MD_REMARK = [remarkGfm, remarkMath]
-const MD_REHYPE = [rehypeKatex, rehypeRaw]
+const MD_REHYPE: import("unified").PluggableList = [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]
 
 function initialsOf(name: string) {
   return name

@@ -17,6 +17,9 @@ import "katex/dist/katex.min.css"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
 import rehypeRaw from "rehype-raw"
+import rehypeSanitize from "rehype-sanitize"
+
+import { sanitizeSchema } from "@/lib/markdown-sanitize"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import { toast } from "sonner"
@@ -621,7 +624,7 @@ export function QuestionsPage() {
                                     >
                                       <ReactMarkdown
                                         remarkPlugins={[remarkMath, remarkGfm]}
-                                        rehypePlugins={[rehypeRaw, rehypeKatex]}
+                                        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
                                       >
                                         {q.question_text}
                                       </ReactMarkdown>

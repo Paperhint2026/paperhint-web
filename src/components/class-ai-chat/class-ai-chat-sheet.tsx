@@ -20,6 +20,9 @@ import {
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
 import rehypeRaw from "rehype-raw"
+import rehypeSanitize from "rehype-sanitize"
+
+import { sanitizeSchema } from "@/lib/markdown-sanitize"
 import remarkBreaks from "remark-breaks"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -742,7 +745,7 @@ function AnswerMarkdown({ content }: { content: string }) {
     <div className="prose prose-sm dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted prose-pre:text-foreground max-w-none [&_svg]:h-auto [&_svg]:max-w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
-        rehypePlugins={[rehypeRaw, rehypeKatex]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
         components={{
           table: ({ children, ...props }) => (
             <div className="my-3 overflow-x-auto rounded-lg border border-border">
