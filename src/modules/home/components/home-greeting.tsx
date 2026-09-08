@@ -54,7 +54,7 @@ export function HomeGreeting({
             </em>
           </h1>
           {summary ? (
-            <p className="text-sm text-muted-foreground">{summary}</p>
+            <div className="text-sm text-muted-foreground">{summary}</div>
           ) : null}
         </div>
       </div>

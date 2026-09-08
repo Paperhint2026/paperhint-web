@@ -4,6 +4,7 @@ import {
   ArchiveIcon,
   BookOpenIcon,
   BooksIcon,
+  CalendarDotsIcon,
   ChalkboardIcon,
   ExamIcon,
   GraduationCapIcon,
@@ -11,6 +12,7 @@ import {
   IdentificationCardIcon,
   ListChecksIcon,
   SparkleIcon,
+  TableIcon,
   UsersIcon,
 } from "@phosphor-icons/react"
 import { useAuth } from "@/lib/auth"
@@ -113,6 +115,20 @@ export function AppSidebar() {
       icon: GraduationCapIcon,
       isActive: isActivePath("/students"),
       onClick: () => handleNav("/students"),
+    },
+    {
+      title: "Calendar",
+      icon: CalendarDotsIcon,
+      isActive: isActivePath("/calendar"),
+      onClick: () => handleNav("/calendar"),
+    },
+    // Admins get the builder; teachers get their read-only My Schedule +
+    // class timetables on the same route.
+    {
+      title: "Timetable",
+      icon: TableIcon,
+      isActive: isActivePath("/timetable"),
+      onClick: () => handleNav("/timetable"),
     },
     // Batch management is an admin-only, structural operation
     ...(!isTeacher

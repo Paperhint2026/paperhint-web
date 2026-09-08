@@ -94,6 +94,17 @@ interface TeacherOverview {
   assignments: Assignment[]
   classes: ClassInfo[]
   subjects: SubjectInfo[]
+  custom_duties?: {
+    label: string
+    class: {
+      id: string
+      grade: number
+      section: string
+      academic_year: string
+    } | null
+    periods_per_week: number
+  }[]
+  total_custom_periods?: number
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -589,7 +600,8 @@ export function TeacherDetailDrawer({
                       Classes & subjects
                     </SectionHeading>
 
-                    {byGrade.length === 0 ? (
+                    {byGrade.length === 0 &&
+                    (teacher.custom_duties?.length ?? 0) === 0 ? (
                       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border px-4 py-8 text-center">
                         <Sticker name="sleep" size={72} />
                         <div className="flex flex-col gap-0.5">
@@ -613,7 +625,7 @@ export function TeacherDetailDrawer({
                           </Button>
                         )}
                       </div>
-                    ) : (
+                    ) : byGrade.length === 0 ? null : (
                       <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                         {byGrade.map((row) => {
                           const sections = [...row.sections].sort()
@@ -679,6 +691,40 @@ export function TeacherDetailDrawer({
                           )
                         })}
                       </div>
+                    )}
+
+                    {(teacher.custom_duties?.length ?? 0) > 0 && (
+                      <>
+                        <SectionHeading
+                          hint={`${teacher.total_custom_periods ?? 0}/wk`}
+                        >
+                          Timetable duties
+                        </SectionHeading>
+                        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+                          {teacher.custom_duties!.map((d, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-3 px-4 py-2.5"
+                            >
+                              <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                                {d.label}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {d.class
+                                  ? `Grade ${d.class.grade} - ${d.class.section}`
+                                  : "—"}
+                              </span>
+                              <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                                {d.periods_per_week}/wk
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Custom periods (PT, Art, Library…) assigned directly
+                          on section timetables.
+                        </p>
+                      </>
                     )}
                   </motion.div>
 

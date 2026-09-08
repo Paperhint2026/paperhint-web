@@ -10,12 +10,14 @@ import {
   ChalkboardTeacherIcon,
   MagnifyingGlassIcon,
   BookOpenIcon,
+  TableIcon,
   UsersIcon,
   XIcon,
   type Icon,
 } from "@phosphor-icons/react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useAuth } from "@/lib/auth"
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { tameCaps } from "@/lib/format"
@@ -247,9 +249,9 @@ export function GradeOverviewSheet({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [sectionId, setSectionId] = useState<string | null>(null)
-  const [tab, setTab] = useState<"subjects" | "students" | "teachers">(
-    "subjects"
-  )
+  const [tab, setTab] = useState<
+    "subjects" | "students" | "teachers" | "timetable"
+  >("subjects")
   const [query, setQuery] = useState("")
   // A person opened from the roster — shown in a second sheet stacked on
   // this one, so closing it lands back on the grade rather than the grid.
@@ -258,6 +260,46 @@ export function GradeOverviewSheet({
     id: string
   } | null>(null)
   const personOpen = person !== null
+
+  // Timetable tab — lazy: fetched only when the tab is opened for a section,
+  // then cached per section id for the life of the sheet.
+  const { user } = useAuth()
+  const isAdmin = user?.role === "admin"
+  const [ttPeriods, setTtPeriods] = useState<TtPeriod[] | null>(null)
+  const [ttBySection, setTtBySection] = useState<
+    Record<string, "loading" | TtData>
+  >({})
+
+  useEffect(() => {
+    if (tab !== "timetable" || !sectionId || ttBySection[sectionId]) return
+    const id = sectionId
+    setTtBySection((prev) => ({ ...prev, [id]: "loading" }))
+    Promise.all([
+      ttPeriods
+        ? Promise.resolve(null)
+        : apiClient.get<{ periods: TtPeriod[] }>("/api/timetable/periods"),
+      apiClient.get<TtData>(`/api/timetable/${id}`),
+    ])
+      .then(([p, t]) => {
+        if (p) setTtPeriods(p.periods ?? [])
+        setTtBySection((prev) => ({
+          ...prev,
+          [id]: {
+            slots: t.slots ?? [],
+            subjects: t.subjects ?? [],
+            teachers: t.teachers ?? [],
+          },
+        }))
+      })
+      .catch(() => {
+        setTtBySection((prev) => {
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, sectionId, ttBySection, ttPeriods])
 
   const fetchOverview = useCallback(async () => {
     if (!grade) return
@@ -557,6 +599,16 @@ export function GradeOverviewSheet({
                           icon: ChalkboardTeacherIcon,
                           count: (section?.teachers ?? []).length,
                         },
+                        {
+                          key: "timetable",
+                          label: "Timetable",
+                          icon: TableIcon,
+                          count:
+                            section &&
+                            typeof ttBySection[section.id] === "object"
+                              ? (ttBySection[section.id] as TtData).slots.length
+                              : 0,
+                        },
                       ] as const
                     ).map((t) => {
                       const on = tab === t.key
@@ -667,6 +719,17 @@ export function GradeOverviewSheet({
                             No sections in this grade yet.
                           </p>
                         </div>
+                      ) : tab === "timetable" ? (
+                        <SectionTimetableView
+                          sectionLabel={section.section}
+                          data={ttBySection[section.id]}
+                          periods={ttPeriods}
+                          isAdmin={isAdmin}
+                          onOpenBuilder={() => {
+                            onOpenChange(false)
+                            navigate(`/timetable?class=${section.id}`)
+                          }}
+                        />
                       ) : (
                         <>
                           <div className="relative">
@@ -821,5 +884,164 @@ export function GradeOverviewSheet({
         canManage={false}
       />
     </Sheet>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Timetable tab — a compact read-only week for the picked section. Empty →
+// admins get a one-click jump into the builder with this section selected.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TtPeriod {
+  id: string
+  period_number: number
+  name: string
+  is_break: boolean
+}
+
+interface TtData {
+  slots: {
+    day_of_week: number
+    period_id: string
+    kind: string
+    class_subject_id: string | null
+    custom_label: string | null
+    elective_label: string | null
+    teacher_id: string | null
+  }[]
+  subjects: { class_subject_id: string; subject_name: string }[]
+  teachers: { id: string; full_name: string }[]
+}
+
+const TT_DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+function SectionTimetableView({
+  sectionLabel,
+  data,
+  periods,
+  isAdmin,
+  onOpenBuilder,
+}: {
+  sectionLabel: string
+  data: "loading" | TtData | undefined
+  periods: TtPeriod[] | null
+  isAdmin: boolean
+  onOpenBuilder: () => void
+}) {
+  if (!data || data === "loading" || !periods) {
+    return <Skeleton className="h-48 w-full rounded-xl" />
+  }
+
+  if (data.slots.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <Sticker name="point" size={100} />
+        <p className="text-sm text-muted-foreground">
+          No timetable for Section {sectionLabel} yet.
+        </p>
+        {isAdmin && (
+          <Button size="sm" className="rounded-full" onClick={onOpenBuilder}>
+            Create timetable
+            <ArrowRightIcon className="size-3.5" />
+          </Button>
+        )}
+      </div>
+    )
+  }
+
+  const teachable = periods
+    .filter((p) => !p.is_break)
+    .sort((a, b) => a.period_number - b.period_number)
+  const subjectName = new Map(
+    data.subjects.map((s) => [s.class_subject_id, s.subject_name])
+  )
+  const teacherName = new Map(data.teachers.map((t) => [t.id, t.full_name]))
+  const byCell = new Map(
+    data.slots.map((sl) => [`${sl.day_of_week}|${sl.period_id}`, sl])
+  )
+  const days = [...new Set(data.slots.map((s) => s.day_of_week))].sort(
+    (a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b)
+  )
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full border-collapse text-[11px]">
+          <thead>
+            <tr className="bg-sidebar">
+              <th className="sticky left-0 z-10 w-12 border-b border-border bg-sidebar px-2 py-1.5 text-left font-medium text-muted-foreground after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border">
+                Day
+              </th>
+              {teachable.map((p) => (
+                <th
+                  key={p.id}
+                  className="min-w-16 border-b border-l border-border px-1 py-1.5 text-center font-medium text-muted-foreground"
+                >
+                  P{p.period_number}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((d) => (
+              <tr key={d}>
+                <td className="sticky left-0 z-10 border-b border-border bg-background px-2 py-1.5 font-medium text-secondary-foreground after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border">
+                  {TT_DAY_SHORT[d]}
+                </td>
+                {teachable.map((p) => {
+                  const sl = byCell.get(`${d}|${p.id}`)
+                  if (!sl) {
+                    return (
+                      <td
+                        key={p.id}
+                        className="border-b border-l border-border px-1 py-1.5 text-center text-muted-foreground/30"
+                      >
+                        ·
+                      </td>
+                    )
+                  }
+                  const label =
+                    sl.kind === "subject"
+                      ? subjectName.get(sl.class_subject_id ?? "") ?? "Subject"
+                      : sl.kind === "custom"
+                        ? sl.custom_label
+                        : sl.elective_label
+                  const teacher = sl.teacher_id
+                    ? teacherName.get(sl.teacher_id)
+                    : null
+                  return (
+                    <td
+                      key={p.id}
+                      className="border-b border-l border-border px-1 py-1.5 text-center align-middle"
+                      title={teacher ? `${label} — ${teacher}` : label ?? ""}
+                    >
+                      <span className="block truncate font-medium text-secondary-foreground">
+                        {label}
+                      </span>
+                      {teacher && (
+                        <span className="block truncate text-[9px] text-muted-foreground">
+                          {teacher}
+                        </span>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {isAdmin && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-end rounded-full"
+          onClick={onOpenBuilder}
+        >
+          Open in builder
+          <ArrowRightIcon className="size-3.5" />
+        </Button>
+      )}
+    </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
 import {
   BriefcaseIcon,
   CircleNotchIcon,
@@ -428,8 +429,12 @@ export function TeachersPage() {
       setEditData(null)
       setEditTeacherId(null)
       fetchTeachers()
+      toast.success(editTeacherId ? "Teacher updated" : "Teacher added")
     } catch (err) {
       console.error("Failed to save teacher:", err)
+      // surface the API error (e.g. "email already registered") — the drawer
+      // stays open with the form intact so the admin can correct and retry
+      toast.error(err instanceof Error ? err.message : "Failed to save teacher")
     } finally {
       setIsSaving(false)
     }

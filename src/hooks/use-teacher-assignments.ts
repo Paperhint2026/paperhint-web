@@ -33,7 +33,13 @@ export function useTeacherAssignments() {
   const [isLoading, setIsLoading] = useState(!cachedAssignments || cacheUserId !== user?.id)
 
   const fetchAssignments = useCallback(async () => {
-    if (!user) return
+    // The overview endpoint is teacher-scoped (.single() on role='teacher'),
+    // so calling it as an admin 500s with a coercion error. Admins have no
+    // class assignments anyway.
+    if (!user || user.role !== "teacher") {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     try {
       const res = await apiClient.get<{ teacher: TeacherOverview }>(
@@ -51,7 +57,11 @@ export function useTeacherAssignments() {
   }, [user])
 
   useEffect(() => {
-    if (user && (cacheUserId !== user.id || !cachedAssignments)) {
+    if (
+      user &&
+      user.role === "teacher" &&
+      (cacheUserId !== user.id || !cachedAssignments)
+    ) {
       fetchAssignments()
     }
   }, [user, fetchAssignments])

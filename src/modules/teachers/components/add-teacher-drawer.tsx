@@ -13,6 +13,9 @@ import {
   XIcon,
 } from "@phosphor-icons/react"
 import { format } from "date-fns"
+import { toast } from "sonner"
+
+import { apiClient } from "@/lib/api-client"
 
 import {
   AlertDialog,
@@ -138,6 +141,50 @@ export function AddTeacherDrawer({
   const [confirmDisassociate, setConfirmDisassociate] =
     useState<ExistingAssignment | null>(null)
   const [isDisassociating, setIsDisassociating] = useState(false)
+
+  // Inline department creation — for staff outside the seeded academic
+  // departments (Physical Education, Art, Music…). Created rows are appended
+  // locally and selected immediately; the server dedupes by name.
+  const [extraDepartments, setExtraDepartments] = useState<
+    { value: string; label: string }[]
+  >([])
+  const [creatingDept, setCreatingDept] = useState(false)
+  const [newDeptName, setNewDeptName] = useState("")
+  const [isSavingDept, setIsSavingDept] = useState(false)
+  const allDepartments = [
+    ...departments,
+    ...extraDepartments.filter(
+      (x) => !departments.some((d) => d.value === x.value)
+    ),
+  ]
+
+  const createDepartment = async () => {
+    const name = newDeptName.trim()
+    if (!name) return
+    setIsSavingDept(true)
+    try {
+      const res = await apiClient.post<{
+        department: { id: string; name: string }
+        existed: boolean
+      }>("/api/schools/departments", { name })
+      const dep = { value: res.department.id, label: res.department.name }
+      setExtraDepartments((prev) =>
+        prev.some((x) => x.value === dep.value) ? prev : [...prev, dep]
+      )
+      setForm((prev) => ({ ...prev, departmentId: dep.value }))
+      setCreatingDept(false)
+      setNewDeptName("")
+      toast.success(
+        res.existed
+          ? `"${res.department.name}" already existed — selected it`
+          : `Department "${res.department.name}" created`
+      )
+    } catch (err) {
+      if (err instanceof Error) toast.error(err.message)
+    } finally {
+      setIsSavingDept(false)
+    }
+  }
 
   useEffect(() => {
     if (open && editData) {
@@ -289,11 +336,11 @@ export function AddTeacherDrawer({
     form.email.trim() !== "" &&
     form.departmentId !== ""
 
+  // Hand the form to the parent as-is. The parent owns the API call: on
+  // success it closes the drawer; on failure it toasts and leaves the drawer
+  // open with every field intact so the admin can correct and retry.
   const handleSave = () => {
     onSave(form)
-    setForm({ ...emptyForm })
-    setPreviewSrc("")
-    setConfirmDisassociate(null)
   }
 
   const handleClose = () => {
@@ -463,19 +510,71 @@ export function AddTeacherDrawer({
               </Label>
               <Select
                 value={form.departmentId}
-                onValueChange={(v) => updateField("departmentId", v)}
+                onValueChange={(v) => {
+                  if (v === "__create__") {
+                    setCreatingDept(true)
+                    return
+                  }
+                  updateField("departmentId", v)
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departments.map((d) => (
+                  {allDepartments.map((d) => (
                     <SelectItem key={d.value} value={d.value}>
                       {d.label}
                     </SelectItem>
                   ))}
+                  <SelectItem
+                    value="__create__"
+                    className="font-medium text-primary"
+                  >
+                    ＋ New department…
+                  </SelectItem>
                 </SelectContent>
               </Select>
+              {creatingDept && (
+                <div className="flex items-center gap-2 pt-1">
+                  <Input
+                    autoFocus
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        createDepartment()
+                      }
+                    }}
+                    placeholder="e.g. Physical Education, Art, Music"
+                    className="h-8 flex-1 text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={createDepartment}
+                    disabled={isSavingDept || !newDeptName.trim()}
+                  >
+                    {isSavingDept ? (
+                      <CircleNotchIcon className="size-3.5 animate-spin" />
+                    ) : (
+                      "Add"
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => {
+                      setCreatingDept(false)
+                      setNewDeptName("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3">
@@ -525,7 +624,7 @@ export function AddTeacherDrawer({
             <p className="text-xs text-muted-foreground">
               {isEditMode
                 ? "Manage class-subject assignments for this teacher."
-                : "Optionally assign this teacher to class-subject combinations."}
+                : "Optional — skip this for common-period staff (PT, Art, Music, Library…); they're picked directly in the timetable's custom classes."}
             </p>
 
             {/* Existing assignments (edit mode) */}
