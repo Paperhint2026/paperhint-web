@@ -180,3 +180,57 @@ the admin shell is settled.
 
 **Future roles (committee, student, parent):** direction only per the handoff; nothing
 placed, nothing built.
+
+## 9. Founder decisions (2026-09-10) and what they imply
+
+**Coming soon rows.** Reverses the "no empty groups" rule in section 2: every module
+in the handoff appears in the nav from day one. Unbuilt ones are visibly disabled and
+land on a placeholder page that carries the module's one-paragraph description from
+the handoff. The nav is the complete picture of the application.
+
+**Timetable: template vs filled timetable — two layers, both modelled.**
+Today `school_periods` is one bell schedule per school (`school_id`, no grade), which
+the 020 migration header already calls "one template for all working days (v1)".
+The founder's case — KG on fewer periods than grade 6 — needs a template layer:
+
+- *Period template* (Setup › School day): a named set of periods and breaks
+  (`period_templates` + `period_template_periods`), and a grade → template
+  assignment. A school with one shape has one template assigned to every grade, so
+  the simple case stays simple. Not hard-wired: templates are rows, not code.
+- *Timetable* (Classes › Timetable): subjects, teachers and rooms placed on the
+  template's slots, per section. `timetable_slots.period_id` then points at a template
+  period rather than a school-wide one.
+
+Rule: the template is configuration (Setup); the filled grid is class data (Classes).
+The current school-wide bell schedule becomes "the default template" in a migration
+with no data loss.
+
+**Year rollover.** Accepted in principle; the founder wants to see the page before the
+move. A visual mock of Setup › Year rollover and Classes (with class creation moved
+in) comes before any code changes there.
+
+**Knowledge: class-level vs teacher-shared — two things, tracked separately.**
+Today `knowledge_materials` attach to `class_subjects` through a join table, and a
+`class_subject` is one section's subject (class = grade + section + year). So "Grade 6
+Science" material must be attached to each section separately; nothing represents the
+grade-level subject. The founder's rule — knowledge for a class is constant across its
+sections — needs a grade-level anchor:
+
+- *Class knowledge* (curriculum sources, admin-curated, A5/A17): attached at
+  grade × subject, inherited by every section's `class_subject`. Model: a
+  `grade_subjects` entity (school, grade, subject) that `class_subjects` reference, and
+  materials attach there. Sections inherit; a section-specific extra is still allowed.
+- *Shared library* (teacher-created, shared to the school shelf, T11): stays a separate
+  concept and a separate page. Provenance is the teacher; scope is the school.
+
+Placement: Knowledge is its own group with two entries — Class knowledge and Shared
+library — so the two are never confused. The class page's Knowledge tab reads the
+inherited set.
+
+**Home: role-driven with a preview switcher.** Keep the current teacher-centric home.
+The code is already split (`admin-home.tsx`, `teacher-home.tsx`), so a "View as: Admin /
+Teacher" switcher is cheap. Shown only to admins; the teacher preview is scoped to the
+admin's own assignments. The switcher is a preview aid for the founder's dual role and
+for splitting the shells cleanly, not a permissions feature.
+
+**Teacher-facing screens untouched.** Confirmed.
