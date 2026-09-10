@@ -66,6 +66,9 @@ interface ExamCardsResponse {
     in_progress: number
     needs_review: number
     done: number
+    graded_sheets?: number
+    pending_sheets?: number
+    flagged_sheets?: number
   }
   exams: ExamCardLite[]
 }
@@ -285,6 +288,9 @@ export function ClassHomePage() {
     in_progress: 0,
     needs_review: 0,
     done: 0,
+    graded_sheets: 0,
+    pending_sheets: 0,
+    flagged_sheets: 0,
   }
   const base = `/class/${classSubjectId}`
   const grade = assignment?.class ? String(assignment.class.grade) : "?"
@@ -292,7 +298,12 @@ export function ClassHomePage() {
     ? `${assignment.class.grade}${assignment.class.section}`
     : "—"
   const palette = coverFor(grade)
-  const sheetsWaiting = totals.in_progress + totals.needs_review
+  // Actual SHEETS awaiting someone: queued/failed with the AI, or flagged
+  // for the teacher. (Previously this summed in-progress EXAM counts, so two
+  // fully graded exams read as "2 sheets waiting".)
+  const sheetsWaiting =
+    (totals.pending_sheets ?? 0) + (totals.flagged_sheets ?? 0)
+  const sheetsGraded = totals.graded_sheets ?? 0
 
   /* Where the teacher should go next. The first unmet condition wins, so a
      brand-new class points at Knowledge and a busy one at Grading. */
@@ -301,7 +312,7 @@ export function ClassHomePage() {
       ? "knowledge"
       : totals.exams === 0
         ? "exams"
-        : sheetsWaiting > 0 || totals.done === 0
+        : sheetsWaiting > 0 || sheetsGraded === 0
           ? "grading"
           : "students"
 
@@ -342,13 +353,13 @@ export function ClassHomePage() {
       icon: ListChecksIcon,
       title: "Grading",
       verb: "Upload answer sheets",
-      value: sheetsWaiting > 0 ? sheetsWaiting : totals.done,
+      value: sheetsWaiting > 0 ? sheetsWaiting : sheetsGraded,
       label:
         sheetsWaiting > 0
           ? sheetsWaiting === 1
             ? "sheet waiting"
             : "sheets waiting"
-          : totals.done === 1
+          : sheetsGraded === 1
             ? "sheet graded"
             : "sheets graded",
       hint:
@@ -356,7 +367,7 @@ export function ClassHomePage() {
           ? "Needs a paper first."
           : "Hint grades each sheet; you review the doubtful ones.",
       tone:
-        sheetsWaiting > 0 ? "warning" : totals.done > 0 ? "done" : undefined,
+        sheetsWaiting > 0 ? "warning" : sheetsGraded > 0 ? "done" : undefined,
     },
     {
       key: "students",

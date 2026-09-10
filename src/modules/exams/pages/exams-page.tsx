@@ -31,6 +31,7 @@ import rehypeRaw from "rehype-raw"
 import rehypeSanitize from "rehype-sanitize"
 
 import { sanitizeSchema } from "@/lib/markdown-sanitize"
+import { formatAnswerKey } from "@/lib/answer-key"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 
@@ -1491,7 +1492,7 @@ export function ExamsPage() {
                                                         rehypeKatex,
                                                       ]}
                                                     >
-                                                      {q.answer_key!}
+                                                      {formatAnswerKey(q.answer_key!)}
                                                     </ReactMarkdown>
                                                   </div>
                                                 </div>

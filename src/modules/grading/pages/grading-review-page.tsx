@@ -9,6 +9,7 @@ import rehypeRaw from "rehype-raw"
 import rehypeSanitize from "rehype-sanitize"
 
 import { sanitizeSchema } from "@/lib/markdown-sanitize"
+import { formatAnswerKey } from "@/lib/answer-key"
 import "katex/dist/katex.min.css"
 import {
   ArrowLeftIcon,
@@ -22,6 +23,7 @@ import {
   PencilSimpleIcon,
   PlusIcon,
   SidebarSimpleIcon,
+  SlidersHorizontalIcon,
   XIcon,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -38,6 +40,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { FilterPill } from "@/components/shared/page-toolbar"
+import { FilterFieldHeader } from "@/components/shared/filter-controls"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
 import { PaperhintMark } from "@/components/shared/paperhint-mark"
@@ -66,6 +76,7 @@ interface QuestionMark {
   final_marks: number | null
   teacher_override_marks: number | null
   feedback: string | null
+  needs_review?: boolean | null
   questions: QuestionDetail
 }
 
@@ -213,7 +224,9 @@ export function GradingReviewPage() {
     submissionId: string
   }>()
   const navigate = useNavigate()
-  const backUrl = `/class/${classSubjectId}/grading`
+  // Back target: once the submission loads we know its exam, so back lands
+  // on that exam's student list (?exam=…), not the exam-cards view.
+  const gradingBase = `/class/${classSubjectId}/grading`
 
   const [submission, setSubmission] = useState<SubmissionData | null>(null)
   const [marks, setMarks] = useState<QuestionMark[]>([])
@@ -223,6 +236,13 @@ export function GradingReviewPage() {
   const [editFeedback, setEditFeedback] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [showSheet, setShowSheet] = useState(false)
+  // Mark-status filter (same Filters-popover pattern as the list pages):
+  // the reviewing teacher's first question is "where did marks go" — jump
+  // straight to partial/zero/flagged answers.
+  const [bucketFilter, setBucketFilter] = useState<
+    Set<"full" | "partial" | "zero">
+  >(new Set())
+  const [reviewOnly, setReviewOnly] = useState(false)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set()
   )
@@ -341,7 +361,7 @@ export function GradingReviewPage() {
               It may have been removed. Head back to grading to pick another.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate(backUrl)}>
+          <Button variant="outline" size="sm" onClick={() => navigate(gradingBase)}>
             <ArrowLeftIcon className="size-4" />
             Back to grading
           </Button>
@@ -349,6 +369,10 @@ export function GradingReviewPage() {
       </LoadingSwap>
     )
   }
+
+  const backUrl = submission.exam_id
+    ? `${gradingBase}?exam=${submission.exam_id}`
+    : gradingBase
 
   const examTotalMarks =
     submission.exams?.total_marks ??
@@ -363,6 +387,37 @@ export function GradingReviewPage() {
   const zeroCount = marks.filter(
     (m) => (m.final_marks ?? m.ai_marks ?? 0) === 0
   ).length
+
+  // Disjoint mark-status buckets (+ an overlapping "needs review" flag).
+  const bucketOf = (m: QuestionMark): "full" | "partial" | "zero" => {
+    const max = m.questions?.marks ?? 0
+    const final = m.final_marks ?? m.ai_marks
+    if (final == null || final === 0) return "zero"
+    if (final >= max) return "full"
+    return "partial"
+  }
+  const hasFilter = bucketFilter.size > 0 || reviewOnly
+  const matchesFilter = (m: QuestionMark) => {
+    if (reviewOnly && !m.needs_review) return false
+    if (bucketFilter.size > 0 && !bucketFilter.has(bucketOf(m))) return false
+    return true
+  }
+  const toggleBucket = (b: "full" | "partial" | "zero") =>
+    setBucketFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(b)) next.delete(b)
+      else next.add(b)
+      return next
+    })
+  const clearFilters = () => {
+    setBucketFilter(new Set())
+    setReviewOnly(false)
+  }
+  const partialCount = marks.filter((m) => bucketOf(m) === "partial").length
+  const zeroBucketCount = marks.filter((m) => bucketOf(m) === "zero").length
+  const reviewCount = marks.filter((m) => Boolean(m.needs_review)).length
+  const filteredTotal = marks.filter(matchesFilter).length
+  const activeFilterCount = bucketFilter.size + (reviewOnly ? 1 : 0)
 
   const sections = [
     ...new Set(marks.map((m) => m.questions?.section).filter(Boolean)),
@@ -518,7 +573,11 @@ export function GradingReviewPage() {
               <span className="text-[10px] font-medium tracking-wider text-primary uppercase">
                 Answer key
               </span>
-              <p className="text-secondary-foreground">{q.answer_key}</p>
+              <div className="text-secondary-foreground [&_.katex]:text-[1em] [&_p+p]:mt-2">
+                <ReactMarkdown remarkPlugins={MD_REMARK} rehypePlugins={MD_REHYPE}>
+                  {formatAnswerKey(q.answer_key)}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
         )}
@@ -527,7 +586,11 @@ export function GradingReviewPage() {
         {!isEditing && qm.feedback && (
           <div className="mt-3 flex items-start gap-2.5 border-l-2 border-border pl-3 text-sm text-secondary-foreground">
             <PaperhintMark className="mt-0.5 size-3.5 shrink-0 text-primary" />
-            <p className="leading-relaxed">{qm.feedback}</p>
+            <div className="leading-relaxed">
+              <ReactMarkdown remarkPlugins={MD_REMARK} rehypePlugins={MD_REHYPE}>
+                {qm.feedback}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
 
@@ -842,11 +905,116 @@ export function GradingReviewPage() {
                 </div>
               </div>
 
+              {/* Mark-status filter — same Filters button + popover the
+                  list pages use, so the pattern is familiar. */}
+              <div className="flex items-center gap-3">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-9 transition-colors",
+                        activeFilterCount > 0 &&
+                          "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary"
+                      )}
+                    >
+                      <SlidersHorizontalIcon className="size-3.5" />
+                      Filters
+                      {activeFilterCount > 0 && (
+                        <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-medium text-primary-foreground">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" sideOffset={8} className="w-80 gap-0 p-0">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                      <p className="flex items-center gap-2 text-sm font-medium">
+                        <SlidersHorizontalIcon className="size-4 text-muted-foreground" />
+                        Filters
+                      </p>
+                      {activeFilterCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={clearFilters}
+                          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          Clear all
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">None applied</span>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-5 p-4">
+                      <div className="flex flex-col gap-2">
+                        <FilterFieldHeader
+                          label="Marks awarded"
+                          count={bucketFilter.size}
+                          onClear={() => setBucketFilter(new Set())}
+                        />
+                        <div className="flex flex-wrap gap-1.5">
+                          <FilterPill
+                            label={`Full marks (${fullMarksCount})`}
+                            selected={bucketFilter.has("full")}
+                            onToggle={() => toggleBucket("full")}
+                          />
+                          <FilterPill
+                            label={`Partial marks (${partialCount})`}
+                            selected={bucketFilter.has("partial")}
+                            onToggle={() => toggleBucket("partial")}
+                          />
+                          <FilterPill
+                            label={`Zero / unanswered (${zeroBucketCount})`}
+                            selected={bucketFilter.has("zero")}
+                            onToggle={() => toggleBucket("zero")}
+                          />
+                        </div>
+                      </div>
+                      {reviewCount > 0 && (
+                        <div className="flex flex-col gap-2">
+                          <FilterFieldHeader
+                            label="Flags"
+                            count={reviewOnly ? 1 : 0}
+                            onClear={() => setReviewOnly(false)}
+                          />
+                          <div className="flex flex-wrap gap-1.5">
+                            <FilterPill
+                              label={`Needs review (${reviewCount})`}
+                              selected={reviewOnly}
+                              onToggle={() => setReviewOnly((v) => !v)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border bg-sidebar px-4 py-2.5 text-xs text-muted-foreground">
+                      <span>
+                        {filteredTotal} of {marks.length} questions
+                      </span>
+                      <PopoverClose asChild>
+                        <Button size="sm" variant="outline" className="h-7 text-xs">
+                          Done
+                        </Button>
+                      </PopoverClose>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                {hasFilter && (
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    Showing {filteredTotal} of {marks.length} questions
+                    {filteredTotal === 0 && " — nothing matches these filters"}
+                  </span>
+                )}
+              </div>
+
               {/* Sections */}
               {sections.map((section) => {
                 const sectionMarks = marks.filter(
                   (m) => m.questions?.section === section
                 )
+                const visibleMarks = sectionMarks.filter(matchesFilter)
+                if (hasFilter && visibleMarks.length === 0) return null
                 const sectionTotal = sectionMarks.reduce(
                   (s, m) => s + (m.final_marks ?? m.ai_marks ?? 0),
                   0
@@ -876,7 +1044,9 @@ export function GradingReviewPage() {
                       </span>
                       <span className="h-px flex-1 bg-border" />
                       <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                        {sectionMarks.length}{" "}
+                        {hasFilter
+                          ? `${visibleMarks.length} of ${sectionMarks.length}`
+                          : sectionMarks.length}{" "}
                         {sectionMarks.length === 1 ? "question" : "questions"}
                         <span className="mx-1.5 text-border">·</span>
                         <span className="font-medium text-foreground">
@@ -900,7 +1070,7 @@ export function GradingReviewPage() {
                           className="overflow-hidden"
                         >
                           <div className="flex flex-col gap-3 pt-4">
-                            {sectionMarks.map(renderQuestion)}
+                            {visibleMarks.map(renderQuestion)}
                           </div>
                         </motion.div>
                       )}
@@ -909,9 +1079,9 @@ export function GradingReviewPage() {
                 )
               })}
 
-              {unsectionedMarks.length > 0 && (
+              {unsectionedMarks.filter(matchesFilter).length > 0 && (
                 <div className="flex flex-col gap-3">
-                  {unsectionedMarks.map(renderQuestion)}
+                  {unsectionedMarks.filter(matchesFilter).map(renderQuestion)}
                 </div>
               )}
             </div>

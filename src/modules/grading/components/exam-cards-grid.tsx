@@ -84,19 +84,15 @@ type Props = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-// Classify a card into a filter bucket. "Done" requires every enrolled
-// student to have a graded submission AND no flagged questions — the same
-// definition the backend uses in `totals.done`.
-function classify(card: ExamCard, totalStudents: number): Filter {
+// "in-progress" = sheets actually queued/failed with the AI; "done" = every
+// UPLOADED sheet graded and unflagged (upload coverage is the progress bar's
+// job, not a status). Exams with no sheets belong to no status bucket.
+function classify(card: ExamCard): Filter | null {
   if (card.review.submissions_needing_review > 0) return "needs-review"
-  if (
-    totalStudents > 0 &&
-    card.submissions.graded === totalStudents &&
-    card.review.submissions_needing_review === 0
-  ) {
-    return "done"
-  }
-  return "in-progress"
+  if (card.submissions.pending > 0 || card.submissions.failed > 0)
+    return "in-progress"
+  if (card.submissions.total > 0) return "done"
+  return null
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -153,7 +149,7 @@ export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
     const byBucket =
       filter === "all"
         ? data.exams
-        : data.exams.filter((c) => classify(c, totalStudents) === filter)
+        : data.exams.filter((c) => classify(c) === filter)
     if (!debouncedSearch) return byBucket
     return byBucket.filter((c) =>
       c.exam_name.toLowerCase().includes(debouncedSearch)
@@ -210,13 +206,13 @@ export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
     },
     {
       key: "in-progress",
-      label: "In progress",
+      label: "Grading",
       count: data.totals.in_progress,
       icon: HourglassIcon,
     },
     {
       key: "done",
-      label: "Done",
+      label: "Graded",
       count: data.totals.done,
       icon: CheckCircleIcon,
     },
@@ -390,9 +386,10 @@ function ExamCardView({
       ? Math.min(100, Math.round((submissions.graded / totalStudents) * 100))
       : 0
 
+  const isGradingActive = submissions.pending > 0 || submissions.failed > 0
   const isDone =
-    totalStudents > 0 &&
-    submissions.graded === totalStudents &&
+    submissions.total > 0 &&
+    !isGradingActive &&
     review.submissions_needing_review === 0
   const isEmpty = submissions.total === 0
   const needsReview = review.submissions_needing_review > 0
@@ -441,7 +438,7 @@ function ExamCardView({
         {isDone ? (
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
             <CheckCircleIcon weight="fill" className="size-3" />
-            Done
+            Graded
           </span>
         ) : isEmpty ? (
           <span className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -456,7 +453,7 @@ function ExamCardView({
         ) : (
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
             <HourglassIcon className="size-3" />
-            In progress
+            Grading
           </span>
         )}
       </div>
