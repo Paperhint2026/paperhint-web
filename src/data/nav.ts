@@ -259,7 +259,7 @@ export const ADMIN_NAV: NavGroup[] = [
       },
       {
         key: "bank",
-        title: "Shared library",
+        title: "Shared Library",
         icon: BooksIcon,
         path: "/library/bank",
         status: "live",
