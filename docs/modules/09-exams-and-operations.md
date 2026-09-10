@@ -11,8 +11,10 @@ dependency — the Notifications rail — is decided once.
    Publishers: attendance, homework, results, exchanges, circulars.
 2. **Attendance oversight (A9)**: web surface over the mobile scan flow; day view per
    section, missing registers, resend. Tags: section, date, marker, student.
-3. **Exam manager (A12)**: `exams` gains `academic_year_id`, calendar window, and can span
-   sections; papers and grading link; publish results in one action.
+3. **Exam manager (A12)**: `exams` gains `academic_year_id` and a calendar **exam window**
+   (truth.md: windows are set per grade range when the calendar is defined; exams are
+   scheduled inside them, teachers do not invent dates); can span sections; papers and
+   grading link; publish results in one action.
 4. **Results & report cards (A13)**: `report_cards (student_id, academic_year_id, term,
    generated_at, pdf_url)` compiled from results + attendance; visible in the student
    profile to teachers of that student (edge case 8: full card by default).

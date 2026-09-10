@@ -7,13 +7,12 @@ Today: one 3,655-line file, admin and teacher forked at runtime, config in dialo
 
 Keep what works (grid builder, readiness strip, drafts, AI generation, validation,
 copy-day, teacher load) and restructure: own sub-routes, components by surface, tiered
-teacher picker, room on slot with clash, stable slot identity for logs and exchanges,
+teacher picker, stable slot identity for logs and exchanges,
 allotment ripple. Teacher view stays as it is (My schedule · any class) on
 `/timetable/my-schedule`.
 
 ## Schema (additive; migration 026)
 
-- `timetable_slots.room_id uuid NULL REFERENCES rooms`.
 - `timetable_slots.template_period_id` becomes the read path (from 04); `period_id`
   dropped in a later migration once no reader remains.
 - Slot identity: rows are already UUID; add `published_at` on a `timetables (id,
@@ -21,14 +20,13 @@ allotment ripple. Teacher view stays as it is (My schedule · any class) on
   grids are versioned; slots reference the header. Period logs (T4) and exchanges (T2)
   reference slot id + date.
 - Unique clash guards as DB constraints: `(teacher_id, day_of_week, template_period_id,
-  timetable_version)` and `(room_id, day, period, version)` partial on published rows.
+  timetable_version)` partial on published rows. No room clash: rooms are not modelled (truth.md).
 
 ## API
 
 Existing: periods, readiness, teacher-busy, teacher-load, my-schedule, align-elective,
 `/:classId` get, slots replace, validate, generate, draft get/save/delete. Add:
-`GET /api/timetable/candidates?class_subject_id=&day=&period=` (tiered, excludes busy),
-`GET /api/timetable/rooms/free?day=&period=`, `POST /api/timetable/:classId/publish`
+`GET /api/timetable/candidates?class_subject_id=&day=&period=` (tiered, excludes busy), `POST /api/timetable/:classId/publish`
 (creates a version), `GET /api/timetable/changes?since=` for the calendar-sync diff
 (edge case 2).
 
@@ -38,11 +36,13 @@ Existing: periods, readiness, teacher-busy, teacher-load, my-schedule, align-ele
 - `/timetable/teacher-load` — page, not dialog.
 - `/timetable/my-schedule` — teacher default; admins can open it via View as.
 - Bell schedule dialog removed → Setup › School day.
-- Cell editor: teacher field pre-selected from allotment; tiers as rule 1; room field
-  with free-rooms first; busy teachers greyed with where they are.
+- Cell editor: teacher field pre-selected from allotment; tiers as rule 1; busy teachers greyed with where they are.
 - Class page (`/class/:id`) gains a read-only timetable tab — the surface T2 borrows from.
 
 ## Acceptance
+
+- A slot may hold a department period (PT, Library) with no class-subject: `kind` +
+  `department_id` on the slot (truth.md).
 
 - Split: no file over ~600 lines; `modules/timetable/components/*` by surface.
 - Picker tiers verified with a section whose allotted teacher is busy at that period.

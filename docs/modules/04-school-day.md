@@ -7,15 +7,18 @@ table the live timetable reads — staging decision due before this ships.**
 ## Scope
 
 The shape of the school day, per grade. **Period templates**: named sets of periods and
-breaks with times (KG: 5 periods; grades 6–12: 8). **Grade → template** assignment; a
-school with one shape assigns one template everywhere. **Week**: working days and week
+breaks with times (KG: 5 periods; grades 6–12: 8). **Grade → template** assignment done as a multi-select of grades, so a band (primary,
+seniors) is one action without a band object (truth.md: bands stay translucent). A school
+with one shape assigns one template everywhere. **Week**: working days and week
 start (moved from Calendar; shown here, stored on `schools` as today).
 
 ## Schema (additive; migration 025)
 
 - `period_templates (id, school_id, name, is_default bool, created_at)`.
 - `period_template_periods (id, template_id, period_number, name, start_time, end_time,
-  is_break)`; UNIQUE (template_id, period_number); CHECK end > start.
+  is_break, day_of_week smallint NULL)`; NULL = every working day. UNIQUE (template_id,
+  period_number, day_of_week); CHECK end > start. The nullable day is the readiness for a
+  short-Saturday variant later (truth.md: not seen yet, be ready) without another migration.
 - `grade_period_templates (school_id, grade, template_id, PRIMARY KEY (school_id, grade))`.
 - Migration copies each school's `school_periods` into one template named "Default",
   marks it default, assigns it to every grade in use, and adds
@@ -50,5 +53,4 @@ start (moved from Calendar; shown here, stored on `schools` as today).
 
 ## Out of scope
 
-Per-day variants (short Saturday) — noted follow-up in migration 020's header.
-Room list (01). Clash rules (05).
+Per-day variant UI (schema is ready; UI when a pilot school needs it). Clash rules (05).
