@@ -1,20 +1,13 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
-  ArchiveIcon,
   BookOpenIcon,
-  BooksIcon,
-  CalendarDotsIcon,
   ChalkboardIcon,
   ExamIcon,
-  GraduationCapIcon,
-  HouseIcon,
-  IdentificationCardIcon,
   ListChecksIcon,
-  SparkleIcon,
-  TableIcon,
   UsersIcon,
 } from "@phosphor-icons/react"
+import { isNavItemActive, navForRole } from "@/data/nav"
 import { useAuth } from "@/lib/auth"
 import {
   useTeacherAssignments,
@@ -80,85 +73,17 @@ export function AppSidebar() {
     })
   }
 
-  const isActivePath = (path: string) => {
-    if (path === "/") return location.pathname === "/"
-    return location.pathname.startsWith(path)
-  }
-
-  const mainItems = [
-    {
-      title: "Home",
-      icon: HouseIcon,
-      isActive: location.pathname === "/",
-      onClick: () => handleNav("/"),
-    },
-    {
-      title: "Ask Hint",
-      icon: SparkleIcon,
-      isActive: isActivePath("/ask"),
-      onClick: () => handleNav("/ask"),
-    },
-    {
-      title: "Classes",
-      icon: ChalkboardIcon,
-      isActive: isActivePath("/classes"),
-      onClick: () => handleNav("/classes"),
-    },
-    {
-      title: "Teachers",
-      icon: IdentificationCardIcon,
-      isActive: isActivePath("/teachers"),
-      onClick: () => handleNav("/teachers"),
-    },
-    {
-      title: "Students",
-      icon: GraduationCapIcon,
-      isActive: isActivePath("/students"),
-      onClick: () => handleNav("/students"),
-    },
-    {
-      title: "Calendar",
-      icon: CalendarDotsIcon,
-      isActive: isActivePath("/calendar"),
-      onClick: () => handleNav("/calendar"),
-    },
-    // Admins get the builder; teachers get their read-only My Schedule +
-    // class timetables on the same route.
-    {
-      title: "Timetable",
-      icon: TableIcon,
-      isActive: isActivePath("/timetable"),
-      onClick: () => handleNav("/timetable"),
-    },
-    // Batch management is an admin-only, structural operation
-    ...(!isTeacher
-      ? [
-          {
-            title: "Batches",
-            icon: ArchiveIcon,
-            isActive: isActivePath("/batches"),
-            onClick: () => handleNav("/batches"),
-          },
-        ]
-      : []),
-  ]
-
-  const libraryItems = [
-    {
-      title: "Knowledge Library",
-      icon: BookOpenIcon,
-      // Active only on /library itself (not /library/bank); the Bank has
-      // its own entry below and we don't want both highlighted at once.
-      isActive: location.pathname === "/library",
-      onClick: () => handleNav("/library"),
-    },
-    {
-      title: "Shared Library",
-      icon: BooksIcon,
-      isActive: isActivePath("/library/bank"),
-      onClick: () => handleNav("/library/bank"),
-    },
-  ]
+  // The menu is per role; the shell is shared. See src/data/nav.ts.
+  const navGroups = navForRole(user?.role).map((group) => ({
+    label: group.label,
+    items: group.items.map((item) => ({
+      title: item.title,
+      icon: item.icon,
+      soon: item.status === "soon",
+      isActive: isNavItemActive(item, location.pathname),
+      onClick: () => handleNav(item.path),
+    })),
+  }))
 
   const workspaces =
     isTeacher && assignments.length > 0
@@ -245,17 +170,15 @@ export function AppSidebar() {
           className="flex min-h-0 flex-col"
           onMouseLeave={() => setHoveredNav(null)}
         >
-          <NavMain
-            items={mainItems}
-            hovered={hoveredNav}
-            onHover={setHoveredNav}
-          />
-          <NavMain
-            items={libraryItems}
-            label="Library"
-            hovered={hoveredNav}
-            onHover={setHoveredNav}
-          />
+          {navGroups.map((group, i) => (
+            <NavMain
+              key={group.label ?? `group-${i}`}
+              items={group.items}
+              label={group.label}
+              hovered={hoveredNav}
+              onHover={setHoveredNav}
+            />
+          ))}
           {workspaces.length > 0 ? (
             <NavWorkspaces
               workspaces={workspaces}

@@ -1,7 +1,11 @@
+import { findSoonItem } from "@/data/nav"
+
 /** Single title for the app shell header (breadcrumb current page). */
 export function getPageTitleFromPath(pathname: string): string {
   const path = pathname || "/"
   if (path === "/" || path === "") return "Home"
+  if (path.startsWith("/soon/"))
+    return findSoonItem(path.slice("/soon/".length))?.title ?? "Coming soon"
   if (path.includes("/classes/") && path.includes("/overview"))
     return "Class overview"
   if (path.startsWith("/classes")) return "Classes"

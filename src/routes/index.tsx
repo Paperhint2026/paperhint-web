@@ -15,6 +15,7 @@ import { StudentsPage } from "@/modules/students/pages/students-page"
 import { BatchesPage } from "@/modules/batches/pages/batches-page"
 import { CalendarPage } from "@/modules/calendar/pages/calendar-page"
 import { TimetablePage } from "@/modules/timetable/pages/timetable-page"
+import { ComingSoonPage } from "@/modules/coming-soon/pages/coming-soon-page"
 import { ClassStudentsMarksPage } from "@/modules/students/pages/class-students-marks-page"
 import { KnowledgePage } from "@/modules/knowledge/pages/knowledge-page"
 import { LibraryPage } from "@/modules/knowledge/pages/library-page"
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
           { path: "batches", element: <BatchesPage /> },
           { path: "calendar", element: <CalendarPage /> },
           { path: "timetable", element: <TimetablePage /> },
+          { path: "soon/:slug", element: <ComingSoonPage /> },
           { path: "library", element: <LibraryPage /> },
           { path: "library/bank", element: <BankPage /> },
 
