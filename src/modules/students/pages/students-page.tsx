@@ -435,6 +435,7 @@ export function StudentsPage() {
           emergency_contact_relationship:
             entry.emergency_contact_relationship || null,
           emergency_contact_phone: entry.emergency_contact_phone || null,
+          custom_fields: entry.custom_fields ?? {},
         }
       )
 
@@ -513,6 +514,8 @@ export function StudentsPage() {
         ),
         emergency_contact_phone: String(s.emergency_contact_phone ?? ""),
         elective_choices: electiveChoices,
+        custom_fields:
+          (s.custom_fields as unknown as Record<string, string | number>) ?? {},
       }
       setEditInitialData(entry)
       setEditStudentId(studentId)
@@ -545,6 +548,7 @@ export function StudentsPage() {
         emergency_contact_relationship:
           entry.emergency_contact_relationship || null,
         emergency_contact_phone: entry.emergency_contact_phone || null,
+        custom_fields: entry.custom_fields ?? {},
       })
 
       await saveElectiveChoices(editStudentId, entry.elective_choices)

@@ -296,6 +296,7 @@ export function TeachersPage() {
           designation?: string | null
           date_of_joining?: number | string | null
           phone_number?: string | null
+          custom_fields?: Record<string, string | number> | null
           assignments?: {
             class_subject_id: string
             class: { id: string; grade: number | string; section: string }
@@ -326,6 +327,8 @@ export function TeachersPage() {
           : undefined,
         classSubjects: [{ classId: "", classSubjectId: "" }],
         existingAssignments,
+        customFields:
+          (t.custom_fields as Record<string, string | number>) ?? {},
       })
       setDrawerOpen(true)
     } catch (err) {
@@ -370,6 +373,7 @@ export function TeachersPage() {
             : undefined,
           profile_url: data.profileUrl || undefined,
           phone_number: data.phone || undefined,
+          custom_fields: data.customFields ?? {},
         })
       } else {
         const res = await apiClient.post<{
@@ -384,6 +388,7 @@ export function TeachersPage() {
             ? dayjs(data.dateOfJoining).valueOf()
             : undefined,
           phone_number: data.phone || undefined,
+          custom_fields: data.customFields ?? {},
         })
         teacherId = res.teacher.id
 

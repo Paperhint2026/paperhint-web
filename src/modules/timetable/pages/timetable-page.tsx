@@ -62,7 +62,7 @@ import {
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface Period {
+export interface Period {
   id: string
   period_number: number
   name: string
@@ -82,7 +82,7 @@ interface ReadinessSection {
   ready: boolean
 }
 
-interface WeekSettings {
+export interface WeekSettings {
   week_start: "monday" | "sunday"
   working_days: 5 | 6
 }
@@ -377,7 +377,7 @@ function addMinutes(t: string, mins: number): string {
   return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`
 }
 
-function BellScheduleSetup({
+export function BellScheduleSetup({
   initial,
   onSaved,
   weekSettings,

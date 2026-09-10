@@ -23,6 +23,7 @@ import {
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { apiClient } from "@/lib/api-client"
+import { CustomFieldsDisplay } from "@/components/shared/custom-fields"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -76,6 +77,7 @@ interface StudentDetail {
   street?: string | null
   city?: string | null
   contact_number?: string | null
+  custom_fields?: Record<string, string | number> | null
   emergency_contact_name?: string | null
   emergency_contact_relationship?: string | null
   emergency_contact_phone?: string | null
@@ -601,6 +603,24 @@ export function StudentDetailDrawer({
                       </div>
                     )}
                   </motion.div>
+
+                  {/* School-defined custom fields (/setup) */}
+                  {student.custom_fields &&
+                    Object.keys(student.custom_fields).length > 0 && (
+                      <motion.div
+                        variants={ENTER}
+                        transition={stagger}
+                        className="flex flex-col gap-3 px-6 py-5"
+                      >
+                        <SectionHeading>Additional details</SectionHeading>
+                        <div className="rounded-xl border border-dashed border-border p-4">
+                          <CustomFieldsDisplay
+                            entity="student"
+                            values={student.custom_fields}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
                 </motion.div>
               </div>
 

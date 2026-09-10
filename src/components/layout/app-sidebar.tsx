@@ -7,6 +7,7 @@ import {
   BooksIcon,
   CalendarDotsIcon,
   ChalkboardIcon,
+  GearSixIcon,
   ExamIcon,
   GraduationCapIcon,
   HouseIcon,
@@ -271,7 +272,7 @@ export function AppSidebar() {
         {/* One hover key for every group, cleared once on leaving the whole
             nav — per-list state let two groups both claim the pill mid-move. */}
         <div
-          className="flex min-h-0 flex-col"
+          className="flex min-h-0 flex-1 flex-col"
           onMouseLeave={() => setHoveredNav(null)}
         >
           <NavMain
@@ -294,6 +295,25 @@ export function AppSidebar() {
               onHover={setHoveredNav}
             />
           ) : null}
+
+          {/* Pinned to the bottom, just above the profile — configuration,
+              not a daily destination. Admin only. */}
+          {!isTeacher && !isPlatform && (
+            <div className="mt-auto pt-4">
+              <NavMain
+                items={[
+                  {
+                    title: "Setup",
+                    icon: GearSixIcon,
+                    isActive: isActivePath("/setup"),
+                    onClick: () => handleNav("/setup"),
+                  },
+                ]}
+                hovered={hoveredNav}
+                onHover={setHoveredNav}
+              />
+            </div>
+          )}
         </div>
       </SidebarContent>
       <SidebarFooter>

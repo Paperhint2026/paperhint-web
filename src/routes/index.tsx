@@ -29,6 +29,7 @@ import { GradingReviewPage } from "@/modules/grading/pages/grading-review-page"
 import { SettingsPage } from "@/modules/settings/pages/settings-page"
 import { HelpPage } from "@/modules/help/pages/help-page"
 import { CopilotPage } from "@/modules/copilot/pages/copilot-page"
+import { SetupPage } from "@/modules/setup/pages/setup-page"
 import { PlatformPage } from "@/modules/platform/pages/platform-page"
 import { PlatformSchoolPage } from "@/modules/platform/pages/platform-school-page"
 import { PlatformSchoolNewPage } from "@/modules/platform/pages/platform-school-new-page"
@@ -71,6 +72,9 @@ export const router = createBrowserRouter([
           },
           // PaperHint team only — the page itself redirects non-platform
           // roles home, and every /api/platform route re-checks the role.
+          // School admin's configuration home (role-gated in the page)
+          { path: "setup", element: <SetupPage /> },
+          { path: "setup/:section", element: <SetupPage /> },
           { path: "platform", element: <PlatformPage /> },
           { path: "platform/schools/new", element: <PlatformSchoolNewPage /> },
           { path: "platform/schools/:schoolId", element: <PlatformSchoolPage /> },
