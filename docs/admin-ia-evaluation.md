@@ -234,3 +234,82 @@ admin's own assignments. The switcher is a preview aid for the founder's dual ro
 for splitting the shells cleanly, not a permissions feature.
 
 **Teacher-facing screens untouched.** Confirmed.
+
+## 10. Module check: Teachers (A7 admin · T17 teacher)
+
+Evaluated 2026-09-10 from the code (`src/modules/teachers`, 3,124 lines across
+five files) and the API. Not yet clicked through — pending an admin login.
+
+### What is there
+
+- **Directory** at `/teachers`: cards with photo, name, designation, email, joined
+  date and status (Invited / Active / Inactive). Filters by Department, Designation
+  and Status. Empty state with a call to add the first teacher.
+- **Add / edit teacher** (admin only, drawer): name, work email, phone, department
+  (pick from existing), designation, photo, and class-subject assignments added as
+  rows ("Select class") with a Disassociate action per row. Creating a teacher sends
+  the Supabase invite email.
+- **Detail drawer** on card click: Department, Designation, Email, Phone, Joined;
+  Classes and Subjects; copy / send email; jumps to the class overview. Edit and
+  Delete for admins. Delete asks for confirmation.
+- **Teacher overview page** at `/teachers/:id/overview`: two stat cards (classes,
+  subjects) and the subject list, from the same endpoint as the drawer.
+- **Role gating** is in-page: `isAdmin` hides add, edit, delete and assignment rows.
+  Teachers get the read-only directory.
+
+### What is not visible, or not right
+
+1. **The overview page is unreachable.** Nothing in the app links to
+   `/teachers/:id/overview`; the card opens the drawer, which shows the same data.
+   Dead route, duplicated view. Decide: drop the page, or make the drawer a summary
+   that links to the page as the full profile (the shape Students and Classes use).
+2. **Departments cannot be created.** The API has `POST /api/schools/departments`,
+   the UI only reads the list. A new school has no department until someone inserts
+   one in the database. Department is also the anchor for T17 "My Department" and for
+   fill suggestions in Period Exchange, so it needs a management surface.
+3. **Allotments are edited inside Teachers.** Assign / unassign class-subjects happens
+   in the add-teacher drawer, and separately again on the Batches page. The handoff
+   places allotments as their own module (A8, Classes group). Teachers should show a
+   teacher's allotments read-only and link to the Allotments board to change them.
+4. **No deactivate, only delete.** Status carries `inactive`, but the only admin
+   action is Delete, which removes the user. Edge case 3 in the associations doc
+   (deactivation mid-year: block new requests, keep historical logs and evaluations)
+   needs a Deactivate action that flips status and keeps the record.
+5. **Teacher API lives under `/api/auth`.** `GET /teachers`, `POST /create-teacher`,
+   `PUT|DELETE /teacher/:id` are in the auth module because creation sends an invite.
+   Works, but the module boundary is wrong: staff directory logic belongs in a
+   `teachers` module (which exists, holding only assignments). Move when touched;
+   no user-visible change.
+6. **`custom_fields` on users is unused** in the UI. Either it becomes the home of
+   school-specific staff fields (employee ID, qualifications) with an editor, or it is
+   dead schema. Decide before A1 School setup, which is where such fields would be
+   defined.
+7. **Nothing timetable-aware yet.** The API already exposes `teacher-busy` and
+   `teacher-load` (Timetable module). The directory shows neither. T17's
+   "free at this period" filter and a load figure per card are the natural first
+   consumers once Timetable is under Classes.
+8. **Teacher-side scope (T17):** the teacher sees the full directory with no "My
+   Department" grouping. Handoff asks for department first, everyone below. Teacher
+   pass, not this one; noted so the department fix (2) is built with it in mind.
+
+### Logical grouping
+
+Teachers stays in **People** as the staff directory and profile. What moves out:
+
+| Today in Teachers | Belongs to |
+|---|---|
+| Assign / unassign class-subjects | Classes › Allotments (A8) |
+| Department creation (missing) | Setup › School & year, as the school's department list; Teachers picks from it |
+| Load and availability (missing) | Read from Timetable; shown on the card and profile |
+
+What stays: directory, filters, add / edit / deactivate, profile drawer and page,
+invite flow. Teacher profile shows allotments and load read-only with links out.
+
+### Order of work when this module is picked up
+
+1. Wire or drop the overview page (one decision, small change).
+2. Departments: list + create under Setup; Teachers keeps the picker.
+3. Deactivate action alongside Delete; Delete reserved for invited-never-joined.
+4. Lift assignment editing out once the Allotments board exists; until then it stays,
+   so nothing breaks.
+5. Card and profile read load / availability once Timetable is grouped under Classes.
