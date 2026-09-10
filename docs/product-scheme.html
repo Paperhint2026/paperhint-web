@@ -178,6 +178,7 @@
     <ol>
       <li><a href="#principles">Principles</a></li>
       <li><a href="#map">Admin map</a></li>
+      <li><a href="#index">Every module</a></li>
       <li><a href="#layers">Horizontals, junctions, verticals</a></li>
       <li><a href="#rules">Pick rules</a></li>
       <li><a href="#artefacts">Artefacts and tags</a></li>
@@ -189,7 +190,7 @@
       <li><a href="#decisions">Decisions</a></li>
       <li><a href="#open">Open questions</a></li>
     </ol>
-    <div class="meta">Revision 3 · 10 Sept 2026<br>Execution docs 00–10 rendered in <a href="#documents">Module documents</a>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
+    <div class="meta">Revision 4 · 10 Sept 2026<br>Execution docs 00–10 rendered in <a href="#documents">Module documents</a>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
   </nav>
 
   <main>
@@ -259,6 +260,61 @@
         </ul></div>
       </div>
       <p style="margin-top:16px;font-size:14px;color:var(--muted)">Teacher menu: unchanged for now, expressed from the same nav definition. Its restructure, ordered by the teacher's day (T1–T17), is a later pass. An admin previews it with the <b>View as</b> switch.</p>
+    </section>
+
+    <section id="index">
+      <div class="eyebrow">Complete inventory</div>
+      <h2>Every module in the handoff</h2>
+      <p class="sub">All 41 entries from the Sept 2026 module list — teacher, admin, Phase 2 and shared platform — with the home this scheme gives each, its status as verified on 3 Sept, what it depends on, what it feeds (from the associations document), and which execution document carries it. Teacher rows are placed but not built in this pass.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Code</th><th>Module</th><th>Role</th><th>Home in the scheme</th><th>Status</th><th>Depends on</th><th>Feeds</th><th>Doc</th></tr></thead>
+          <tbody>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T1</td><td><b style="font-weight:500">My Schedule (My Day)</b></td><td>Teacher</td><td>Teacher menu › top</td><td><span class="tag build">build</span></td><td>A2 → A3</td><td>T2, T4, calendar sync</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T2</td><td><b style="font-weight:500">Period Exchange — borrow &amp; fill</b></td><td>Teacher</td><td>Class page timetable · My Day</td><td><span class="tag build">build</span></td><td>A3, T1, T17</td><td>A10, T1, A11, T4</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T3</td><td><b style="font-weight:500">Ask Hint (assistant)</b></td><td>Teacher</td><td>Top</td><td><span class="tag done">done</span></td><td>T10 knowledge</td><td>T4 capture, T9, T13</td><td class="code" style="font-size:12px">—</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T4</td><td><b style="font-weight:500">Period Log</b></td><td>Teacher</td><td>My Day period card</td><td><span class="tag build">build</span></td><td>T1, T3</td><td>T5, T6, T7, T12, A14</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T5</td><td><b style="font-weight:500">Syllabus Tracker</b></td><td>Teacher</td><td>Class pipeline step 5 · Portion</td><td><span class="tag build">build</span></td><td>T4, grade_subjects</td><td>T6, T9 next chapter</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T6</td><td><b style="font-weight:500">Portion completion — teacher KPI</b></td><td>Teacher</td><td>My stats</td><td><span class="tag build">build</span></td><td>T4, T5</td><td>A14</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T7</td><td><b style="font-weight:500">Recap Card</b></td><td>Teacher</td><td>My Day period card</td><td><span class="tag build">build</span></td><td>T4, T8</td><td>—</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T8</td><td><b style="font-weight:500">Attendance (mark / scan)</b></td><td>Teacher</td><td>Period card</td><td><span class="tag tweak">tweak</span></td><td>roster</td><td>A11, T7, A9, A13</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T9</td><td><b style="font-weight:500">Teaching Notes</b></td><td>Teacher</td><td>Class › Knowledge · Library</td><td><span class="tag tweak">tweak</span></td><td>T10, T5</td><td>T11</td><td class="code" style="font-size:12px">08</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T10</td><td><b style="font-weight:500">Knowledge (class sources)</b></td><td>Teacher</td><td>Class › Knowledge</td><td><span class="tag done">done</span></td><td>A17, grade_subjects</td><td>T3, T9, T13</td><td class="code" style="font-size:12px">08</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T11</td><td><b style="font-weight:500">Personal &amp; Shared Library</b></td><td>Teacher</td><td>Knowledge › Shared library</td><td><span class="tag done">done</span></td><td>T9, T13</td><td>A17</td><td class="code" style="font-size:12px">08</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T12</td><td><b style="font-weight:500">Homework &amp; Assignments</b></td><td>Teacher</td><td>Class page</td><td><span class="tag build">build</span></td><td>T4, roster</td><td>A11, T14 reuse</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T13</td><td><b style="font-weight:500">Question Papers</b></td><td>Teacher</td><td>Class › Exams · school view in Exams &amp; papers</td><td><span class="tag done">done</span></td><td>T10</td><td>A12, T14</td><td class="code" style="font-size:12px">08 · 09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T14</td><td><b style="font-weight:500">Grading (answer sheets)</b></td><td>Teacher</td><td>Class › Grading · school view</td><td><span class="tag done">done</span></td><td>T13, roster</td><td>T15</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T15</td><td><b style="font-weight:500">Results (marks &amp; records)</b></td><td>Teacher</td><td>Class › Results</td><td><span class="tag done">done</span></td><td>T14</td><td>A13, A14, A11</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T16</td><td><b style="font-weight:500">Students (teacher app)</b></td><td>Teacher</td><td>Class › Students (roster scope of A6)</td><td><span class="tag move">move</span></td><td>A6, roster</td><td>—</td><td class="code" style="font-size:12px">03 · 10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T17</td><td><b style="font-weight:500">Teachers &amp; My Department</b></td><td>Teacher</td><td>Teacher menu · People</td><td><span class="tag tweak">tweak</span></td><td>A7, A3 availability</td><td>T2 entry point</td><td class="code" style="font-size:12px">02 · 10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">P2-1</td><td><b style="font-weight:500">Classwork / Quick Quiz</b></td><td>Teacher</td><td>Class page</td><td><span class="tag build">build</span></td><td>T4</td><td>student record</td><td class="code" style="font-size:12px">later</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">P2-2</td><td><b style="font-weight:500">PTM One-pager</b></td><td>Teacher</td><td>Student profile</td><td><span class="tag build">build</span></td><td>T15, T8, T4</td><td>—</td><td class="code" style="font-size:12px">later</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">P2-3</td><td><b style="font-weight:500">Remedial Follow-up</b></td><td>Teacher</td><td>Class › Results</td><td><span class="tag build">build</span></td><td>T14, T15</td><td>A11</td><td class="code" style="font-size:12px">later</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A1</td><td><b style="font-weight:500">School Setup &amp; Academic Year</b></td><td>Admin</td><td>Setup › School &amp; year</td><td><span class="tag tweak">tweak</span></td><td>—</td><td>everything dates from it</td><td class="code" style="font-size:12px">01</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A2</td><td><b style="font-weight:500">School Calendar</b></td><td>Admin</td><td>Setup › Calendar</td><td><span class="tag tweak">tweak</span></td><td>A1</td><td>A3, A12, T1</td><td class="code" style="font-size:12px">01 (week settings) · 04</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A3</td><td><b style="font-weight:500">Timetable</b></td><td>Admin</td><td>Classes › Timetable · config in Setup › School day</td><td><span class="tag tweak">tweak</span></td><td>A2, A8, School day</td><td>T1, T2, T4, A10, sync</td><td class="code" style="font-size:12px">04 · 05</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A4</td><td><b style="font-weight:500">Classes &amp; Sections</b></td><td>Admin</td><td>Classes › Classes &amp; sections</td><td><span class="tag done">done</span></td><td>A1, grade_subjects</td><td>A8, A3, roster</td><td class="code" style="font-size:12px">03</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A5</td><td><b style="font-weight:500">Departments &amp; Subjects (was Subjects &amp; books)</b></td><td>Admin</td><td>Setup › Departments &amp; subjects</td><td><span class="tag tweak">tweak</span></td><td>A1</td><td>A4 subject sets, A8 picker, T10, T17</td><td class="code" style="font-size:12px">02</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A6</td><td><b style="font-weight:500">Students</b></td><td>Admin</td><td>People › Students</td><td><span class="tag done">done</span></td><td>A4</td><td>roster, T16, A13</td><td class="code" style="font-size:12px">—</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A7</td><td><b style="font-weight:500">Teachers</b></td><td>Admin</td><td>People › Teachers</td><td><span class="tag done">done</span></td><td>A5 departments</td><td>A8, T17</td><td class="code" style="font-size:12px">02 (departments) · 03</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A8</td><td><b style="font-weight:500">Allotments (staffing)</b></td><td>Admin</td><td>Classes › Allotments</td><td><span class="tag move">move</span></td><td>A4, A5, A7</td><td>A3 picker, Home gaps</td><td class="code" style="font-size:12px">03</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A9</td><td><b style="font-weight:500">Attendance Oversight</b></td><td>Admin</td><td>Operations › Attendance</td><td><span class="tag tweak">tweak</span></td><td>T8, roster</td><td>A11, A13, A14</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A10</td><td><b style="font-weight:500">Leave &amp; Substitution (office)</b></td><td>Admin</td><td>Operations › Leave &amp; substitution</td><td><span class="tag build">build</span></td><td>A3, T2</td><td>T1, A11, T4</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A11</td><td><b style="font-weight:500">Notifications &amp; Circulars</b></td><td>Admin</td><td>Operations › Notifications</td><td><span class="tag build">build</span></td><td>rail first</td><td>every publisher</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A12</td><td><b style="font-weight:500">Exam Manager</b></td><td>Admin</td><td>Exams &amp; papers › Exam manager</td><td><span class="tag build">build</span></td><td>A2, T13, T14</td><td>T15 publish, A13</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A13</td><td><b style="font-weight:500">Report Cards</b></td><td>Admin</td><td>Exams &amp; papers › Results &amp; report cards · Student profile</td><td><span class="tag build">build</span></td><td>T15, T8</td><td>A14, PTM</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A14</td><td><b style="font-weight:500">Reports &amp; KPI Dashboard</b></td><td>Admin</td><td>Operations › Reports &amp; KPI</td><td><span class="tag build">build</span></td><td>T4, T6, T15, A9</td><td>export</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A15</td><td><b style="font-weight:500">Batch Migration → Year rollover</b></td><td>Admin</td><td>Setup › Year rollover</td><td><span class="tag tweak">tweak</span></td><td>A1</td><td>A4, A8, A3, A6, archives all verticals</td><td class="code" style="font-size:12px">06</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A16</td><td><b style="font-weight:500">Ask Hint (office assistant)</b></td><td>Admin</td><td>Top</td><td><span class="tag tweak">tweak</span></td><td>every admin action</td><td>confirm-before-write (edge 10)</td><td class="code" style="font-size:12px">—</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A17</td><td><b style="font-weight:500">Knowledge &amp; Shared Libraries</b></td><td>Admin</td><td>Knowledge › Class knowledge · Shared library</td><td><span class="tag done">done</span></td><td>A5 grade_subjects</td><td>T10, T3, T9, T13</td><td class="code" style="font-size:12px">08</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">—</td><td><b style="font-weight:500">Notifications engine (rail)</b></td><td>Both</td><td>Operations › Notifications (infrastructure)</td><td><span class="tag build">build</span></td><td>—</td><td>A11 publishers, digest per day</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">—</td><td><b style="font-weight:500">Calendar sync (one-way out)</b></td><td>Both</td><td>Settings › integrations · T1</td><td><span class="tag build">build</span></td><td>A3 versions</td><td>T1, edge cases 2 &amp; 13</td><td class="code" style="font-size:12px">05 (diff endpoint)</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">—</td><td><b style="font-weight:500">Roles &amp; permissions</b></td><td>Both</td><td>Settings</td><td><span class="tag tweak">tweak</span></td><td>HoD marker (02)</td><td>one shell, role-gated</td><td class="code" style="font-size:12px">02</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">—</td><td><b style="font-weight:500">Data import (CSV)</b></td><td>Admin</td><td>Home checklist › Import → People</td><td><span class="tag build">build</span></td><td>A1</td><td>A6, A7</td><td class="code" style="font-size:12px">01 · 07</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted)">Statuses follow the handoff tags. A2 and A3 were BUILD there and have since landed (calendar, bell schedule, builder, drafts); shown as tweak. Codes with "—" are the shared platform, which the handoff lists without numbers.</p>
     </section>
 
     <section id="layers">
