@@ -139,3 +139,44 @@ Timetable sits and what surrounds it before touching its internals.
 3. Knowledge libraries as their own small group, or folded under Classes.
 4. Home as the setup checklist for a fresh school (section 3). Confirm.
 5. Teacher-facing screens: untouched in this pass (admin-only build). Confirm.
+
+## 7. Setup vs Settings — the rule
+
+Two different things, kept apart on purpose:
+
+- **Setup** is about the *school*. Anything another module reads as data about how
+  this school runs: academic year, calendar, school day, subjects, year rollover, and
+  importing the school's people. It sits in the sidebar because it is part of running
+  the school. Test: "would a different admin at the same school see the same value?"
+  If yes, it is Setup.
+- **Settings** is about the *application and the account*. How Paperhint behaves for
+  this user or this account: my profile, appearance, password and security, roles &
+  permissions, notification channels and integrations (calendar sync provider, email
+  sender). It stays in the user menu, as today, not in the sidebar groups. Test: "does
+  changing this alter any school record?" If no, it is Settings.
+
+Concretely: working days are Setup (the timetable reads them); dark mode is Settings.
+Roles & permissions is Settings even though it is admin-only, because it governs the
+app, not the school's data.
+
+## 8. Coverage against the handoff document
+
+**Admin modules A1–A17:** all seventeen placed (table in section 4).
+
+**Shared platform (listed under both roles):**
+
+| Item | Placement |
+|---|---|
+| Notifications engine | The rail under A11 (Operations). Built as infrastructure first; delivery-channel configuration lives in Settings |
+| Calendar sync | Teacher-side feature (T1). Provider connection lives in Settings; no admin page |
+| Roles & permissions | Settings — admin-only section |
+| Data import (CSV of students/teachers) | Setup — as an "Import" action on the setup checklist, writing into People |
+
+**Teacher modules T1–T17 and Phase 2 (P2-1..3):** out of scope for this pass by
+decision (admin-only build). They are not lost: T16 Students and T17 Teachers already
+map onto A6/A7 as role-scoped views of the same pages (association 10), and T13/T14/T15
+gain school-level views under Exams & papers. The teacher shell gets its own pass once
+the admin shell is settled.
+
+**Future roles (committee, student, parent):** direction only per the handoff; nothing
+placed, nothing built.
