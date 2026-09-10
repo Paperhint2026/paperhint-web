@@ -251,7 +251,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       {
         key: "library",
-        title: "Class knowledge",
+        title: "Knowledge Library",
         icon: StackIcon,
         path: "/library",
         status: "live",
