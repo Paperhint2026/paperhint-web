@@ -145,6 +145,22 @@
   .step.now { border-color: var(--accent); background: var(--accent-soft); }
   @media (max-width: 640px) { .step { grid-template-columns: 34px 1fr; } .step .tag { grid-column: 2; justify-self: start; } }
 
+  /* module documents */
+  .docs { display: grid; gap: 8px; }
+  details.doc { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  details.doc[open] { background: transparent; }
+  details.doc summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: baseline; padding: 12px 16px; }
+  details.doc summary::-webkit-details-marker { display: none; }
+  details.doc summary:hover { background: var(--surface); }
+  details.doc summary .no { font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--accent); }
+  details.doc summary .t { font-weight: 500; }
+  details.doc summary .src { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--muted); }
+  details.doc .body { padding: 4px 16px 18px 68px; border-top: 1px solid var(--line); }
+  details.doc .body h4 { font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; font-weight: 500; }
+  details.doc .body p, details.doc .body ul, details.doc .body ol { font-size: 14px; color: var(--ink-2); max-width: 72ch; }
+  details.doc .body li { margin-bottom: 4px; }
+  @media (max-width: 640px) { details.doc .body { padding-left: 16px; } details.doc summary .src { display: none; } }
+
   .log { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .log div { display: grid; grid-template-columns: 96px 1fr; gap: 14px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
   .log div:last-child { border-bottom: 0; }
@@ -169,10 +185,11 @@
       <li><a href="#profiles">Profile pages</a></li>
       <li><a href="#schema">Schema deltas</a></li>
       <li><a href="#plan">Build plan</a></li>
+      <li><a href="#documents">Module documents</a></li>
       <li><a href="#decisions">Decisions</a></li>
       <li><a href="#open">Open questions</a></li>
     </ol>
-    <div class="meta">Revision 2 · 10 Sept 2026<br>Execution docs 00–10 in <code>docs/modules/</code>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
+    <div class="meta">Revision 3 · 10 Sept 2026<br>Execution docs 00–10 rendered in <a href="#documents">Module documents</a>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
   </nav>
 
   <main>
@@ -412,6 +429,168 @@ flowchart LR
         <div class="step"><div class="no">8</div><div><b>Knowledge: class-level and shared</b><p>Class knowledge at grade × subject inherited by sections; shared library kept separate with the teacher as provenance.</p><div class="dep">Needs 2 · docs/modules/08</div></div><span class="tag tweak">doc ready</span></div>
         <div class="step"><div class="no">9</div><div><b>Exams &amp; papers, Operations</b><p>Exam manager, results and report cards, attendance oversight, substitution, notifications rail, reports. Each replaces a Soon row.</p><div class="dep">Notifications rail before any publisher · docs/modules/09</div></div><span class="tag tweak">doc ready</span></div>
         <div class="step"><div class="no">10</div><div><b>Teacher shell</b><p>Teacher menu ordered by her day, My Department grouping, class pipeline gains Portion. Screens untouched until then.</p><div class="dep">After the admin shell settles · docs/modules/10</div></div><span class="tag build">later</span></div>
+      </div>
+    </section>
+
+    <section id="documents">
+      <div class="eyebrow">Execution</div>
+      <h2>Module documents</h2>
+      <p class="sub">One document per build step, same six headings each: scope, schema, API, screens and pickers, acceptance, out of scope. Rendered from <code>docs/modules/*.md</code> by <code>scripts/build-scheme-docs.py</code>, so the repo and this page never disagree. Principles and step 1 are open; the rest expand on click.</p>
+      <div class="docs">
+<!-- modules:start -->
+<details class="doc" open id="doc-00-principles">
+  <summary><span class="no">00</span><span class="t">Execution principles (apply to every module document)</span><span class="src">00-principles.md</span></summary>
+  <div class="body"><p>Founder's rule, 2026-09-10: <b>the whole app should be seamless.</b> In testable terms:</p>
+<ol><li><b>No dead ends.</b> Every nav row opens something. Every artefact opens from every horizontal it is tagged with (subject, section, teacher, student, year). Every empty state names the next action and links to it.</li><li><b>Pickers are pre-filtered, never full lists.</b> Candidates come from the junction (allotment, department, roster, free-at-period), with "show all" behind a step.</li><li><b>One record, many views.</b> The same rows serve admin and teacher; scope changes, the data does not. Never build a second table for a second role.</li><li><b>Setup flows into use.</b> Finishing one setup step offers the next. Data entered once is picked everywhere; nothing is typed twice.</li><li><b>Tags and provenance are mandatory.</b> Every artefact row carries its horizontal keys and a link to what it was made from (see <code>docs/module-map.md</code>).</li></ol>
+<p>Each module document has the same six headings: Scope · Schema · API · Screens and pickers · Acceptance · Out of scope. Migrations are additive, idempotent, and recorded in <code>paperhint-service/migrations/README.md</code> in the same commit.</p></div>
+</details>
+<details class="doc" open id="doc-01-school-and-year">
+  <summary><span class="no">01</span><span class="t">School &amp; academic year (A1)</span><span class="src">01-school-and-year.md</span></summary>
+  <div class="body"><p>Group: Setup · Status: TWEAK in handoff (batch tag exists, no year module) · First module in setup order; everything else dates from the year that is open here.</p>
+<h4>Scope</h4>
+<p>One page with two parts. <b>School profile</b>: name, board, address, contact, logo, week start and working days (moved here from Calendar's form; School day keeps the period templates). <b>Academic years</b>: the list of years, exactly one <em>open</em>, the rest <em>closed</em> (read-only). Opening a year is the first step of Year rollover, not a separate action: "Start new academic year" on this page hands off to the rollover flow, which creates the year, promotes classes and memberships, and closes the old year at the end. Rooms live here too as a small list (name, capacity, optional building), because the timetable's clash rule needs them and nothing else owns them.</p>
+<h4>Schema (additive; migration 023)</h4>
+<ul><li><code>academic_years (id, school_id, label text e.g. "2026–27", start_date, end_date, status enum open|closed, created_at)</code>; UNIQUE (school_id, label); at most one <code>open</code> per school (partial unique index).</li><li><code>classes.academic_year_id uuid REFERENCES academic_years</code> — nullable at first; backfill from the existing <code>classes.academic_year</code> text tag (one row per distinct tag per school), then keep the text column until every reader moves.</li><li><code>schools</code>: add <code>board text</code>, <code>address text</code>, <code>contact_email text</code>, <code>contact_phone text</code>, <code>logo_url text</code>. <code>week_start</code> / <code>working_days</code> already exist (018).</li><li><code>rooms (id, school_id, name, capacity int null, building text null)</code>; UNIQUE (school_id, name).</li><li>RLS: enabled, no policies, service-role only — same posture as 020.</li></ul>
+<h4>API</h4>
+<ul><li><code>GET /api/schools/me</code> → profile + open year + counts (exists in part; extend).</li><li><code>PATCH /api/schools/me</code> — profile fields, week settings.</li><li><code>GET /api/academic-years</code> · <code>POST /api/academic-years</code> (used by rollover) · <code>PATCH /api/academic-years/:id</code> (dates, label) · <code>POST /api/academic-years/:id/close</code>.</li><li><code>GET|POST|PATCH|DELETE /api/rooms</code>.</li><li>Every list endpoint that is year-scoped (classes, allotments, timetable, exams) accepts <code>?year=&lt;id&gt;</code> and defaults to the open year.</li></ul>
+<h4>Screens and pickers</h4>
+<ul><li><b>Setup › School &amp; year</b>: profile card (edit in place), Years list with the open year pinned and "Start new academic year →" (hands off to Year rollover), Rooms list with inline add. Admin only.</li><li><b>Year picker in the header</b> (shell): defaults to the open year; choosing a closed year puts the app in read-only mode with a visible band. This is how a teacher opens last year's paper without anything being editable.</li><li>Calendar page loses its week-settings form; it links here instead.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>A brand-new school lands on Home's setup checklist at step 1 and can complete the profile and open its first year without touching the database.</li><li>Exactly one open year per school is enforced by the database, not the UI.</li><li>Every existing class resolves to an <code>academic_years</code> row after backfill; no class left with a null year.</li><li>Selecting a closed year renders every page read-only; no write endpoint accepts a closed year.</li><li>Rooms appear as a picker in the timetable cell once the Timetable module reads them.</li></ul>
+<h4>Out of scope</h4>
+<p>Rollover mechanics (A15, own document). Department list (02). Period templates (03). Custom staff fields (decision pending on <code>users.custom_fields</code>).</p></div>
+</details>
+<details class="doc" id="doc-02-departments-and-subjects">
+  <summary><span class="no">02</span><span class="t">Departments &amp; subjects (A5)</span><span class="src">02-departments-and-subjects.md</span></summary>
+  <div class="body"><p>Group: Setup · Handoff: TWEAK ("Subjects &amp; books") · Renamed by founder decision. Second in setup order. Lands the two junctions that Knowledge, Papers, Allotments and Period Exchange all hang off.</p>
+<h4>Scope</h4>
+<p>One page, a hierarchy: <b>Department</b> → <b>subjects it owns</b> → <b>grades each subject runs in</b>. Departments carry a head of department (a teacher) and derive their members from <code>users.department_id</code>. Books do not appear as a top-level word: a subject-in-a-grade shows a count of attached materials and links to Knowledge › Class knowledge. Handles the primary-section case: a "Primary" department may own every subject for grades 1–5.</p>
+<h4>Schema (additive; migration 024)</h4>
+<ul><li><code>departments.head_user_id uuid NULL REFERENCES users(id) ON DELETE SET NULL</code>.</li><li><code>department_subjects (department_id, subject_id, PRIMARY KEY (department_id, subject_id))</code>. A subject may sit in more than one department (Primary owns Maths for 1–5, Mathematics owns it for 6–12) — scope by grade via <code>grade_subjects</code>, not by uniqueness here.</li><li><code>grade_subjects (id, school_id, grade int, subject_id, academic_year_id NULL, created_at)</code>; UNIQUE (school_id, grade, subject_id, academic_year_id). Year nullable so curriculum can be school-constant; a year-specific row overrides.</li><li><code>class_subjects.grade_subject_id uuid NULL REFERENCES grade_subjects</code> — backfilled from (class.grade, subject_id); trigger or service layer keeps it set on insert.</li><li>RLS: service-role only, as 020.</li></ul>
+<h4>API</h4>
+<ul><li><code>GET /api/schools/departments</code> (exists) · <code>POST /api/schools/departments</code> (exists, no UI today) · add <code>PATCH /api/schools/departments/:id</code> (name, head_user_id) · <code>DELETE</code> refused while members or subjects exist.</li><li><code>GET|POST /api/subjects</code> (exist) · add <code>PATCH /api/subjects/:id</code>.</li><li><code>PUT /api/departments/:id/subjects</code> — replace the owned-subject set.</li><li><code>GET|PUT /api/grade-subjects?grade=6</code> — the grades a subject runs in; PUT replaces.</li><li><code>GET /api/departments/:id/members</code> — derived; includes head flag and load once Timetable exists.</li></ul>
+<h4>Screens and pickers</h4>
+<ul><li><b>Setup › Departments &amp; subjects</b>: left list of departments with member count and head; right panel: head picker (teachers in this department first, then all), owned subjects as chips with add, and per subject the grade range as toggles (1–12). Material counts per subject-grade link to Class knowledge.</li><li><b>Teachers</b>: department picker reads this list; creation moves here. HoD badge on the card and profile.</li><li><b>Classes</b>: when a class is created, its subject set defaults to the grade's <code>grade_subjects</code>; electives still configured per section.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>A new school can create departments, name heads, and attach subjects without the database. Deleting a department with members is refused with the member count.</li><li>Every existing <code>class_subjects</code> row resolves a <code>grade_subject_id</code> after backfill.</li><li>Allotment picker (module 03) defaults to the owning department's teachers.</li><li>HoD gains no new role; permission checks read <code>departments.head_user_id</code>.</li></ul>
+<h4>Out of scope</h4>
+<p>Department KPI slice (A14). Department-scoped approvals (A10). Material upload (Knowledge).</p></div>
+</details>
+<details class="doc" id="doc-03-classes-and-allotments">
+  <summary><span class="no">03</span><span class="t">Classes &amp; sections (A4) + Allotments board (A8)</span><span class="src">03-classes-and-allotments.md</span></summary>
+  <div class="body"><p>Group: Classes · Handoff: A4 DONE, A8 DONE but edited in the wrong places (Teachers drawer, Batches page). One module because allotment is a property of a section's subject.</p>
+<h4>Scope</h4>
+<p><b>Classes &amp; sections</b> keeps today's page (grades, sections, subject sets, electives, archive) and gains class creation moved in from Batches (<code>POST /batches/prepare-class</code>, <code>GET /batches/class-template</code> → move to <code>/api/classes</code>). <b>Allotments</b> becomes one school-wide board: rows = sections × subjects, cell = allotted teacher(s) with tenure; department-first picker; gaps flagged; a teacher-load column from the timetable once it exists. Teachers page and Batches page show allotments read-only and link here.</p>
+<h4>Schema</h4>
+<p>No new tables. <code>teacher_assignments</code> already has tenure (012) and <code>is_current</code>. Add <code>teacher_assignments.grade_subject_id</code> denormalised? <b>No</b> — derive via <code>class_subjects</code>. Add index on <code>(class_subject_id, is_current)</code> if missing.</p>
+<h4>API</h4>
+<ul><li>Classes: <code>GET /api/classes</code>, <code>/grouped</code>, <code>/grade/:grade/overview</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code> (exist). Move <code>prepare-class</code> and <code>class-template</code> here from batches.</li><li>Class subjects: exist. Ensure <code>POST</code> sets <code>grade_subject_id</code> (02).</li><li>Allotments: <code>POST /api/teacher-assignments</code> and <code>/unassign</code> exist. Add <code>GET /api/teacher-assignments/board?year=</code> returning sections × subjects × teacher with gaps, and <code>GET /api/teacher-assignments/candidates?class_subject_id=</code> returning the tiered list (allotted · department · all) with current load.</li></ul>
+<h4>Screens and pickers</h4>
+<ul><li><b>Classes › Classes &amp; sections</b>: today's page + "New class" (from Batches). Archive is a flag, never a delete (edge case 6).</li><li><b>Classes › Allotments</b>: grid by grade; filters by department, unassigned only; cell click opens the tiered picker; swap keeps history (ends old tenure, starts new).</li><li><b>Teachers</b> drawer: allotments read-only with "Change in Allotments →".</li><li><b>Home › Needs a look</b>: staffing gaps come from the board endpoint.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>No section-subject without a teacher is invisible: the board shows every gap.</li><li>Assigning from the board, the Teachers drawer, or Batches is one code path (the drawer and Batches lose their editors).</li><li>Candidate list order: allotted, then owning department, then all; load shown.</li><li>Mid-term swap keeps the old tenure row with <code>ended_at</code> (association 2 depends on it).</li></ul>
+<h4>Out of scope</h4>
+<p>Ripple into a published timetable (module 05 handles: slots on the old allotment move to the new teacher, pending exchanges invalidated).</p></div>
+</details>
+<details class="doc" id="doc-04-school-day">
+  <summary><span class="no">04</span><span class="t">School day (A3 configuration)</span><span class="src">04-school-day.md</span></summary>
+  <div class="body"><p>Group: Setup · Handoff: part of A3 (BUILD) · Today: one bell schedule per school in a Timetable dialog; week settings in a Calendar form. <b>First migration that touches a table the live timetable reads — staging decision due before this ships.</b></p>
+<h4>Scope</h4>
+<p>The shape of the school day, per grade. <b>Period templates</b>: named sets of periods and breaks with times (KG: 5 periods; grades 6–12: 8). <b>Grade → template</b> assignment; a school with one shape assigns one template everywhere. <b>Week</b>: working days and week start (moved from Calendar; shown here, stored on <code>schools</code> as today).</p>
+<h4>Schema (additive; migration 025)</h4>
+<ul><li><code>period_templates (id, school_id, name, is_default bool, created_at)</code>.</li><li><code>period_template_periods (id, template_id, period_number, name, start_time, end_time, is_break)</code>; UNIQUE (template_id, period_number); CHECK end &gt; start.</li><li><code>grade_period_templates (school_id, grade, template_id, PRIMARY KEY (school_id, grade))</code>.</li><li>Migration copies each school's <code>school_periods</code> into one template named "Default", marks it default, assigns it to every grade in use, and adds <code>timetable_slots.template_period_id</code> backfilled by matching <code>period_id</code> → same period_number. <code>school_periods</code> and <code>period_id</code> stay until the Timetable module switches readers, then a later migration drops them.</li></ul>
+<h4>API</h4>
+<ul><li><code>GET|POST|PATCH|DELETE /api/timetable/templates</code> · <code>PUT /:id/periods</code> (replace set) · <code>PUT /api/timetable/grade-templates</code> (grade → template map).</li><li><code>GET /api/timetable/periods</code> (exists) gains <code>?grade=</code> and returns that grade's template periods; without grade returns the default template (keeps today's callers working).</li><li><code>PATCH /api/calendar/week-settings</code> (exists) is called from this page now.</li></ul>
+<h4>Screens and pickers</h4>
+<ul><li><b>Setup › School day</b>: templates as cards (periods rendered as a day strip); "New template" generator (start, end, period length, breaks → rows, editable, as today's BellScheduleSetup does); grade assignment as a 1–12 row of template pickers; Week panel. The Timetable page's Bell schedule dialog is removed and links here.</li><li><b>Timetable</b>: grid rows come from the class's grade template.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>Existing schools see one "Default" template on every grade with their current periods; no timetable cell changes.</li><li>KG on 5 periods and grade 6 on 8 render as different grids.</li><li>Changing a template that has published slots warns with the affected section count and requires confirm; slots on removed periods are listed, not silently dropped.</li><li>Calendar page no longer edits week settings.</li></ul>
+<h4>Out of scope</h4>
+<p>Per-day variants (short Saturday) — noted follow-up in migration 020's header. Room list (01). Clash rules (05).</p></div>
+</details>
+<details class="doc" id="doc-05-timetable">
+  <summary><span class="no">05</span><span class="t">Timetable (A3)</span><span class="src">05-timetable.md</span></summary>
+  <div class="body"><p>Group: Classes · Handoff: BUILD, since landed (builder, AI fill, drafts, teacher view). Today: one 3,655-line file, admin and teacher forked at runtime, config in dialogs.</p>
+<h4>Scope</h4>
+<p>Keep what works (grid builder, readiness strip, drafts, AI generation, validation, copy-day, teacher load) and restructure: own sub-routes, components by surface, tiered teacher picker, room on slot with clash, stable slot identity for logs and exchanges, allotment ripple. Teacher view stays as it is (My schedule · any class) on <code>/timetable/my-schedule</code>.</p>
+<h4>Schema (additive; migration 026)</h4>
+<ul><li><code>timetable_slots.room_id uuid NULL REFERENCES rooms</code>.</li><li><code>timetable_slots.template_period_id</code> becomes the read path (from 04); <code>period_id</code> dropped in a later migration once no reader remains.</li><li>Slot identity: rows are already UUID; add <code>published_at</code> on a <code>timetables (id, class_id, academic_year_id, version, published_at)</code> header so drafts and published grids are versioned; slots reference the header. Period logs (T4) and exchanges (T2) reference slot id + date.</li><li>Unique clash guards as DB constraints: <code>(teacher_id, day_of_week, template_period_id, timetable_version)</code> and <code>(room_id, day, period, version)</code> partial on published rows.</li></ul>
+<h4>API</h4>
+<p>Existing: periods, readiness, teacher-busy, teacher-load, my-schedule, align-elective, <code>/:classId</code> get, slots replace, validate, generate, draft get/save/delete. Add: <code>GET /api/timetable/candidates?class_subject_id=&amp;day=&amp;period=</code> (tiered, excludes busy), <code>GET /api/timetable/rooms/free?day=&amp;period=</code>, <code>POST /api/timetable/:classId/publish</code> (creates a version), <code>GET /api/timetable/changes?since=</code> for the calendar-sync diff (edge case 2).</p>
+<h4>Screens and pickers</h4>
+<ul><li><code>/timetable</code> — section grid (default), class picker, readiness strip.</li><li><code>/timetable/teacher-load</code> — page, not dialog.</li><li><code>/timetable/my-schedule</code> — teacher default; admins can open it via View as.</li><li>Bell schedule dialog removed → Setup › School day.</li><li>Cell editor: teacher field pre-selected from allotment; tiers as rule 1; room field with free-rooms first; busy teachers greyed with where they are.</li><li>Class page (<code>/class/:id</code>) gains a read-only timetable tab — the surface T2 borrows from.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>Split: no file over ~600 lines; <code>modules/timetable/components/*</code> by surface.</li><li>Picker tiers verified with a section whose allotted teacher is busy at that period.</li><li>Two sections cannot both publish the same teacher at the same period (DB refuses).</li><li>Allotment swap (03) moves that teacher's slots and lists pending exchanges to cancel.</li><li>Publishing a new version emits a diff of moved slots per teacher.</li></ul>
+<h4>Out of scope</h4>
+<p>Calendar sync itself (Settings integration). Period Exchange (T2, teacher pass).</p></div>
+</details>
+<details class="doc" id="doc-06-year-rollover">
+  <summary><span class="no">06</span><span class="t">Year rollover (A15) — Batches renamed and moved</span><span class="src">06-year-rollover.md</span></summary>
+  <div class="body"><p>Group: Setup · Handoff: TWEAK · <b>Founder wants a mock before code.</b> Today the Batches page already has Year Rollover and Past Batches tabs, "Start new academic year", class creation, and student transfer/withdraw/history.</p>
+<h4>Scope</h4>
+<p>Rename <b>Batches → Year rollover</b> under Setup. The page keeps: rollover preview and execute (<code>/rollover/preview</code>, <code>/execute</code>, <code>/execute-plan</code>, <code>/promotion-draft</code>), past years (<code>/past</code>, <code>/past/:classId/students</code>), per-student history, transfer and withdraw, annual result flag. Class creation leaves for Classes (03). Opening a year <em>is</em> the first step here: "Start new academic year" creates the <code>academic_years</code> row (01), then the promotion plan, then closes the old year at the end.</p>
+<h4>Schema</h4>
+<p>Uses <code>academic_years</code> (01) and <code>student_class_memberships</code> (013). Add <code>academic_years.closed_at</code> and <code>rolled_from_year_id</code> for lineage. Nothing else.</p>
+<h4>API</h4>
+<p>Existing batches routes stay, mounted additionally at <code>/api/rollover/*</code> with the old paths kept as aliases for one release. <code>POST /switch-year</code> becomes a write to <code>academic_years.status</code>. <code>prepare-class</code> and <code>class-template</code> move to <code>/api/classes</code>.</p>
+<h4>Screens and pickers</h4>
+<ul><li><b>Setup › Year rollover</b>: year header (open year, dates), the promotion plan grid (grade → target grade, sections mapped), review, execute; Past years list; student history/transfer stays reachable from the Student profile too (one record, two views).</li><li>Mock first: two screens — the plan grid, and the Past years view — for founder sign-off.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>Rollover never rewrites verticals; every artefact of the closed year stays tagged and read-only (edge case 1). Verified by opening a past year in the header picker.</li><li>Transfer within school carries every record; transfer out produces a partial-year report card export (edge case 4).</li><li>Archived sections hide from pickers, stay queryable (edge case 6).</li></ul>
+<h4>Out of scope</h4>
+<p>Report card generation itself (A13); allotment re-staffing UI (03 does it against the new year).</p></div>
+</details>
+<details class="doc" id="doc-07-home-setup-checklist">
+  <summary><span class="no">07</span><span class="t">Home as setup checklist</span><span class="src">07-home-setup-checklist.md</span></summary>
+  <div class="body"><p>Handoff: not a module; the founder's call (2026-09-10). Teacher home kept. Admin home already has "Set up your school", "Needs a look", "Staffing".</p>
+<h4>Scope</h4>
+<p>For a school that has not published a timetable, Home leads with a nine-step checklist, each step linking into its page, done state computed live: School &amp; year → Calendar → Departments &amp; subjects → Classes &amp; sections → Teachers → Students → Allotments → School day → Timetable published. Once published, the checklist folds into a compact "setup complete" line and the operations view (Needs a look: gaps, missing registers, pending exchanges) leads. The View-as switch previews the teacher home.</p>
+<h4>Schema</h4>
+<p>None. Readiness is derived.</p>
+<h4>API</h4>
+<p><code>GET /api/schools/readiness</code> — one call returning each step's state and count (reuses <code>/api/timetable/readiness</code>, allotment board gaps, counts of departments, classes, teachers, students, calendar published, open year).</p>
+<h4>Screens and pickers</h4>
+<p>Admin home: greeting; checklist card with progress (done / total); each row: step, state, count, "Open →". Below it today's Needs a look and Staffing, unchanged. When all done: checklist collapses to one line with "Setup complete · 9 of 9".</p>
+<h4>Acceptance</h4>
+<ul><li>New school: step 1 open, others pending, every row links to the correct Setup page.</li><li>Completing a step elsewhere updates the row on return without reload.</li><li>Published timetable collapses the checklist.</li></ul>
+<h4>Out of scope</h4>
+<p>Teacher home changes; Ask Hint panel changes.</p></div>
+</details>
+<details class="doc" id="doc-08-knowledge">
+  <summary><span class="no">08</span><span class="t">Knowledge: Class knowledge (A17/T10) and Shared library (T11)</span><span class="src">08-knowledge.md</span></summary>
+  <div class="body"><p>Group: Knowledge · Handoff: DONE. Today: materials attach per section; Knowledge Library and Shared Library pages exist; nav labels kept matching page titles until this ships.</p>
+<h4>Scope</h4>
+<p>Two pages, never confused. <b>Class knowledge</b>: curriculum sources at grade × subject, inherited by every section; a section may add its own extras that never leak. Admin curates school-wide; teachers see their subjects' sets. <b>Shared library</b>: teacher-made items shared to the school shelf; provenance is the teacher. Every paper and note records the materials it used.</p>
+<h4>Schema (additive; migration 027)</h4>
+<ul><li><code>knowledge_materials.grade_subject_id uuid NULL REFERENCES grade_subjects</code> — backfill from each material's class_subject's grade+subject; materials attached to several sections of one grade collapse to one grade-level row (dedupe by file hash / title, report the rest for manual merge).</li><li><code>knowledge_material_class_subjects</code> stays for section-only extras.</li><li><code>paper_sources (paper_id, material_id)</code> and <code>note_sources (note_id, material_id)</code>.</li><li><code>exams.paper_id</code> if papers are not first-class today (verify in exams module).</li></ul>
+<h4>API</h4>
+<p>Knowledge routes exist (upload, analyze, visibility). Add <code>?grade_subject_id=</code> filters, <code>POST /api/knowledge/:id/scope</code> (section-only ↔ grade-wide), and sources endpoints on exams/blueprints. <code>match_knowledge_materials</code> RPC gains a grade_subject filter.</p>
+<h4>Screens and pickers</h4>
+<ul><li><b>Knowledge › Class knowledge</b>: grade × subject matrix with counts; drill to the set; upload attaches at grade level by default with "only for this section" toggle.</li><li><b>Knowledge › Shared library</b>: as today, plus source links on each item.</li><li><b>Class page › Knowledge tab</b>: inherited set + section extras, labelled.</li><li><b>Setup › Departments &amp; subjects</b>: counts link here.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>Upload once for Grade 6 Maths → visible in 6A, 6B, 6C knowledge tabs.</li><li>Section extra never appears in another section.</li><li>A generated paper lists its sources; Ask Hint answers cite grade-level sources.</li></ul>
+<h4>Out of scope</h4>
+<p>Rename of nav labels lands here (Knowledge Library → Class knowledge).</p></div>
+</details>
+<details class="doc" id="doc-09-exams-and-operations">
+  <summary><span class="no">09</span><span class="t">Exams &amp; papers and Operations (A12, A13, A9, A10, A11, A14)</span><span class="src">09-exams-and-operations.md</span></summary>
+  <div class="body"><p>All BUILD. Each replaces one "Soon" row. Written as one document so the shared dependency — the Notifications rail — is decided once.</p>
+<h4>Order</h4>
+<ol><li><b>Notifications rail (A11)</b> first, as infrastructure: <code>notifications (id, school_id, recipient_user_id | student_id (parent), channel, kind, source_type, source_id, payload, status, sent_at)</code> + daily digest per recipient per channel (edge case 12). Publishers: attendance, homework, results, exchanges, circulars.</li><li><b>Attendance oversight (A9)</b>: web surface over the mobile scan flow; day view per section, missing registers, resend. Tags: section, date, marker, student.</li><li><b>Exam manager (A12)</b>: <code>exams</code> gains <code>academic_year_id</code>, calendar window, and can span sections; papers and grading link; publish results in one action.</li><li><b>Results &amp; report cards (A13)</b>: <code>report_cards (student_id, academic_year_id, term, generated_at, pdf_url)</code> compiled from results + attendance; visible in the student profile to teachers of that student (edge case 8: full card by default).</li><li><b>Leave &amp; substitution (A10)</b>: office view over T2 exchanges; unfilled periods list; suggested free teachers; cover assignment; exam-duty check (edge case 5). Depends on Timetable versions (05) and T2 (teacher pass).</li><li><b>Reports &amp; KPI (A14)</b>: read-only aggregates; needs period logs (T4) for the teacher-completion KPI — ships with marks and attendance first, adds KPI when T4 exists.</li></ol>
+<h4>Cross-cutting acceptance</h4>
+<ul><li>Every artefact carries its tag columns from the module map matrix.</li><li>No module sends its own messages; all go through the rail.</li><li>Every list is year-scoped by the header picker.</li></ul></div>
+</details>
+<details class="doc" id="doc-10-teacher-shell">
+  <summary><span class="no">10</span><span class="t">Teacher shell (later pass)</span><span class="src">10-teacher-shell.md</span></summary>
+  <div class="body"><p>Deferred by decision (admin-only build first). Recorded so the admin work is built with it in mind.</p>
+<h4>Shape</h4>
+<p>Teacher menu ordered by her day, from the handoff T1–T17: My Day / My schedule (T1) on top; Your classes with the five-step pipeline Knowledge → Exams → Grading → Results → Portion (T5); Library; My Department + Teachers (T17); Ask Hint everywhere. Coming-soon rows for T1, T2, T4, T5, T6, T7, T12 the same way as the admin menu.</p>
+<h4>What the admin pass must leave in place for it</h4>
+<ul><li>Nav definition per role already exists (<code>src/data/nav.ts</code>); this pass edits data.</li><li>Department with head (02) → My Department grouping and fill suggestions.</li><li>Stable slot identity and versions (05) → Period log and exchanges.</li><li><code>grade_subjects</code> (02) → Portion tracker per section reads one chapter list.</li><li>Students page scoped by roster (T16 → A6): same page, teacher scope.</li></ul>
+<h4>Out of scope for now</h4>
+<p>Everything above until the admin shell and modules 01–05 are merged.</p></div>
+</details>
+<!-- modules:end -->
       </div>
     </section>
 
