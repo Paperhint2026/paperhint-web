@@ -42,3 +42,10 @@ paths kept as aliases for one release. `POST /switch-year` becomes a write to
 ## Out of scope
 
 Report card generation itself (A13); allotment re-staffing UI (03 does it against the new year).
+
+## From interview (truth.md, 2026-09-10)
+
+- Default promotion is whole sections (6A → 7A, same students). Exceptions per student:
+  hold back, remove, add transfer-in. The copilot proposes hold-backs from results.
+- **Reshuffle** step: section → student remapping by uploading a list or typing names,
+  reviewed, then applied. Optional; off by default.

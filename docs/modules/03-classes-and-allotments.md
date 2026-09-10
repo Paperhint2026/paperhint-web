@@ -49,3 +49,19 @@ Add `teacher_assignments.grade_subject_id` denormalised? **No** — derive via
 
 Ripple into a published timetable (module 05 handles: slots on the old allotment move
 to the new teacher, pending exchanges invalidated).
+
+## From interview (truth.md, 2026-09-10)
+
+- **Class teacher**: `classes.class_teacher_id` (nullable → users). Owns the class; shown
+  on the section card and the roster; attendance per period is by the period's teacher.
+- **Replace teacher** is a first-class action on the board and on a deactivated teacher's
+  profile: pick the section-subjects they held, pick the replacement (tiered), and every
+  slot, upcoming duty and pending request moves in one transaction. Old tenure ends.
+- Shared allotment (two teachers, one subject-section) allowed; UI neutral.
+- Optional `teacher_load_limit` per school or per teacher; board warns past it.
+- Combined class: two sections, same teacher, same period is allowed by the clash rule
+  when the slots are marked as a combined block (`block_id` already exists on slots).
+- Guardian contacts (Students): three slots, two mandatory — `student_guardians
+  (student_id, name, relation, phone, email, is_primary, position 1..3)`.
+- Roles as a set: `user_roles (user_id, role)` with `admin | teacher | staff`; the
+  principal holds admin + teacher. `users.role` kept as the primary for compatibility.

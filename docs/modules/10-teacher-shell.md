@@ -21,3 +21,11 @@ Coming-soon rows for T1, T2, T4, T5, T6, T7, T12 the same way as the admin menu.
 ## Out of scope for now
 
 Everything above until the admin shell and modules 01–05 are merged.
+
+## From interview (truth.md, 2026-09-10)
+
+- Teacher schedules (layer 3) are the teacher's home surface; borrow and substitute live
+  there. Colleagues' schedules can be added to one's view. Upcoming duties (accepted
+  fills) show on the dashboard with a countdown.
+- Non-teaching staff get the same shell scoped to their department periods and
+  attendance.

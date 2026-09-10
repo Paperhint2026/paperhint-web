@@ -66,3 +66,13 @@ the primary-section case: a "Primary" department may own every subject for grade
 ## Out of scope
 
 Department KPI slice (A14). Department-scoped approvals (A10). Material upload (Knowledge).
+
+## From interview (truth.md, 2026-09-10)
+
+- Teacher ↔ department is many-to-many with a primary: `teacher_departments (user_id,
+  department_id, is_primary)` replaces reliance on `users.department_id` (keep the column
+  as the primary for compatibility; backfill).
+- Non-teaching staff belong to departments too (Library, PT, Office). Department members
+  include staff.
+- Designation becomes a tag: `designation_tags (school_id, label)`; `users.designation`
+  keeps the text; picker offers existing tags, creates on new text.

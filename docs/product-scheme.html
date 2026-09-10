@@ -190,7 +190,7 @@
       <li><a href="#decisions">Decisions</a></li>
       <li><a href="#open">Open questions</a></li>
     </ol>
-    <div class="meta">Revision 5 · 10 Sept 2026<br>Interview answers in <code>docs/truth.md</code>.<br>Execution docs 00–10 rendered in <a href="#documents">Module documents</a>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
+    <div class="meta">Revision 6 · 10 Sept 2026<br>Interview answers in <code>docs/truth.md</code>.<br>Execution docs 00–10 rendered in <a href="#documents">Module documents</a>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
   </nav>
 
   <main>
@@ -529,7 +529,9 @@ flowchart LR
 <h4>Acceptance</h4>
 <ul><li>A new school can create departments, name heads, and attach subjects without the database. Deleting a department with members is refused with the member count.</li><li>Every existing <code>class_subjects</code> row resolves a <code>grade_subject_id</code> after backfill.</li><li>Allotment picker (module 03) defaults to the owning department's teachers.</li><li>Heads gain no new role; permission checks read <code>department_heads</code>.</li><li>A department with zero subjects (PT) can be created and allotted to sections.</li></ul>
 <h4>Out of scope</h4>
-<p>Department KPI slice (A14). Department-scoped approvals (A10). Material upload (Knowledge).</p></div>
+<p>Department KPI slice (A14). Department-scoped approvals (A10). Material upload (Knowledge).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>Teacher ↔ department is many-to-many with a primary: <code>teacher_departments (user_id, department_id, is_primary)</code> replaces reliance on <code>users.department_id</code> (keep the column as the primary for compatibility; backfill).</li><li>Non-teaching staff belong to departments too (Library, PT, Office). Department members include staff.</li><li>Designation becomes a tag: <code>designation_tags (school_id, label)</code>; <code>users.designation</code> keeps the text; picker offers existing tags, creates on new text.</li></ul></div>
 </details>
 <details class="doc" id="doc-03-classes-and-allotments">
   <summary><span class="no">03</span><span class="t">Classes &amp; sections (A4) + Allotments board (A8)</span><span class="src">03-classes-and-allotments.md</span></summary>
@@ -545,7 +547,9 @@ flowchart LR
 <h4>Acceptance</h4>
 <ul><li>No section-subject without a teacher is invisible: the board shows every gap.</li><li>Assigning from the board, the Teachers drawer, or Batches is one code path (the drawer and Batches lose their editors).</li><li>Candidate list order: allotted, then owning department, then all; load shown.</li><li>Mid-term swap keeps the old tenure row with <code>ended_at</code> (association 2 depends on it).</li></ul>
 <h4>Out of scope</h4>
-<p>Ripple into a published timetable (module 05 handles: slots on the old allotment move to the new teacher, pending exchanges invalidated).</p></div>
+<p>Ripple into a published timetable (module 05 handles: slots on the old allotment move to the new teacher, pending exchanges invalidated).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li><b>Class teacher</b>: <code>classes.class_teacher_id</code> (nullable → users). Owns the class; shown on the section card and the roster; attendance per period is by the period's teacher.</li><li><b>Replace teacher</b> is a first-class action on the board and on a deactivated teacher's profile: pick the section-subjects they held, pick the replacement (tiered), and every slot, upcoming duty and pending request moves in one transaction. Old tenure ends.</li><li>Shared allotment (two teachers, one subject-section) allowed; UI neutral.</li><li>Optional <code>teacher_load_limit</code> per school or per teacher; board warns past it.</li><li>Combined class: two sections, same teacher, same period is allowed by the clash rule when the slots are marked as a combined block (<code>block_id</code> already exists on slots).</li><li>Guardian contacts (Students): three slots, two mandatory — <code>student_guardians (student_id, name, relation, phone, email, is_primary, position 1..3)</code>.</li><li>Roles as a set: <code>user_roles (user_id, role)</code> with <code>admin | teacher | staff</code>; the principal holds admin + teacher. <code>users.role</code> kept as the primary for compatibility.</li></ul></div>
 </details>
 <details class="doc" id="doc-04-school-day">
   <summary><span class="no">04</span><span class="t">School day (A3 configuration)</span><span class="src">04-school-day.md</span></summary>
@@ -561,7 +565,9 @@ flowchart LR
 <h4>Acceptance</h4>
 <ul><li>Existing schools see one "Default" template on every grade with their current periods; no timetable cell changes.</li><li>KG on 5 periods and grade 6 on 8 render as different grids.</li><li>Changing a template that has published slots warns with the affected section count and requires confirm; slots on removed periods are listed, not silently dropped.</li><li>Calendar page no longer edits week settings.</li></ul>
 <h4>Out of scope</h4>
-<p>Per-day variant UI (schema is ready; UI when a pilot school needs it). Clash rules (05).</p></div>
+<p>Per-day variant UI (schema is ready; UI when a pilot school needs it). Clash rules (05).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>The timetable is constant for the year; template edits after sharing are rare. The warning on edit stays, and the copy should say why ("6 sections use this template").</li></ul></div>
 </details>
 <details class="doc" id="doc-05-timetable">
   <summary><span class="no">05</span><span class="t">Timetable (A3)</span><span class="src">05-timetable.md</span></summary>
@@ -578,7 +584,9 @@ flowchart LR
 <ul><li>A slot may hold a department period (PT, Library) with no class-subject: <code>kind</code> + <code>department_id</code> on the slot (truth.md).</li></ul>
 <ul><li>Split: no file over ~600 lines; <code>modules/timetable/components/*</code> by surface.</li><li>Picker tiers verified with a section whose allotted teacher is busy at that period.</li><li>Two sections cannot both publish the same teacher at the same period (DB refuses).</li><li>Allotment swap (03) moves that teacher's slots and lists pending exchanges to cancel.</li><li>Publishing a new version emits a diff of moved slots per teacher.</li></ul>
 <h4>Out of scope</h4>
-<p>Calendar sync itself (Settings integration). Period Exchange (T2, teacher pass).</p></div>
+<p>Calendar sync itself (Settings integration). Period Exchange (T2, teacher pass).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li><b>Share, not Publish</b>, in every label. Draft until shared; sharing writes every teacher's schedule (layer 3 below).</li><li>Three calendar layers: school calendar (master) · timetable (office) · <b>teacher schedules</b> (derived, calendar-shaped, what teachers actually see). <code>/timetable/ my-schedule</code> renders layer 3; the grid is admin-only.</li><li>Schedules are the surface for <b>borrow</b> and <b>substitute</b> (T2): add a colleague's schedule like Google Calendar; request a period from it; request a fill on your own. Accepted requests land on both schedules and the dashboard as upcoming duties. Design the schedule view now so T2 attaches without rework: each rendered period carries its slot id + date.</li><li>Combined classes: one teacher, two sections, one period — allowed via <code>block_id</code>.</li><li>Staff periods (Library, PT) are department slots with a staff user as the owner.</li><li>Committee builds, admin enters: no multi-editor requirement in v1; drafts already exist.</li></ul></div>
 </details>
 <details class="doc" id="doc-06-year-rollover">
   <summary><span class="no">06</span><span class="t">Year rollover (A15) — Batches renamed and moved</span><span class="src">06-year-rollover.md</span></summary>
@@ -594,7 +602,9 @@ flowchart LR
 <h4>Acceptance</h4>
 <ul><li>Rollover never rewrites verticals; every artefact of the closed year stays tagged and read-only (edge case 1). Verified by opening a past year in the header picker.</li><li>Transfer within school carries every record; transfer out produces a partial-year report card export (edge case 4).</li><li>Archived sections hide from pickers, stay queryable (edge case 6).</li></ul>
 <h4>Out of scope</h4>
-<p>Report card generation itself (A13); allotment re-staffing UI (03 does it against the new year).</p></div>
+<p>Report card generation itself (A13); allotment re-staffing UI (03 does it against the new year).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>Default promotion is whole sections (6A → 7A, same students). Exceptions per student: hold back, remove, add transfer-in. The copilot proposes hold-backs from results.</li><li><b>Reshuffle</b> step: section → student remapping by uploading a list or typing names, reviewed, then applied. Optional; off by default.</li></ul></div>
 </details>
 <details class="doc" id="doc-07-home-setup-checklist">
   <summary><span class="no">07</span><span class="t">Home as setup checklist</span><span class="src">07-home-setup-checklist.md</span></summary>
@@ -634,7 +644,9 @@ flowchart LR
 <h4>Order</h4>
 <ol><li><b>Notifications rail (A11)</b> first, as infrastructure: <code>notifications (id, school_id, recipient_user_id | student_id (parent), channel, kind, source_type, source_id, payload, status, sent_at)</code> + daily digest per recipient per channel (edge case 12). Publishers: attendance, homework, results, exchanges, circulars.</li><li><b>Attendance oversight (A9)</b>: web surface over the mobile scan flow; day view per section, missing registers, resend. Tags: section, date, marker, student.</li><li><b>Exam manager (A12)</b>: <code>exams</code> gains <code>academic_year_id</code> and a calendar <b>exam window</b> (truth.md: windows are set per grade range when the calendar is defined; exams are scheduled inside them, teachers do not invent dates); can span sections; papers and grading link; publish results in one action.</li><li><b>Results &amp; report cards (A13)</b>: <code>report_cards (student_id, academic_year_id, term, generated_at, pdf_url)</code> compiled from results + attendance; visible in the student profile to teachers of that student (edge case 8: full card by default).</li><li><b>Leave &amp; substitution (A10)</b>: office view over T2 exchanges; unfilled periods list; suggested free teachers; cover assignment; exam-duty check (edge case 5). Depends on Timetable versions (05) and T2 (teacher pass).</li><li><b>Reports &amp; KPI (A14)</b>: read-only aggregates; needs period logs (T4) for the teacher-completion KPI — ships with marks and attendance first, adds KPI when T4 exists.</li></ol>
 <h4>Cross-cutting acceptance</h4>
-<ul><li>Every artefact carries its tag columns from the module map matrix.</li><li>No module sends its own messages; all go through the rail.</li><li>Every list is year-scoped by the header picker.</li></ul></div>
+<ul><li>Every artefact carries its tag columns from the module map matrix.</li><li>No module sends its own messages; all go through the rail.</li><li>Every list is year-scoped by the header picker.</li></ul>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>Attendance: per period, by the period's teacher (including staff periods). Absence notifications go to the two primary guardian contacts.</li><li>Homework assignment triggers a push to parents (rail).</li></ul></div>
 </details>
 <details class="doc" id="doc-10-teacher-shell">
   <summary><span class="no">10</span><span class="t">Teacher shell (later pass)</span><span class="src">10-teacher-shell.md</span></summary>
@@ -644,7 +656,9 @@ flowchart LR
 <h4>What the admin pass must leave in place for it</h4>
 <ul><li>Nav definition per role already exists (<code>src/data/nav.ts</code>); this pass edits data.</li><li>Department with head (02) → My Department grouping and fill suggestions.</li><li>Stable slot identity and versions (05) → Period log and exchanges.</li><li><code>grade_subjects</code> (02) → Portion tracker per section reads one chapter list.</li><li>Students page scoped by roster (T16 → A6): same page, teacher scope.</li></ul>
 <h4>Out of scope for now</h4>
-<p>Everything above until the admin shell and modules 01–05 are merged.</p></div>
+<p>Everything above until the admin shell and modules 01–05 are merged.</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>Teacher schedules (layer 3) are the teacher's home surface; borrow and substitute live there. Colleagues' schedules can be added to one's view. Upcoming duties (accepted fills) show on the dashboard with a countdown.</li><li>Non-teaching staff get the same shell scoped to their department periods and attendance.</li></ul></div>
 </details>
 <!-- modules:end -->
       </div>
@@ -668,6 +682,10 @@ flowchart LR
         <div><span class="d">10 Sept</span><span>One calendar per school with three layers: holidays, school events, exam windows per grade range. Exams are scheduled inside windows the office defined. (Interview)</span></div>
         <div><span class="d">10 Sept</span><span>Departments can have several heads, own subjects, and serve a grade range. The grade range is the "band", kept translucent. A default General department exists; subject-less departments (PT, Library) are valid and can hold periods. (Interview)</span></div>
         <div><span class="d">10 Sept</span><span>Templates assign to a multi-select of grades; no band object. Template periods carry a nullable day so a short-Saturday variant needs no later migration. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>Principal = admin + teacher. Roles become a set on the user. Non-teaching staff (library, PT, office) are users with a department; they hold periods and take attendance. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>A grade decides the subject; a section decides who teaches it. Class teacher owns the class; attendance is per period by that period's teacher. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>The calendar is three layers: school calendar (master), timetable (office), teacher schedules (derived, calendar-shaped). Teachers see schedules, not the grid; borrow and substitute happen on schedules. "Share", not "Publish". (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>Leaving teacher: deactivate, then "Replace teacher" per section moves allotment, slots and duties in one step. Guardians: two mandatory contacts, one optional. Fees and transport parked. (Interview)</span></div>
       </div>
     </section>
 

@@ -53,3 +53,19 @@ Existing: periods, readiness, teacher-busy, teacher-load, my-schedule, align-ele
 ## Out of scope
 
 Calendar sync itself (Settings integration). Period Exchange (T2, teacher pass).
+
+## From interview (truth.md, 2026-09-10)
+
+- **Share, not Publish**, in every label. Draft until shared; sharing writes every
+  teacher's schedule (layer 3 below).
+- Three calendar layers: school calendar (master) · timetable (office) · **teacher
+  schedules** (derived, calendar-shaped, what teachers actually see). `/timetable/
+  my-schedule` renders layer 3; the grid is admin-only.
+- Schedules are the surface for **borrow** and **substitute** (T2): add a colleague's
+  schedule like Google Calendar; request a period from it; request a fill on your own.
+  Accepted requests land on both schedules and the dashboard as upcoming duties.
+  Design the schedule view now so T2 attaches without rework: each rendered period
+  carries its slot id + date.
+- Combined classes: one teacher, two sections, one period — allowed via `block_id`.
+- Staff periods (Library, PT) are department slots with a staff user as the owner.
+- Committee builds, admin enters: no multi-editor requirement in v1; drafts already exist.

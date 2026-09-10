@@ -54,3 +54,8 @@ start (moved from Calendar; shown here, stored on `schools` as today).
 ## Out of scope
 
 Per-day variant UI (schema is ready; UI when a pilot school needs it). Clash rules (05).
+
+## From interview (truth.md, 2026-09-10)
+
+- The timetable is constant for the year; template edits after sharing are rare. The
+  warning on edit stays, and the copy should say why ("6 sections use this template").

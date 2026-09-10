@@ -29,3 +29,9 @@ dependency — the Notifications rail — is decided once.
 - Every artefact carries its tag columns from the module map matrix.
 - No module sends its own messages; all go through the rail.
 - Every list is year-scoped by the header picker.
+
+## From interview (truth.md, 2026-09-10)
+
+- Attendance: per period, by the period's teacher (including staff periods). Absence
+  notifications go to the two primary guardian contacts.
+- Homework assignment triggers a push to parents (rail).
