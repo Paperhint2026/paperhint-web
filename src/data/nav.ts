@@ -120,11 +120,11 @@ export const ADMIN_NAV: NavGroup[] = [
         "The shape of the school day: period templates with their times and breaks, assigned per grade, plus working days and week start. The timetable is built on top of this."
       ),
       soon(
-        "subjects",
-        "Subjects & books",
+        "departments",
+        "Departments & subjects",
         BookOpenIcon,
         "A5",
-        "Subjects per grade with the books and materials attached to each. What is attached here flows to every teacher's library in that department."
+        "Departments with a head of department, the subjects each department owns, and the grades each subject runs in. Books and materials attach to a subject per grade and are managed in Class knowledge."
       ),
       {
         key: "batches",

@@ -313,3 +313,29 @@ invite flow. Teacher profile shows allotments and load read-only with links out.
 4. Lift assignment editing out once the Allotments board exists; until then it stays,
    so nothing breaks.
 5. Card and profile read load / availability once Timetable is grouped under Classes.
+
+## 11. Departments (founder, 2026-09-10)
+
+**Decision.** The Setup entry "Subjects & books" becomes **Departments & subjects**
+(A5). Department and subject are two axes: a department groups people, a subject is
+what is taught per grade. They overlap but are not one-to-one (Science owns three
+subjects; a primary teacher teaches five under one department; Sports has none).
+The page is a hierarchy: department → subjects it owns → grades each subject runs in.
+
+**Books** stop being a top-level word. A book is a material attached to a subject in
+a grade (`grade_subjects`, section 9) and is managed in Knowledge › Class knowledge.
+The Setup page shows counts and links there.
+
+**Head of department** is a marker on the department, not a role. The person stays a
+teacher in the same portal and gains department-scoped permissions: the department's
+period logs and syllabus progress, approving fills inside the department, the
+department's KPI slice. Same rule as the principal on the site: intermediate
+permissions, no third role. Period Exchange (T2) and My Department (T17) route
+through the department, so it needs an owner.
+
+**Schema (additive):** `departments.head_user_id` (nullable → users),
+`department_subjects (department_id, subject_id)`, plus `grade_subjects` from
+section 9. Membership stays derived from `users.department_id`.
+
+**Fixes item 2 of the Teachers check** (departments cannot be created): creation
+moves here; Teachers keeps the picker.
