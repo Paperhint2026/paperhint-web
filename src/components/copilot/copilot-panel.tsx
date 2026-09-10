@@ -1,8 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import {
+  ArrowClockwiseIcon,
   ArrowUpIcon,
   BookOpenIcon,
   ChartLineIcon,
+  CheckIcon,
+  CopyIcon,
   DatabaseIcon,
   FileTextIcon,
   GraduationCapIcon,
@@ -139,6 +142,44 @@ function MarkdownBody({ content }: { content: string }) {
     >
       {content}
     </ReactMarkdown>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Copy-to-clipboard                                                  */
+/* ------------------------------------------------------------------ */
+
+function CopyButton({ text, className }: { text: string; className?: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={copied ? "Copied" : "Copy message"}
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(text)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 1600)
+            } catch {
+              /* clipboard unavailable (permissions / http) — nothing to do */
+            }
+          }}
+          className={cn(
+            "grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground",
+            className
+          )}
+        >
+          {copied ? (
+            <CheckIcon aria-hidden className="size-3.5 text-primary" />
+          ) : (
+            <CopyIcon aria-hidden className="size-3.5" />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{copied ? "Copied" : "Copy"}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -940,6 +981,11 @@ export function CopilotPanel({
       created_at: new Date().toISOString(),
     }
     setMessages((prev) => [...prev, userMsg])
+    await runAsk(chatId, q)
+  }
+
+  /** The ask round-trip, shared by a fresh send and a retry of a failed one. */
+  const runAsk = async (chatId: string, q: string) => {
     setIsAsking(true)
     setStage("routing")
 
@@ -982,7 +1028,9 @@ export function CopilotPanel({
         {
           id: `temp-err-${Date.now()}`,
           role: "assistant",
-          content: "Sorry, something went wrong. Please try again.",
+          content: "Sorry, something went wrong.",
+          // Carries what failed so the bubble's Try again button can re-run it.
+          metadata: { error: true, retry_query: q },
           created_at: new Date().toISOString(),
         },
       ])
@@ -991,6 +1039,16 @@ export function CopilotPanel({
     } finally {
       setIsAsking(false)
     }
+  }
+
+  /** Re-run the question a failed bubble carries, replacing the bubble. */
+  const retryAsk = (errMsg: Message) => {
+    const q = errMsg.metadata?.retry_query
+    const chatId = activeChatId
+    if (typeof q !== "string" || !q || !chatId || isAsking) return
+    setLatestAnswer(null)
+    setMessages((prev) => prev.filter((m) => m.id !== errMsg.id))
+    runAsk(chatId, q)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1248,8 +1306,12 @@ export function CopilotPanel({
                       <div
                         key={msg.id}
                         data-msg-key={msg.id}
-                        className="flex justify-end"
+                        className="group/msg flex items-center justify-end gap-1"
                       >
+                        <CopyButton
+                          text={msg.content}
+                          className="opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                        />
                         <div className="max-w-[80%] rounded-xl bg-muted px-3.5 py-2.5 text-sm text-foreground">
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                         </div>
@@ -1257,11 +1319,13 @@ export function CopilotPanel({
                     )
                   }
 
+                  const isError = msg.metadata?.error === true
+
                   return (
                     <div
                       key={msg.id}
                       data-msg-key={msg.id}
-                      className="flex gap-3"
+                      className="group/msg flex gap-3"
                     >
                       <PaperhintMark className="mt-0.5 size-5 shrink-0 text-primary" />
                       <div className="min-w-0 flex-1 text-sm leading-relaxed">
@@ -1298,6 +1362,22 @@ export function CopilotPanel({
                             <MarkdownBody content={msg.content} />
                           )}
                         </div>
+                        {isError ? (
+                          <button
+                            type="button"
+                            onClick={() => retryAsk(msg)}
+                            disabled={isAsking}
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+                          >
+                            <ArrowClockwiseIcon aria-hidden className="size-3.5" />
+                            Try again
+                          </button>
+                        ) : (
+                          <CopyButton
+                            text={msg.content}
+                            className="mt-1.5 -ml-1 opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                          />
+                        )}
                       </div>
                     </div>
                   )
