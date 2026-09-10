@@ -93,6 +93,83 @@ Each row: what it produces, which horizontals it picks, through which junction.
    never rewrites verticals; it creates next year's classes and memberships and marks
    the old ones read-only (associations doc, edge case 1).
 
+
+## Artefacts and how they cross-link
+
+Everything a vertical produces is an **artefact**: a paper, a note, a grade, a log.
+Two rules make artefacts findable from anywhere:
+
+1. **Every artefact is tagged with the horizontals it belongs to** — as foreign keys
+   to junction rows (`class_subject_id`, `grade_subject_id`), never as free text.
+   Department is *derived* (subject → department, teacher → department), not stored.
+2. **Every artefact records what it was made from** — a stored link to its source
+   artefacts, so "which sources did this paper use" is a query, not a guess.
+
+### Tag matrix
+
+D = direct foreign key · d = derived through a junction · · = not applicable
+
+| Artefact (module) | Year | Grade×Subject | Section | Teacher | Student | Calendar date | Department |
+|---|---|---|---|---|---|---|---|
+| Knowledge material (T10/A17) | d | D | optional | D uploader | · | · | d |
+| Teaching note (T9) | d | D | optional | D author | · | · | d |
+| Question paper (T13) | d | D | optional | D author | · | · | d |
+| Exam (A12) | D | d | D one or many | d | · | D window | d |
+| Answer sheet / submission (T14) | d | d | d | D grader | D | D | d |
+| Result / marks (T15) | d | d | d | · | D | d | d |
+| Report card (A13) | D | · | d | · | D | D term | · |
+| Attendance record (T8/A9) | d | · | D | D marker | D | D | d |
+| Period log (T4) | d | D | D | D who taught | mentions | D date + period | d |
+| Homework (T12) | d | D | D | D | D assignees | D due | d |
+| Exchange / fill request (T2/A10) | d | d | d | D from, D to | · | D | d both |
+| Notification (A11) | d | · | d | D or · | D (parent) | D sent | · |
+| Circular (A11) | D | · | D audience | · | · | D | D audience |
+| Library item (T11) | d | D | · | D owner | · | · | d |
+
+Reading the matrix by column gives each horizontal's **profile page** for free —
+the "one shell, same data" rule from the associations doc:
+
+- **Subject (Grade 6 Maths)**: knowledge, notes, papers, exams, syllabus progress,
+  the sections it runs in, the teachers allotted.
+- **Section (6A)**: timetable, roster, subjects, attendance, exams, results.
+- **Teacher**: allotments, schedule, period logs, papers, notes, load, KPI.
+- **Student**: roster history, attendance, results, report card, homework.
+- **Department**: subjects owned, members, head, KPI slice — all derived.
+- **Academic year**: everything above, read-only once the year closes.
+
+### Provenance chains (stored links, arrow = "made from")
+
+```
+Knowledge material ──► Teaching note ──► Library item ──► Shared library
+        │
+        └──► Question paper ──► Exam ──► Answer sheet ──► Result ──► Report card
+                                                             └──► Reports & KPI
+Timetable slot ──► Period log ──► Syllabus progress ──► Teacher KPI ──► Reports & KPI
+                       ├──► Recap card
+                       └──► Homework ──► Submission ──► (Grading, reused)
+Attendance record ──► Notification · Recap card · Report card
+Exchange request ──► Slot alteration ──► Period log (by the filling teacher)
+```
+
+Two consequences:
+
+- **Filters are free.** "Papers for Grade 6 Maths", "everything this teacher made
+  this term", "6A's week" are each a single join on stored keys.
+- **Reuse is safe.** A paper knows its sources; a result knows its exam; a log knows
+  its slot. Rollover marks the year read-only and nothing dangles.
+
+### What the schema has and lacks for this
+
+Has: `knowledge_materials.class_subject_id` + `teacher_id`; `exams.class_subject_id`;
+`student_submissions.exam_id`; `timetable_slots.class_subject_id` + `teacher_id`;
+`teacher_assignments` with tenure. The pattern is already there.
+
+Lacks: `grade_subject_id` on materials, notes and papers (today section-level only);
+a stored **paper → source materials** link; **exam → paper** as a first-class link
+(verify how exams reference their paper today); period log, homework, exchange,
+notification tables (all BUILD modules). Each BUILD module's execution doc carries
+its tag columns and its provenance links as acceptance criteria.
+
 ## Where the current app breaks the rule
 
 | Violation | Fix |
