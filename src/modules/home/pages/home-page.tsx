@@ -1,3 +1,5 @@
+import { Navigate } from "react-router-dom"
+
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
@@ -12,6 +14,9 @@ import { TeacherHome } from "@/modules/home/components/teacher-home"
  */
 export function HomePage() {
   const { user } = useAuth()
+
+  // PaperHint team accounts have no school — their home is the console.
+  if (user?.role === "platform") return <Navigate to="/platform" replace />
   const { assignments, isLoading } = useTeacherAssignments()
   const isTeacher = user?.role === "teacher"
   const firstName = user?.full_name?.split(" ")[0] ?? "there"

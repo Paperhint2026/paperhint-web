@@ -29,6 +29,10 @@ import { GradingReviewPage } from "@/modules/grading/pages/grading-review-page"
 import { SettingsPage } from "@/modules/settings/pages/settings-page"
 import { HelpPage } from "@/modules/help/pages/help-page"
 import { CopilotPage } from "@/modules/copilot/pages/copilot-page"
+import { PlatformPage } from "@/modules/platform/pages/platform-page"
+import { PlatformSchoolPage } from "@/modules/platform/pages/platform-school-page"
+import { PlatformSchoolNewPage } from "@/modules/platform/pages/platform-school-new-page"
+import { FeatureRoute } from "@/components/shared/feature-route"
 
 export const router = createBrowserRouter([
   { path: "login", element: <LoginPage /> },
@@ -49,8 +53,27 @@ export const router = createBrowserRouter([
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },
           { path: "batches", element: <BatchesPage /> },
-          { path: "calendar", element: <CalendarPage /> },
-          { path: "timetable", element: <TimetablePage /> },
+          {
+            path: "calendar",
+            element: (
+              <FeatureRoute feature="calendar">
+                <CalendarPage />
+              </FeatureRoute>
+            ),
+          },
+          {
+            path: "timetable",
+            element: (
+              <FeatureRoute feature="timetable">
+                <TimetablePage />
+              </FeatureRoute>
+            ),
+          },
+          // PaperHint team only — the page itself redirects non-platform
+          // roles home, and every /api/platform route re-checks the role.
+          { path: "platform", element: <PlatformPage /> },
+          { path: "platform/schools/new", element: <PlatformSchoolNewPage /> },
+          { path: "platform/schools/:schoolId", element: <PlatformSchoolPage /> },
           { path: "library", element: <LibraryPage /> },
           { path: "library/bank", element: <BankPage /> },
 
@@ -77,20 +100,38 @@ export const router = createBrowserRouter([
             path: "class/:classSubjectId/exams/:examId/pdf-builder",
             element: <PdfBuilderPage />,
           },
-          { path: "class/:classSubjectId/grading", element: <GradingPage /> },
+          {
+            path: "class/:classSubjectId/grading",
+            element: (
+              <FeatureRoute feature="grading">
+                <GradingPage />
+              </FeatureRoute>
+            ),
+          },
           {
             path: "class/:classSubjectId/grading/:submissionId/review",
-            element: <GradingReviewPage />,
+            element: (
+              <FeatureRoute feature="grading">
+                <GradingReviewPage />
+              </FeatureRoute>
+            ),
           },
           {
             path: "class/:classSubjectId/students",
             element: <ClassStudentsMarksPage />,
           },
 
-          { path: "ask", element: <CopilotPage /> },
+          { path: "ask", element: (<FeatureRoute feature="copilot"><CopilotPage /></FeatureRoute>) },
           // A thread is its own page: navigating between it and /ask remounts
           // the panel, so no scroll/anchor state can leak between the two.
-          { path: "ask/c/:chatId", element: <CopilotPage /> },
+          {
+            path: "ask/c/:chatId",
+            element: (
+              <FeatureRoute feature="copilot">
+                <CopilotPage />
+              </FeatureRoute>
+            ),
+          },
           { path: "settings", element: <SettingsPage /> },
           { path: "help", element: <HelpPage /> },
         ],

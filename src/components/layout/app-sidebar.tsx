@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
+  BuildingsIcon,
   ArchiveIcon,
   BookOpenIcon,
   BooksIcon,
@@ -16,6 +17,7 @@ import {
   UsersIcon,
 } from "@phosphor-icons/react"
 import { useAuth } from "@/lib/auth"
+import { useFeatures } from "@/hooks/use-features"
 import {
   useTeacherAssignments,
   classLabel,
@@ -59,6 +61,8 @@ export function AppSidebar() {
   const [hoveredNav, setHoveredNav] = useState<string | null>(null)
   const { assignments } = useTeacherAssignments()
   const isTeacher = user?.role === "teacher"
+  const isPlatform = user?.role === "platform"
+  const { isEnabled } = useFeatures()
 
   const closeMobileThen = (fn: () => void) => {
     if (isMobile) {
@@ -85,19 +89,34 @@ export function AppSidebar() {
     return location.pathname.startsWith(path)
   }
 
-  const mainItems = [
+  // PaperHint team accounts see only the console — they have no school, so
+  // every school-scoped page would just error.
+  const platformItems = [
+    {
+      title: "Platform Console",
+      icon: BuildingsIcon,
+      isActive: isActivePath("/platform"),
+      onClick: () => handleNav("/platform"),
+    },
+  ]
+
+  const schoolItems = [
     {
       title: "Home",
       icon: HouseIcon,
       isActive: location.pathname === "/",
       onClick: () => handleNav("/"),
     },
-    {
-      title: "Ask Hint",
-      icon: SparkleIcon,
-      isActive: isActivePath("/ask"),
-      onClick: () => handleNav("/ask"),
-    },
+    ...(isEnabled("copilot")
+      ? [
+          {
+            title: "Ask Hint",
+            icon: SparkleIcon,
+            isActive: isActivePath("/ask"),
+            onClick: () => handleNav("/ask"),
+          },
+        ]
+      : []),
     {
       title: "Classes",
       icon: ChalkboardIcon,
@@ -116,20 +135,28 @@ export function AppSidebar() {
       isActive: isActivePath("/students"),
       onClick: () => handleNav("/students"),
     },
-    {
-      title: "Calendar",
-      icon: CalendarDotsIcon,
-      isActive: isActivePath("/calendar"),
-      onClick: () => handleNav("/calendar"),
-    },
+    ...(isEnabled("calendar")
+      ? [
+          {
+            title: "Calendar",
+            icon: CalendarDotsIcon,
+            isActive: isActivePath("/calendar"),
+            onClick: () => handleNav("/calendar"),
+          },
+        ]
+      : []),
     // Admins get the builder; teachers get their read-only My Schedule +
-    // class timetables on the same route.
-    {
-      title: "Timetable",
-      icon: TableIcon,
-      isActive: isActivePath("/timetable"),
-      onClick: () => handleNav("/timetable"),
-    },
+    // class timetables on the same route. Hidden when not in the plan.
+    ...(isEnabled("timetable")
+      ? [
+          {
+            title: "Timetable",
+            icon: TableIcon,
+            isActive: isActivePath("/timetable"),
+            onClick: () => handleNav("/timetable"),
+          },
+        ]
+      : []),
     // Batch management is an admin-only, structural operation
     ...(!isTeacher
       ? [
@@ -143,7 +170,9 @@ export function AppSidebar() {
       : []),
   ]
 
-  const libraryItems = [
+  const mainItems = isPlatform ? platformItems : schoolItems
+
+  const libraryItems = isPlatform ? [] : [
     {
       title: "Knowledge Library",
       icon: BookOpenIcon,
@@ -250,12 +279,14 @@ export function AppSidebar() {
             hovered={hoveredNav}
             onHover={setHoveredNav}
           />
-          <NavMain
-            items={libraryItems}
-            label="Library"
-            hovered={hoveredNav}
-            onHover={setHoveredNav}
-          />
+          {libraryItems.length > 0 && (
+            <NavMain
+              items={libraryItems}
+              label="Library"
+              hovered={hoveredNav}
+              onHover={setHoveredNav}
+            />
+          )}
           {workspaces.length > 0 ? (
             <NavWorkspaces
               workspaces={workspaces}
