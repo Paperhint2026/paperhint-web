@@ -1,0 +1,447 @@
+<title>Paperhint Product Scheme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..600&family=Merriweather:ital,wght@1,400&display=swap">
+<style>
+  :root {
+    --ground: #FCFBF8;
+    --surface: #F3F0E8;
+    --surface-2: #EAE6DB;
+    --line: #E2DDD1;
+    --line-strong: #CFC9BB;
+    --ink: #14201A;
+    --ink-2: #3E4A43;
+    --muted: #6B776F;
+    --accent: #0B8A5C;
+    --accent-soft: #E3F3EB;
+    --amber: #B7791F;
+    --amber-soft: #FBF1DD;
+    --violet: #6B4FE0;
+    --violet-soft: #ECE7FB;
+    --build: #8A9188;
+    --code-bg: #F1EEE6;
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --serif: "Merriweather", Georgia, "Times New Roman", serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0A0F0C; --surface: #121A15; --surface-2: #192219; --line: #24302A;
+      --line-strong: #34443B; --ink: #F2EEE3; --ink-2: #C9C6BC; --muted: #8E978F;
+      --accent: #31D492; --accent-soft: #10291E; --amber: #E0A93F; --amber-soft: #2A2113;
+      --violet: #A08BFF; --violet-soft: #1E1A33; --build: #7C857D; --code-bg: #141C17;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0A0F0C; --surface: #121A15; --surface-2: #192219; --line: #24302A;
+    --line-strong: #34443B; --ink: #F2EEE3; --ink-2: #C9C6BC; --muted: #8E978F;
+    --accent: #31D492; --accent-soft: #10291E; --amber: #E0A93F; --amber-soft: #2A2113;
+    --violet: #A08BFF; --violet-soft: #1E1A33; --build: #7C857D; --code-bg: #141C17;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  em.ac { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--accent); }
+
+  .frame { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto; padding: 40px 32px 96px; }
+  @media (max-width: 900px) { .frame { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 72px; } .toc { position: static; } }
+
+  .toc { position: sticky; top: 24px; align-self: start; font-size: 13px; }
+  .toc .mark { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-weight: 500; letter-spacing: -0.01em; }
+  .toc .mark svg { width: 20px; height: 20px; color: var(--accent); }
+  .toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .toc a { display: block; padding: 5px 8px; border-radius: 6px; color: var(--ink-2); }
+  .toc a:hover { background: var(--surface); text-decoration: none; color: var(--ink); }
+  .toc .meta { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+  main { min-width: 0; }
+  header.head { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 40px; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  h1 { font-size: 40px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 500; margin: 8px 0 12px; text-wrap: balance; }
+  .lede { font-size: 17px; color: var(--ink-2); max-width: 62ch; margin: 0; }
+  h2 { font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 500; margin: 0 0 6px; text-wrap: balance; }
+  h3 { font-size: 16px; font-weight: 500; letter-spacing: -0.01em; margin: 0 0 6px; }
+  section { margin-bottom: 56px; }
+  section > .sub { color: var(--muted); margin: 0 0 20px; max-width: 65ch; }
+  p { max-width: 65ch; margin: 0 0 12px; }
+  ul, ol { padding-left: 20px; max-width: 65ch; }
+  li { margin-bottom: 6px; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.92em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre.mermaid { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x: auto; margin: 0; }
+
+  /* status + kind grammar */
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--ink-2); white-space: nowrap; }
+  .tag.done { color: var(--accent); border-color: transparent; background: var(--accent-soft); }
+  .tag.tweak { color: var(--amber); border-color: transparent; background: var(--amber-soft); }
+  .tag.move { color: var(--violet); border-color: transparent; background: var(--violet-soft); }
+  .tag.build { color: var(--build); border-style: dashed; }
+  .tag.live { color: var(--accent); border-color: var(--accent); }
+  .code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--muted); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 18px; align-items: center; color: var(--muted); font-size: 13px; }
+
+  /* nav map */
+  .groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .group { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .group h3 { padding: 10px 14px 8px; margin: 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; }
+  .group h3 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .group ul { list-style: none; margin: 0; padding: 6px; max-width: none; }
+  .group li { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 7px 8px; border-radius: 8px; margin: 0; font-size: 14px; }
+  .group li .code { margin-left: 6px; }
+  .group li.soon { color: var(--muted); }
+
+  /* layer bands */
+  .bands { display: grid; gap: 10px; }
+  .band { display: grid; grid-template-columns: 130px 1fr; gap: 16px; align-items: start; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); }
+  .band.h { background: var(--surface); }
+  .band.j { border-style: dashed; }
+  .band.v { background: transparent; }
+  .band .role { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .band .role b { display: block; color: var(--ink); font-weight: 500; font-size: 14px; margin-bottom: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 13px; padding: 4px 10px; border: 1px solid var(--line-strong); background: var(--ground); }
+  .chip.pill { border-radius: 999px; }
+  .chip.tile { border-radius: 4px; }
+  .chip.junc { border-radius: 6px; border-style: dashed; }
+  .chip.new { color: var(--violet); border-color: var(--violet); }
+  .chip .code { margin-left: 5px; }
+  @media (max-width: 640px) { .band { grid-template-columns: 1fr; } }
+
+  /* rules */
+  .rules { display: grid; gap: 10px; counter-reset: rule; }
+  .rule { display: grid; grid-template-columns: 34px 1fr; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
+  .rule::before { counter-increment: rule; content: counter(rule); font-family: var(--serif); font-style: italic; font-size: 22px; color: var(--accent); line-height: 1; }
+  .rule b { font-weight: 500; }
+  .rule p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+  .tier { display: grid; grid-template-columns: 58px 1fr; gap: 10px; font-size: 14px; margin-top: 8px; }
+  .tier span:first-child { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 2px; }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 500; font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); background: var(--surface); position: sticky; top: 0; }
+  tr:last-child td { border-bottom: 0; }
+  td.c { text-align: center; }
+  td .D { color: var(--accent); font-weight: 500; }
+  td .d { color: var(--muted); }
+  td .n { color: var(--line-strong); }
+
+  /* plan */
+  .plan { display: grid; gap: 8px; }
+  .step { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: start; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
+  .step .no { font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--accent); line-height: 1.1; }
+  .step b { font-weight: 500; }
+  .step p { margin: 3px 0 0; font-size: 14px; color: var(--ink-2); max-width: none; }
+  .step .dep { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .step.now { border-color: var(--accent); background: var(--accent-soft); }
+  @media (max-width: 640px) { .step { grid-template-columns: 34px 1fr; } .step .tag { grid-column: 2; justify-self: start; } }
+
+  .log { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .log div { display: grid; grid-template-columns: 96px 1fr; gap: 14px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .log div:last-child { border-bottom: 0; }
+  .log .d { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; padding-top: 1px; }
+  .open li { color: var(--ink-2); }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="frame">
+  <nav class="toc" aria-label="Sections">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 3.9L18 4.5l-1.4 4.2L20.5 12l-3.9 3.3L18 19.5l-4.2-1.4L12 22l-1.8-3.9L6 19.5l1.4-4.2L3.5 12l3.9-3.3L6 4.5l4.2 1.4z"/></svg>
+      Product Scheme
+    </div>
+    <ol>
+      <li><a href="#principles">Principles</a></li>
+      <li><a href="#map">Admin map</a></li>
+      <li><a href="#layers">Horizontals, junctions, verticals</a></li>
+      <li><a href="#rules">Pick rules</a></li>
+      <li><a href="#artefacts">Artefacts and tags</a></li>
+      <li><a href="#chains">Provenance chains</a></li>
+      <li><a href="#profiles">Profile pages</a></li>
+      <li><a href="#schema">Schema deltas</a></li>
+      <li><a href="#plan">Build plan</a></li>
+      <li><a href="#decisions">Decisions</a></li>
+      <li><a href="#open">Open questions</a></li>
+    </ol>
+    <div class="meta">Revision 1 · 10 Sept 2026<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
+  </nav>
+
+  <main>
+    <header class="head">
+      <div class="eyebrow">Paperhint · admin build · working reference</div>
+      <h1>How the school fits <em class="ac">together</em></h1>
+      <p class="lede">Every module, what it owns, what it picks from, and what it produces. The shared reference for founder, Claude and the dev while the admin shell is rebuilt module by module. When something here changes, the page changes.</p>
+      <div class="legend">
+        <span>Handoff status:</span>
+        <span class="tag done">done</span><span class="tag tweak">tweak</span><span class="tag move">move</span><span class="tag build">build</span>
+        <span style="margin-left:8px">Kind:</span>
+        <span class="chip pill" style="font-size:12px;padding:2px 9px">horizontal</span>
+        <span class="chip junc" style="font-size:12px;padding:2px 9px">junction</span>
+        <span class="chip tile" style="font-size:12px;padding:2px 9px">vertical</span>
+      </div>
+    </header>
+
+    <section id="principles">
+      <div class="eyebrow">Governing rule</div>
+      <h2>The whole app should be <em class="ac">seamless</em></h2>
+      <p class="sub">The founder's rule, made testable. Every module document is checked against these five.</p>
+      <div class="rules">
+        <div class="rule"><div><b>No dead ends.</b><p>Every nav row opens something. Every artefact opens from every horizontal it is tagged with. Every empty state names the next action and links to it.</p></div></div>
+        <div class="rule"><div><b>Pickers are pre-filtered, never full lists.</b><p>Candidates come from the junction: allotment, department, roster, free-at-period. "Show all" sits behind a step.</p></div></div>
+        <div class="rule"><div><b>One record, many views.</b><p>The same rows serve admin and teacher. Scope changes, the data does not. Never a second table for a second role.</p></div></div>
+        <div class="rule"><div><b>Setup flows into use.</b><p>Finishing one setup step offers the next. Data entered once is picked everywhere. Nothing is typed twice.</p></div></div>
+        <div class="rule"><div><b>Tags and provenance are mandatory.</b><p>Every artefact row carries its horizontal keys and a link to what it was made from.</p></div></div>
+      </div>
+    </section>
+
+    <section id="map">
+      <div class="eyebrow">Shell · shipped in PR #5</div>
+      <h2>The admin map</h2>
+      <p class="sub">Five groups plus Home and Ask Hint. Every handoff module has exactly one home. Unbuilt ones stay visible as "Soon" rows so the map is complete from day one. Settings (profile, appearance, security, roles) stays in the user menu: it configures the app, not the school.</p>
+      <div class="groups">
+        <div class="group"><h3>Setup <small>configure once</small></h3><ul>
+          <li class="soon"><span>School &amp; year<span class="code">A1</span></span><span class="tag tweak">tweak</span></li>
+          <li><span>Calendar<span class="code">A2</span></span><span class="tag live">live</span></li>
+          <li class="soon"><span>School day<span class="code">A3·cfg</span></span><span class="tag build">build</span></li>
+          <li class="soon"><span>Departments &amp; subjects<span class="code">A5</span></span><span class="tag tweak">tweak</span></li>
+          <li><span>Batches → Year rollover<span class="code">A15</span></span><span class="tag tweak">tweak</span></li>
+        </ul></div>
+        <div class="group"><h3>People <small>directories</small></h3><ul>
+          <li><span>Teachers<span class="code">A7</span></span><span class="tag done">done</span></li>
+          <li><span>Students<span class="code">A6</span></span><span class="tag done">done</span></li>
+        </ul></div>
+        <div class="group"><h3>Classes <small>structure, staffing, schedule</small></h3><ul>
+          <li><span>Classes &amp; sections<span class="code">A4</span></span><span class="tag done">done</span></li>
+          <li class="soon"><span>Allotments<span class="code">A8</span></span><span class="tag move">move</span></li>
+          <li><span>Timetable<span class="code">A3</span></span><span class="tag tweak">tweak</span></li>
+        </ul></div>
+        <div class="group"><h3>Exams &amp; papers <small>assessment</small></h3><ul>
+          <li class="soon"><span>Exam manager<span class="code">A12</span></span><span class="tag build">build</span></li>
+          <li class="soon"><span>Question papers<span class="code">T13</span></span><span class="tag move">move</span></li>
+          <li class="soon"><span>Grading<span class="code">T14</span></span><span class="tag move">move</span></li>
+          <li class="soon"><span>Results &amp; report cards<span class="code">A13</span></span><span class="tag build">build</span></li>
+        </ul></div>
+        <div class="group"><h3>Operations <small>the running school</small></h3><ul>
+          <li class="soon"><span>Attendance<span class="code">A9</span></span><span class="tag tweak">tweak</span></li>
+          <li class="soon"><span>Leave &amp; substitution<span class="code">A10</span></span><span class="tag build">build</span></li>
+          <li class="soon"><span>Notifications &amp; circulars<span class="code">A11</span></span><span class="tag build">build</span></li>
+          <li class="soon"><span>Reports &amp; KPI<span class="code">A14</span></span><span class="tag build">build</span></li>
+        </ul></div>
+        <div class="group"><h3>Knowledge <small>sources</small></h3><ul>
+          <li><span>Knowledge Library → Class knowledge<span class="code">A17</span></span><span class="tag done">done</span></li>
+          <li><span>Shared Library<span class="code">T11</span></span><span class="tag done">done</span></li>
+        </ul></div>
+      </div>
+      <p style="margin-top:16px;font-size:14px;color:var(--muted)">Teacher menu: unchanged for now, expressed from the same nav definition. Its restructure, ordered by the teacher's day (T1–T17), is a later pass. An admin previews it with the <b>View as</b> switch.</p>
+    </section>
+
+    <section id="layers">
+      <div class="eyebrow">Architecture</div>
+      <h2>Horizontals, junctions, verticals</h2>
+      <p class="sub">A horizontal is reference data the school agrees on and never carries workflow state. A junction is where two horizontals meet and become one pickable thing. A vertical is a workflow that produces records by picking through junctions. Purple marks what the schema does not have yet.</p>
+      <div class="bands">
+        <div class="band h">
+          <div class="role"><b>Horizontals</b>who, what, when, where. Owned by Setup and People.</div>
+          <div class="chips">
+            <span class="chip pill">School</span>
+            <span class="chip pill new">Academic year</span>
+            <span class="chip pill">Calendar</span>
+            <span class="chip pill new">School day · period templates</span>
+            <span class="chip pill">Department<span class="code">+ head</span></span>
+            <span class="chip pill">Subject</span>
+            <span class="chip pill">Grade + Section</span>
+            <span class="chip pill">Teacher</span>
+            <span class="chip pill">Student</span>
+            <span class="chip pill new">Room</span>
+          </div>
+        </div>
+        <div class="band j">
+          <div class="role"><b>Junctions</b>where horizontals meet. These make every picker small.</div>
+          <div class="chips">
+            <span class="chip junc new">Department ↔ Subject</span>
+            <span class="chip junc new">Subject × Grade<span class="code">Grade 6 Maths</span></span>
+            <span class="chip junc">Subject × Section<span class="code">6A Maths</span></span>
+            <span class="chip junc">Teacher × Subject-Section × Year<span class="code">allotment</span></span>
+            <span class="chip junc">Student × Section × Year<span class="code">roster</span></span>
+            <span class="chip junc">Student × Elective</span>
+          </div>
+        </div>
+        <div class="band v">
+          <div class="role"><b>Verticals</b>workflows that produce artefacts.</div>
+          <div class="chips">
+            <span class="chip tile">Allotments</span><span class="chip tile">Timetable</span><span class="chip tile">Period exchange · substitution</span>
+            <span class="chip tile">Attendance</span><span class="chip tile">Period log</span><span class="chip tile">Syllabus · portion</span>
+            <span class="chip tile">Knowledge</span><span class="chip tile">Question papers</span><span class="chip tile">Exams · grading · results</span>
+            <span class="chip tile">Report cards</span><span class="chip tile">Homework</span><span class="chip tile">Notifications</span>
+            <span class="chip tile">Reports · KPI</span><span class="chip tile">Year rollover</span>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:16px">Subject × Grade sits above Subject × Section: every 6A, 6B and 6C Maths row points at the one Grade 6 Maths row. That single fact is what makes knowledge and syllabus constant across sections, and it is why the Departments &amp; subjects module must land the grade junction, not only the department link.</p>
+    </section>
+
+    <section id="rules">
+      <div class="eyebrow">Behaviour</div>
+      <h2>Pick rules</h2>
+      <p class="sub">The founder's example, generalised. Each rule is a filter over a junction, and each is an acceptance test in the module that implements it.</p>
+      <div class="rules">
+        <div class="rule"><div><b>Timetable cell, 6A Maths, Wednesday P3: who teaches it?</b>
+          <div class="tier"><span>Tier 1</span><span>Teachers with a <em>current allotment</em> on 6A Maths. Usually one. Pre-selected.</span></div>
+          <div class="tier"><span>Tier 2</span><span>Teachers in the department that owns Maths. Offered as "also in Mathematics", not selected.</span></div>
+          <div class="tier"><span>Tier 3</span><span>Anyone, behind "show all". The slot is flagged as outside allotment.</span></div>
+          <div class="tier"><span>Always</span><span>Blocked: a teacher already placed elsewhere at that period; a room already taken.</span></div>
+        </div></div>
+        <div class="rule"><div><b>Allotment board, 6A Maths: who can be allotted?</b><p>Default list is the Maths department. Anyone else behind "show all". Load shown per teacher from current allotments and timetable.</p></div></div>
+        <div class="rule"><div><b>Knowledge for 6A Maths</b><p>Is the Grade 6 Maths set. A teacher adds a section-only extra by attaching to 6A Maths; it never leaks to 6B.</p></div></div>
+        <div class="rule"><div><b>A fill request for 6A Maths, Wednesday P3</b><p>Candidates are teachers with no slot at that period, same department first, then anyone free. Without a published timetable the list degrades to the plain department list.</p></div></div>
+        <div class="rule"><div><b>A question paper for 6A Maths</b><p>Draws from rule 3's set, so 6A and 6B papers share sources unless the section added extras. The paper stores which sources it used.</p></div></div>
+        <div class="rule"><div><b>Every vertical row dates from the year</b><p>Directly or through its class. Rollover never rewrites verticals: it creates next year's classes and memberships and marks the old year read-only.</p></div></div>
+      </div>
+    </section>
+
+    <section id="artefacts">
+      <div class="eyebrow">Relatability</div>
+      <h2>Artefacts and their tags</h2>
+      <p class="sub">Everything a vertical produces is an artefact. Each carries foreign keys to the horizontals it belongs to, never free text. Department is always derived, through the subject or the teacher.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Artefact</th><th>Year</th><th>Grade × Subject</th><th>Section</th><th>Teacher</th><th>Student</th><th>Calendar date</th><th>Department</th></tr></thead>
+          <tbody>
+            <tr><td>Knowledge material <span class="code">T10 A17</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">opt</span></td><td class="c"><span class="D">D</span> uploader</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Teaching note <span class="code">T9</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">opt</span></td><td class="c"><span class="D">D</span> author</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Question paper <span class="code">T13</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">opt</span></td><td class="c"><span class="D">D</span> author</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Exam <span class="code">A12</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span> one or many</td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span> window</td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Answer sheet <span class="code">T14</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span> grader</td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Result <span class="code">T15</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Report card <span class="code">A13</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> term</td><td class="c"><span class="n">·</span></td></tr>
+            <tr><td>Attendance record <span class="code">T8 A9</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> marker</td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Period log <span class="code">T4</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> who taught</td><td class="c"><span class="d">mentions</span></td><td class="c"><span class="D">D</span> + period</td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Homework <span class="code">T12</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> assignees</td><td class="c"><span class="D">D</span> due</td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Exchange request <span class="code">T2 A10</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span> from, to</td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span> both</td></tr>
+            <tr><td>Notification <span class="code">A11</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">or ·</span></td><td class="c"><span class="D">D</span> parent</td><td class="c"><span class="D">D</span> sent</td><td class="c"><span class="n">·</span></td></tr>
+            <tr><td>Circular <span class="code">A11</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span> audience</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> audience</td></tr>
+            <tr><td>Library item <span class="code">T11</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span> owner</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:10px;font-size:13px;color:var(--muted)"><span class="D" style="color:var(--accent);font-weight:500">D</span> direct foreign key · <span>d</span> derived through a junction · · not applicable</p>
+    </section>
+
+    <section id="chains">
+      <div class="eyebrow">Provenance</div>
+      <h2>What is made from what</h2>
+      <p class="sub">Two chains carry most of the product. Each arrow is a stored link, so reuse is safe and "which sources did this paper use" is a query.</p>
+      <pre class="mermaid">
+flowchart LR
+  classDef h fill:#0B8A5C,stroke:#0B8A5C,color:#fff,rx:14,ry:14
+  classDef a fill:transparent,stroke:#8A9188,color:inherit
+  KM[Knowledge material]:::a --> TN[Teaching note]:::a --> LI[Library item]:::a --> SL[Shared library]:::a
+  KM --> QP[Question paper]:::a --> EX[Exam]:::a --> AS[Answer sheet]:::a --> RS[Result]:::a --> RC[Report card]:::a
+  RS --> KPI[Reports and KPI]:::a
+  TS([Timetable slot]):::h --> PL[Period log]:::a --> SY[Syllabus progress]:::a --> TK[Teacher KPI]:::a --> KPI
+  PL --> RE[Recap card]:::a
+  PL --> HW[Homework]:::a --> SB[Submission]:::a -.reuses grading.-> AS
+  AT[Attendance record]:::a --> NO[Notification]:::a
+  AT --> RE
+  AT --> RC
+  XR[Exchange request]:::a --> AL[Slot alteration]:::a --> PL
+      </pre>
+    </section>
+
+    <section id="profiles">
+      <div class="eyebrow">One shell, same data</div>
+      <h2>Profile pages come free</h2>
+      <p class="sub">Read the tag matrix by column and each horizontal has a profile page without new tables. This is how a teacher's Students page and admin's directory are one thing at two scopes.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Page</th><th>Shows</th></tr></thead>
+          <tbody>
+            <tr><td>Subject <span class="code">Grade 6 Maths</span></td><td>Knowledge, notes, papers, exams, syllabus progress, sections it runs in, teachers allotted</td></tr>
+            <tr><td>Section <span class="code">6A</span></td><td>Timetable, roster, subjects, attendance, exams, results</td></tr>
+            <tr><td>Teacher</td><td>Allotments, schedule, period logs, papers, notes, load, KPI</td></tr>
+            <tr><td>Student</td><td>Roster history, attendance, results, report card, homework</td></tr>
+            <tr><td>Department</td><td>Subjects owned, members, head, KPI slice. Entirely derived.</td></tr>
+            <tr><td>Academic year</td><td>Everything above, read-only once closed. The header year picker is how you get there.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="schema">
+      <div class="eyebrow">Data</div>
+      <h2>Schema deltas, all additive</h2>
+      <p class="sub">What the live database has, what each module adds. Migrations are hand-run in the Supabase SQL editor, idempotent, and recorded in the service repo's migrations README. Decision pending on a staging project before the first one runs.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Module</th><th>Adds</th><th>Fixes</th></tr></thead>
+          <tbody>
+            <tr><td>01 School &amp; year</td><td><code>academic_years</code> · <code>classes.academic_year_id</code> · profile fields on <code>schools</code> · <code>rooms</code></td><td>Year is a text tag today; one-open-per-school enforced by a partial unique index</td></tr>
+            <tr><td>02 Departments &amp; subjects</td><td><code>departments.head_user_id</code> · <code>department_subjects</code> · <code>grade_subjects</code> · <code>class_subjects.grade_subject_id</code></td><td>Departments cannot be created; subjects flat; knowledge uploaded per section</td></tr>
+            <tr><td>03 School day</td><td><code>period_templates</code> · <code>period_template_periods</code> · grade → template · <code>timetable_slots.period_id</code> points at template periods</td><td><code>school_periods</code> is one bell schedule per school; KG and grade 6 cannot differ</td></tr>
+            <tr><td>Knowledge</td><td><code>grade_subject_id</code> on materials, notes, papers · paper → source materials link</td><td>Provenance is not stored</td></tr>
+            <tr><td>Timetable</td><td>stable slot identity · room on slot</td><td>Logs and exchanges need slots that do not move under them</td></tr>
+            <tr><td>Build modules</td><td>period logs, homework, exchanges, notifications tables</td><td>Each carries its tag columns and provenance links as acceptance criteria</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:12px">Already there and reused: <code>knowledge_materials.class_subject_id + teacher_id</code>, <code>exams.class_subject_id</code>, <code>student_submissions.exam_id</code>, <code>timetable_slots.class_subject_id + teacher_id</code>, <code>teacher_assignments</code> with tenure, <code>student_class_memberships</code>.</p>
+    </section>
+
+    <section id="plan">
+      <div class="eyebrow">Sequence</div>
+      <h2>Build plan</h2>
+      <p class="sub">Shell first, then horizontals and junctions in setup order, because every vertical's picker depends on them. This is also the setup checklist Home shows a new school. One branch per module in each repo, mock before code where the page shape is new, pull request when verified.</p>
+      <div class="plan">
+        <div class="step"><div class="no">0</div><div><b>Admin shell</b><p>Grouped nav per role, coming-soon rows, View-as switcher, IA evaluation and module map.</p><div class="dep">paperhint-web #5 · verified with a real admin session</div></div><span class="tag live">in review</span></div>
+        <div class="step now"><div class="no">1</div><div><b>School &amp; academic year</b><p>Profile, years with one open, rooms, header year picker with read-only past years. Opening a year is step one of rollover.</p><div class="dep">Execution doc written · docs/modules/01</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">2</div><div><b>Departments &amp; subjects</b><p>Department list with head of department, subjects owned, grades each runs in. Lands the grade junction that knowledge and papers hang off.</p><div class="dep">Needs 1 for year scoping</div></div><span class="tag build">next doc</span></div>
+        <div class="step"><div class="no">3</div><div><b>Classes &amp; sections + Allotments board</b><p>Class creation moves in from Batches. One staffing board replaces assignment editing inside Teachers and Batches.</p><div class="dep">Needs 2 for department-first picking</div></div><span class="tag build">queued</span></div>
+        <div class="step"><div class="no">4</div><div><b>School day</b><p>Period templates per grade, week settings pulled from Calendar. First migration that touches a table the live timetable reads.</p><div class="dep">Staging decision due here</div></div><span class="tag build">queued</span></div>
+        <div class="step"><div class="no">5</div><div><b>Timetable under Classes</b><p>Split the 3,655-line file by surface, own sub-routes, tiered teacher picker, room clash, stable slot identity.</p><div class="dep">Needs 3 and 4</div></div><span class="tag build">queued</span></div>
+        <div class="step"><div class="no">6</div><div><b>Year rollover</b><p>Batches renamed and moved to Setup. Mock first, per founder. Creates the year, promotes, closes.</p><div class="dep">Needs 1</div></div><span class="tag build">queued</span></div>
+        <div class="step"><div class="no">7</div><div><b>Home as setup checklist</b><p>Nine steps with done state, folds into the operations view once a timetable is published. Teacher home kept.</p><div class="dep">Reads readiness from 1–5</div></div><span class="tag build">queued</span></div>
+        <div class="step"><div class="no">8</div><div><b>Knowledge: class-level and shared</b><p>Class knowledge at grade × subject inherited by sections; shared library kept separate with the teacher as provenance.</p><div class="dep">Needs 2</div></div><span class="tag build">queued</span></div>
+        <div class="step"><div class="no">9</div><div><b>Exams &amp; papers, Operations</b><p>Exam manager, results and report cards, attendance oversight, substitution, notifications rail, reports. Each replaces a Soon row.</p><div class="dep">Notifications rail before any publisher</div></div><span class="tag build">later</span></div>
+        <div class="step"><div class="no">10</div><div><b>Teacher shell</b><p>Teacher menu ordered by her day, My Department grouping, class pipeline gains Portion. Screens untouched until then.</p><div class="dep">After the admin shell settles</div></div><span class="tag build">later</span></div>
+      </div>
+    </section>
+
+    <section id="decisions">
+      <div class="eyebrow">Record</div>
+      <h2>Decisions</h2>
+      <div class="log">
+        <div><span class="d">09 Sept</span><span>Never commit or push to <code>main</code> in the product repos. One branch per logical change, pull request when verified.</span></div>
+        <div><span class="d">10 Sept</span><span>Build as admin-only for now; teacher-facing screens untouched. Shell first, modules after.</span></div>
+        <div><span class="d">10 Sept</span><span>Setup is about the school (another admin sees the same value). Settings is about the app and the account. Settings stays in the user menu.</span></div>
+        <div><span class="d">10 Sept</span><span>Unbuilt modules stay in the nav as Soon rows landing on a placeholder with the module's own description.</span></div>
+        <div><span class="d">10 Sept</span><span>Timetable is two layers: period templates per grade (Setup, configuration) and the filled grid per section (Classes, data). Templates are rows, not code.</span></div>
+        <div><span class="d">10 Sept</span><span>Knowledge is two things: class knowledge at grade × subject inherited by sections, and the teacher-shared library. Separate pages, never confused.</span></div>
+        <div><span class="d">10 Sept</span><span>Home stays role-driven with an admin View-as switch. Teacher home kept, not scrapped.</span></div>
+        <div><span class="d">10 Sept</span><span>Subjects &amp; books becomes Departments &amp; subjects. Head of department is a marker with department-scoped permissions, not a third role. Books are materials on a subject per grade, managed in Class knowledge.</span></div>
+        <div><span class="d">10 Sept</span><span>The whole app should be seamless. Five testable rules above govern every module document.</span></div>
+        <div><span class="d">10 Sept</span><span>Opening a new academic year is the first step of rollover, not a separate action.</span></div>
+      </div>
+    </section>
+
+    <section id="open" class="open">
+      <div class="eyebrow">Pending</div>
+      <h2>Open questions</h2>
+      <ul>
+        <li><b>Staging Supabase project</b> before the first migration, or additive-only discipline on the live database. Recommended: staging. Due at module 4 at the latest, sooner if module 1's migration goes first.</li>
+        <li><b>Teacher overview page</b> at <code>/teachers/:id/overview</code>: unreachable today and duplicates the drawer. Wire it as the full profile, or drop it.</li>
+        <li><b><code>users.custom_fields</code></b>: unused by the UI. Make it school-specific staff fields with an editor, or treat as dead schema. Decide before module 1 ships.</li>
+        <li><b>Year rollover page shape</b>: founder wants a mock before class creation moves out of Batches.</li>
+        <li><b>Primary section</b>: lower grades run as a department by grade band with one teacher for all subjects. The hierarchy handles it, the page must not assume one subject family per department.</li>
+      </ul>
+    </section>
+  </main>
+</div>
