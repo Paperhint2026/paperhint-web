@@ -8,6 +8,7 @@ import {
   UsersIcon,
 } from "@phosphor-icons/react"
 import { isNavItemActive, navForRole } from "@/data/nav"
+import { useViewRole } from "@/lib/view-role"
 import { useAuth } from "@/lib/auth"
 import {
   useTeacherAssignments,
@@ -18,6 +19,7 @@ import { PaperhintMark } from "@/components/shared/paperhint-mark"
 import { PaperhintWordmark } from "@/components/shared/paperhint-wordmark"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { NavViewRole } from "@/components/nav-view-role"
 import { NavWorkspaces } from "@/components/nav-workspaces"
 import {
   Sidebar,
@@ -51,7 +53,8 @@ export function AppSidebar() {
 
   const [hoveredNav, setHoveredNav] = useState<string | null>(null)
   const { assignments } = useTeacherAssignments()
-  const isTeacher = user?.role === "teacher"
+  const { role: viewRole } = useViewRole()
+  const isTeacher = viewRole === "teacher"
 
   const closeMobileThen = (fn: () => void) => {
     if (isMobile) {
@@ -74,7 +77,7 @@ export function AppSidebar() {
   }
 
   // The menu is per role; the shell is shared. See src/data/nav.ts.
-  const navGroups = navForRole(user?.role).map((group) => ({
+  const navGroups = navForRole(viewRole).map((group) => ({
     label: group.label,
     items: group.items.map((item) => ({
       title: item.title,
@@ -189,6 +192,7 @@ export function AppSidebar() {
         </div>
       </SidebarContent>
       <SidebarFooter>
+        <NavViewRole />
         {user ? (
           <NavUser
             user={{

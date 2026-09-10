@@ -1,4 +1,5 @@
 import { useAuth } from "@/lib/auth"
+import { useViewRole } from "@/lib/view-role"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { useTeacherAssignments } from "@/hooks/use-teacher-assignments"
@@ -13,7 +14,8 @@ import { TeacherHome } from "@/modules/home/components/teacher-home"
 export function HomePage() {
   const { user } = useAuth()
   const { assignments, isLoading } = useTeacherAssignments()
-  const isTeacher = user?.role === "teacher"
+  const { role } = useViewRole()
+  const isTeacher = role === "teacher"
   const firstName = user?.full_name?.split(" ")[0] ?? "there"
 
   return (
