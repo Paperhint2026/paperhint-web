@@ -76,3 +76,9 @@ Department KPI slice (A14). Department-scoped approvals (A10). Material upload (
   include staff.
 - Designation becomes a tag: `designation_tags (school_id, label)`; `users.designation`
   keeps the text; picker offers existing tags, creates on new text.
+
+## From interview batch 3 (truth.md)
+
+- **Chapters** are school data here: `chapters (grade_subject_id, position, title,
+  board_ref)` pre-loadable from the board; a department or teacher **plan** reorders and
+  sets deadlines without changing the list (`chapter_plans`, later, with T5).

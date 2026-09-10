@@ -37,3 +37,9 @@ checklist collapses to one line with "Setup complete · 9 of 9".
 ## Out of scope
 
 Teacher home changes; Ask Hint panel changes.
+
+## From interview batch 3 (truth.md)
+
+- Post-setup Home leads with today's gaps: unfilled periods and registers not taken.
+- Setup checklist gains **Import**: from a table (CSV/XLSX) for students and teachers;
+  Google Workspace calendar sync as an option on the Calendar step.

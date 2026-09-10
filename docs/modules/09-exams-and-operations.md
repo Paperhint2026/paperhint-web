@@ -35,3 +35,18 @@ dependency — the Notifications rail — is decided once.
 - Attendance: per period, by the period's teacher (including staff periods). Absence
   notifications go to the two primary guardian contacts.
 - Homework assignment triggers a push to parents (rail).
+
+## From interview batch 3 (truth.md)
+
+- **Exam manager models term exams only.** Papers have `status draft → submitted →
+  approved`; a committee prepares, the school approves, and the exam cannot be
+  scheduled without an approved paper and an answer key. Class tests stay in the class
+  module and never enter Exam manager.
+- Unit tests count toward results only when scheduled on the calendar (a flag on the exam).
+- Grading: every AI mark requires teacher verification; publication is blocked until all
+  sheets are approved. Results to parents are the marked-up sheet as PDF with remarks,
+  not a marks feed. **Report cards parked** — internal view only, Paperhint layout.
+- Notifications: no parent app; channel messages. Absence digest after the day's roll.
+  Circulars admin-sent; class-level announcements route via class teacher.
+- Homework module is **preparation only**: draft, assign, notify. No submissions.
+- Copilot state changes: confirm, then execute (edge case 10 stands).

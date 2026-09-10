@@ -44,3 +44,11 @@ exams/blueprints. `match_knowledge_materials` RPC gains a grade_subject filter.
 ## Out of scope
 
 Rename of nav labels lands here (Knowledge Library → Class knowledge).
+
+## From interview batch 3 (truth.md)
+
+- Uploaders are the office and department heads; teachers add personal material and
+  share. Board textbooks pre-loaded per grade × subject (crawl or upload) as the seed set.
+- Visibility: `private` (only me) · `shared` with an explicit audience: people or a whole
+  department (`material_shares (material_id, user_id | department_id)`) · `school`.
+- Class knowledge page gets a **Pre-load board textbooks** action on an empty grade-subject.

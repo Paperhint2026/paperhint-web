@@ -29,3 +29,9 @@ Everything above until the admin shell and modules 01–05 are merged.
   fills) show on the dashboard with a countdown.
 - Non-teaching staff get the same shell scoped to their department periods and
   attendance.
+
+## From interview batch 3 (truth.md)
+
+- Period log: pre-filled from the plan, one-tap confirm, detail via Hint. Recap card is
+  generated from the last log (absent, taught, homework) for the next period.
+- KPI visibility: the teacher and department heads only.

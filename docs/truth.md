@@ -131,3 +131,66 @@ changes. Dated. "Unknown until pilot" is a valid answer and is recorded as such.
 - **Principal = admin + teacher.** Principals often teach senior classes. One account
   may hold both roles; the shell shows the union, the View-as switch already exists.
   Roles become a set, not a single value.
+
+## The teacher's day (2026-09-10)
+
+- Period log: if the planned chapter was taught, the log is pre-filled and confirmed
+  with one tap; the teacher may add detail by talking to Hint. Both paths produce the
+  same structured record, and the detail feeds the next recap.
+- Syllabus: the **chapter list is board-defined per grade and subject** (CBSE, state
+  board) — not hidden knowledge. **Order and pacing** are the department's or the
+  teacher's strategy (some schools let teachers reorder chapters, e.g. easy first).
+  Model: chapters are school data under Departments & subjects (pre-loadable from the
+  board); the plan (order, deadlines) is per department or per teacher.
+- Portion-completion KPI is visible to **the teacher and the department heads** (and
+  admin), never to other teachers.
+- Recap card is **generated**: from the previous log — who was absent, what was taught,
+  what homework was given — assessed against the upcoming period. An assistant output,
+  not a static query.
+
+## Knowledge (2026-09-10)
+
+- Curriculum sources are uploaded by **the office or department heads**, not teachers.
+- **Board textbooks can be pre-loaded** per grade and subject (CBSE and state boards
+  publish digital copies): crawl, or download-and-upload. Schools add their own material.
+- **Private = only me.** Sharing is to invited people or to a whole department (pick the
+  department, every member sees it).
+
+## Question papers and exams (2026-09-10)
+
+- **Two kinds.** Class tests: the teacher's own, quick to prepare, quick to evaluate with
+  the answer-sheet evaluator, local to her class. Term/scheduled exams: **school-level**,
+  large volumes of scanned sheets.
+- Term papers are prepared by a **committee of teachers**, submitted to the school's
+  board, and **approved before use**. Answer keys are provided to every evaluating
+  teacher's desk. Approval is a real step.
+- Unit tests count toward results only if the school scheduled them on the calendar;
+  class tests never do (they are sudden, local, optional).
+
+## Grading and results (2026-09-10)
+
+- AI grading is a starting point: teachers **verify every mark and approve** before any
+  publication. Upload-and-correct saves the entry work; the judgement stays theirs.
+- Results to parents: today parents get the corrected paper. Paperhint version: the
+  marked-up answer sheet with per-answer remarks, shareable as a PDF, or a printed
+  overall evaluation with remarks. Not a marks feed.
+- **Report cards are parked**: internal, viewable by teachers and the school, Paperhint
+  layout only. The physical report card stays the school's own process.
+
+## Attendance, notifications, homework (2026-09-10)
+
+- **No parent app.** Parents receive **channel messages** (push to their phone via
+  messaging channels). App context parked.
+- Absence notifications go out **after the day's roll is complete**, not per period.
+- Circulars: **admin sends**. Class-level announcements pass through class teachers;
+  school-level ones go straight to parents and staff through the rail.
+- Homework: **preparation only**. No digital submission, no evaluation; notebooks are
+  corrected by hand.
+
+## Ask Hint and onboarding (2026-09-10)
+
+- Office copilot: **confirm, then execute** for state-changing requests.
+- Onboarding: import from any table the school has; build connectors (MCP) for tools
+  they already use; sync **Google Workspace calendars** where schools run on Google.
+  Must feel easy, never a new process.
+- Admin Home after setup: today's gaps — unfilled periods and registers not yet taken.
