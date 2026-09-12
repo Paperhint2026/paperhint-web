@@ -116,13 +116,13 @@ export const ADMIN_NAV: NavGroup[] = [
         status: "live",
         feature: "calendar",
       },
-      soon(
-        "departments",
-        "Departments & subjects",
-        BookOpenIcon,
-        "A5",
-        "Departments with a head of department, the subjects each department owns, and the grades each subject runs in. Books and materials attach to a subject per grade and are managed in Class knowledge."
-      ),
+      {
+        key: "departments",
+        title: "Departments & subjects",
+        icon: BookOpenIcon,
+        path: "/setup/departments",
+        status: "live",
+      },
       {
         key: "batches",
         title: "Batches",
