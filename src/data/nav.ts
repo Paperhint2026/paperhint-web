@@ -161,13 +161,13 @@ export const ADMIN_NAV: NavGroup[] = [
         path: "/classes",
         status: "live",
       },
-      soon(
-        "allotments",
-        "Allotments",
-        ChalkboardTeacherIcon,
-        "A8",
-        "One school-wide staffing board: who teaches which subject in which section, per grade. Gaps are flagged on Home under 'Needs a look'."
-      ),
+      {
+        key: "allotments",
+        title: "Allotments",
+        icon: ChalkboardTeacherIcon,
+        path: "/allotments",
+        status: "live",
+      },
       {
         key: "timetable",
         title: "Timetable",

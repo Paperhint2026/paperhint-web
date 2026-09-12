@@ -35,6 +35,7 @@ import { PlatformSchoolPage } from "@/modules/platform/pages/platform-school-pag
 import { PlatformSchoolNewPage } from "@/modules/platform/pages/platform-school-new-page"
 import { FeatureRoute } from "@/components/shared/feature-route"
 import { ComingSoonPage } from "@/modules/coming-soon/pages/coming-soon-page"
+import { AllotmentsPage } from "@/modules/allotments/pages/allotments-page"
 
 export const router = createBrowserRouter([
   { path: "login", element: <LoginPage /> },
@@ -75,6 +76,7 @@ export const router = createBrowserRouter([
           // roles home, and every /api/platform route re-checks the role.
           // School admin's configuration home (role-gated in the page)
           { path: "soon/:slug", element: <ComingSoonPage /> },
+          { path: "allotments", element: <AllotmentsPage /> },
           { path: "setup", element: <SetupPage /> },
           { path: "setup/:section", element: <SetupPage /> },
           { path: "platform", element: <PlatformPage /> },
