@@ -157,7 +157,7 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
 
   const selectedField =
     selection?.mode === "edit"
-      ? draft.find((f) => f.id === selection.fieldId) ?? null
+      ? (draft.find((f) => f.id === selection.fieldId) ?? null)
       : null
 
   // ── staged mutations (local only) ────────────────────────────────────────
@@ -198,7 +198,8 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
     setDraft((prev) => {
       const current = prev.find((f) => f.id === fieldId)
       if (!current) return prev
-      const sectionChanged = (current.section || "additional") !== values.section
+      const sectionChanged =
+        (current.section || "additional") !== values.section
       return prev.map((f) =>
         f.id === fieldId
           ? {
@@ -240,7 +241,8 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
       if (!moving) return prev
       const target = prev
         .filter(
-          (f) => (f.section || "additional") === targetSection && f.id !== fieldId
+          (f) =>
+            (f.section || "additional") === targetSection && f.id !== fieldId
         )
         .sort((a, b) => a.sort_order - b.sort_order)
       const insertAt = beforeId
@@ -291,7 +293,11 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
   const handleDrop = (targetSection: string, beforeId: string | null) => {
     if (!drag) return
     if (drag.kind === "palette") {
-      setSelection({ mode: "new", fieldType: drag.fieldType, section: targetSection })
+      setSelection({
+        mode: "new",
+        fieldType: drag.fieldType,
+        section: targetSection,
+      })
     } else {
       placeField(drag.id, targetSection, beforeId)
     }
@@ -404,7 +410,9 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background">
           <div className="flex flex-col gap-6 p-5">
             {sections.map((section) => {
-              const sysHere = systemFields.filter((f) => f.section === section.key)
+              const sysHere = systemFields.filter(
+                (f) => f.section === section.key
+              )
               const customHere = draftBySection.get(section.key) ?? []
               if (
                 sysHere.length === 0 &&
@@ -420,7 +428,7 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
                   key={section.key}
                   className={cn(
                     "flex flex-col gap-3 rounded-lg p-2 transition-colors",
-                    drag && "outline-dashed outline-1 outline-border",
+                    drag && "outline-1 outline-border outline-dashed",
                     isSectionTarget && "bg-primary/5 outline-primary/50"
                   )}
                   onDragOver={(e) => {
@@ -443,7 +451,9 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
                     e.preventDefault()
                     handleDrop(
                       section.key,
-                      dropHint?.section === section.key ? dropHint.beforeId : null
+                      dropHint?.section === section.key
+                        ? dropHint.beforeId
+                        : null
                     )
                   }}
                 >
@@ -469,16 +479,21 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
                         placeholder={f.placeholder}
                         isNew={isTemp(f.id)}
                         selected={
-                          selection?.mode === "edit" && selection.fieldId === f.id
+                          selection?.mode === "edit" &&
+                          selection.fieldId === f.id
                         }
                         dropBefore={
                           dropHint?.section === section.key &&
                           dropHint.beforeId === f.id
                         }
-                        onSelect={() => setSelection({ mode: "edit", fieldId: f.id })}
+                        onSelect={() =>
+                          setSelection({ mode: "edit", fieldId: f.id })
+                        }
                         onMoveUp={i > 0 ? () => move(f, -1) : undefined}
                         onMoveDown={
-                          i < customHere.length - 1 ? () => move(f, 1) : undefined
+                          i < customHere.length - 1
+                            ? () => move(f, 1)
+                            : undefined
                         }
                         onDelete={() => stageRemove(f.id)}
                         onDragStart={() => setDrag({ kind: "field", id: f.id })}
@@ -548,7 +563,12 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
             Unsaved changes — the real form updates when you save.
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={discard} disabled={isSaving}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={discard}
+              disabled={isSaving}
+            >
               Discard
             </Button>
             <Button size="sm" onClick={save} disabled={isSaving}>
@@ -608,7 +628,9 @@ function FieldPreview({
   const shell = (
     <div className="flex flex-col gap-1.5">
       <span className="flex items-center gap-1.5 text-xs font-medium">
-        {locked && <LockSimpleIcon className="size-3 text-muted-foreground/60" />}
+        {locked && (
+          <LockSimpleIcon className="size-3 text-muted-foreground/60" />
+        )}
         <span className={locked ? "text-muted-foreground" : "text-foreground"}>
           {label}
         </span>
@@ -758,7 +780,8 @@ function PropertiesPanel({
 }) {
   const isEdit = selection.mode === "edit"
   const fieldType =
-    field?.field_type ?? (selection.mode === "new" ? selection.fieldType : "text")
+    field?.field_type ??
+    (selection.mode === "new" ? selection.fieldType : "text")
 
   const [label, setLabel] = useState(field?.label ?? "")
   const [placeholder, setPlaceholder] = useState(field?.placeholder ?? "")
@@ -768,13 +791,18 @@ function PropertiesPanel({
       "additional"
   )
   const [required, setRequired] = useState(field?.required ?? false)
-  const [optionsText, setOptionsText] = useState((field?.options ?? []).join("\n"))
+  const [optionsText, setOptionsText] = useState(
+    (field?.options ?? []).join("\n")
+  )
 
   const apply = () => {
     if (!label.trim()) return toast.error("Give the field a label")
     const options =
       fieldType === "select"
-        ? optionsText.split("\n").map((o) => o.trim()).filter(Boolean)
+        ? optionsText
+            .split("\n")
+            .map((o) => o.trim())
+            .filter(Boolean)
         : undefined
     if (fieldType === "select" && (options?.length ?? 0) < 2) {
       return toast.error("A dropdown needs at least 2 options")
@@ -865,7 +893,10 @@ function PropertiesPanel({
 
       {fieldType !== "boolean" && (
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Checkbox checked={required} onCheckedChange={(v) => setRequired(!!v)} />
+          <Checkbox
+            checked={required}
+            onCheckedChange={(v) => setRequired(!!v)}
+          />
           Mandatory on the form
         </label>
       )}
