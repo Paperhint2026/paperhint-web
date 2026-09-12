@@ -190,7 +190,7 @@
       <li><a href="#decisions">Decisions</a></li>
       <li><a href="#open">Open questions</a></li>
     </ol>
-    <div class="meta">Revision 7 · 10 Sept 2026<br>Interview answers in <code>docs/truth.md</code>.<br>Execution docs 00–10 rendered in <a href="#documents">Module documents</a>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
+    <div class="meta">Revision 8 · 12 Sept 2026<br>Interview answers in <code>docs/truth.md</code>.<br>Execution docs 00–10 rendered in <a href="#documents">Module documents</a>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
   </nav>
 
   <main>
@@ -227,10 +227,9 @@
       <p class="sub">Five groups plus Home and Ask Hint. Every handoff module has exactly one home. Unbuilt ones stay visible as "Soon" rows so the map is complete from day one. Settings (profile, appearance, security, roles) stays in the user menu: it configures the app, not the school.</p>
       <div class="groups">
         <div class="group"><h3>Setup <small>configure once</small></h3><ul>
-          <li class="soon"><span>School &amp; year<span class="code">A1</span></span><span class="tag tweak">tweak</span></li>
+          <li><span>School setup<span class="code">A1 · /setup</span></span><span class="tag live">live</span></li>
           <li><span>Calendar<span class="code">A2</span></span><span class="tag live">live</span></li>
-          <li class="soon"><span>School day<span class="code">A3·cfg</span></span><span class="tag build">build</span></li>
-          <li class="soon"><span>Departments &amp; subjects<span class="code">A5</span></span><span class="tag tweak">tweak</span></li>
+                    <li class="soon"><span>Departments &amp; subjects<span class="code">A5</span></span><span class="tag tweak">tweak</span></li>
           <li><span>Batches → Year rollover<span class="code">A15</span></span><span class="tag tweak">tweak</span></li>
         </ul></div>
         <div class="group"><h3>People <small>directories</small></h3><ul>
@@ -473,7 +472,7 @@ flowchart LR
       <h2>Build plan</h2>
       <p class="sub">Shell first, then horizontals and junctions in setup order, because every vertical's picker depends on them. Every step below now has an execution document (scope, schema, API, screens and pickers, acceptance, out of scope) in <code>docs/modules/</code>. This is also the setup checklist Home shows a new school. One branch per module in each repo, mock before code where the page shape is new, pull request when verified.</p>
       <div class="plan">
-        <div class="step"><div class="no">0</div><div><b>Admin shell</b><p>Grouped nav per role, coming-soon rows, View-as switcher, IA evaluation and module map.</p><div class="dep">paperhint-web #5 · verified with a real admin session</div></div><span class="tag live">in review</span></div>
+        <div class="step"><div class="no">0</div><div><b>Admin shell</b><p>Grouped nav per role, coming-soon rows, View-as switcher, IA evaluation and module map.</p><div class="dep">paperhint-web #5 merged 12 Sept · includes the dev's platform role, plan feature flags and /setup page</div></div><span class="tag done">merged</span></div>
         <div class="step now"><div class="no">1</div><div><b>School &amp; academic year</b><p>Profile, years with one open, header year picker with read-only past years. No rooms. Opening a year is step one of rollover.</p><div class="dep">Execution doc written · docs/modules/01</div></div><span class="tag tweak">doc ready</span></div>
         <div class="step"><div class="no">2</div><div><b>Departments &amp; subjects</b><p>Department list with head of department, subjects owned, grades each runs in. Lands the grade junction that knowledge and papers hang off.</p><div class="dep">Needs 1 for year scoping · docs/modules/02</div></div><span class="tag tweak">doc ready</span></div>
         <div class="step"><div class="no">3</div><div><b>Classes &amp; sections + Allotments board</b><p>Class creation moves in from Batches. One staffing board replaces assignment editing inside Teachers and Batches.</p><div class="dep">Needs 2 for department-first picking · docs/modules/03</div></div><span class="tag tweak">doc ready</span></div>
@@ -513,7 +512,9 @@ flowchart LR
 <h4>Acceptance</h4>
 <ul><li>A brand-new school lands on Home's setup checklist at step 1 and can complete the profile and open its first year without touching the database.</li><li>Exactly one open year per school is enforced by the database, not the UI.</li><li>Every existing class resolves to an <code>academic_years</code> row after backfill; no class left with a null year.</li><li>Selecting a closed year renders every page read-only; no write endpoint accepts a closed year.</li><li>Closing a year is admin-only and irreversible; the UI says so before confirm.</li></ul>
 <h4>Out of scope</h4>
-<p>Rollover mechanics (A15, own document). Department list (02). Period templates (03). Custom staff fields (decision pending on <code>users.custom_fields</code>).</p></div>
+<p>Rollover mechanics (A15, own document). Department list (02). Period templates (03). Custom staff fields (decision pending on <code>users.custom_fields</code>).</p>
+<h4>Post-merge note (2026-09-12)</h4>
+<p>Builds as a new <b>Academic year</b> section of the dev's <code>/setup</code> page (School setup), beside Working week, Bell timing, Student form, Teacher form. School profile fields join the same page. <code>custom_fields</code> is resolved: the form builder already edits them.</p></div>
 </details>
 <details class="doc" id="doc-02-departments-and-subjects">
   <summary><span class="no">02</span><span class="t">Departments &amp; subjects (A5)</span><span class="src">02-departments-and-subjects.md</span></summary>
@@ -569,7 +570,9 @@ flowchart LR
 <h4>Out of scope</h4>
 <p>Per-day variant UI (schema is ready; UI when a pilot school needs it). Clash rules (05).</p>
 <h4>From interview (truth.md, 2026-09-10)</h4>
-<ul><li>The timetable is constant for the year; template edits after sharing are rare. The warning on edit stays, and the copy should say why ("6 sections use this template").</li></ul></div>
+<ul><li>The timetable is constant for the year; template edits after sharing are rare. The warning on edit stays, and the copy should say why ("6 sections use this template").</li></ul>
+<h4>Post-merge note (2026-09-12)</h4>
+<p>The Bell timing section of <code>/setup</code> is the surface this module upgrades to period templates per grade; Working week already lives there. No separate School day page.</p></div>
 </details>
 <details class="doc" id="doc-05-timetable">
   <summary><span class="no">05</span><span class="t">Timetable (A3)</span><span class="src">05-timetable.md</span></summary>
@@ -700,6 +703,7 @@ flowchart LR
         <div><span class="d">10 Sept</span><span>AI marks are verified and approved by the teacher before anything publishes. Parents get the marked-up sheet with remarks, not a marks feed. Report cards parked as internal only. (Interview)</span></div>
         <div><span class="d">10 Sept</span><span>No parent app: channel messages, absence digest after the day's roll, circulars by admin. Homework is preparation only. Copilot confirms then executes. Onboarding imports from any table; Google calendar sync. (Interview)</span></div>
         <div><span class="d">10 Sept</span><span>Chapters are board-defined school data, pre-loadable; ordering and pacing are the department's or teacher's plan. KPI visible to the teacher and heads only. Recap card is generated. (Interview)</span></div>
+        <div><span class="d">12 Sept</span><span>Shell merged to main. The dev's /setup page (working week, bell timing, student and teacher form builders) is the live School setup row; modules 01 and 04 build inside it as sections. Custom fields resolved by the form builder. Plan feature flags hide rows a school has not licensed; platform accounts see only the console.</span></div>
       </div>
     </section>
 
@@ -709,8 +713,7 @@ flowchart LR
       <ul>
         <li><b>Staging Supabase project</b> before the first migration, or additive-only discipline on the live database. Recommended: staging. Due at module 4 at the latest, sooner if module 1's migration goes first.</li>
         <li><b>Teacher overview page</b> at <code>/teachers/:id/overview</code>: unreachable today and duplicates the drawer. Wire it as the full profile, or drop it.</li>
-        <li><b><code>users.custom_fields</code></b>: unused by the UI. Make it school-specific staff fields with an editor, or treat as dead schema. Decide before module 1 ships.</li>
-        <li><b>Year rollover page shape</b>: founder wants a mock before class creation moves out of Batches.</li>
+                <li><b>Year rollover page shape</b>: founder wants a mock before class creation moves out of Batches.</li>
         <li><b>Unknown until pilot</b> (founder): whether any school runs different timings on different days; whether breaks and assembly ever differ by grade; how schools actually band their grades. Schema is ready for the first; the other two are recorded, not modelled.</li>
       </ul>
     </section>
