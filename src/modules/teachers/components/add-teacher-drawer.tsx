@@ -16,6 +16,13 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
+import {
+  CustomFieldsInputs,
+  defsForSection,
+  missingRequiredCustomFields,
+  useCustomFieldDefs,
+  type CustomFieldValues,
+} from "@/components/shared/custom-fields"
 
 import {
   AlertDialog,
@@ -86,6 +93,7 @@ export interface TeacherFormData {
   classSubjects: ClassSubjectEntry[]
   existingAssignments: ExistingAssignment[]
   pendingProfileFile?: File
+  customFields?: CustomFieldValues
 }
 
 export interface AddTeacherDrawerProps {
@@ -111,6 +119,7 @@ const emptyForm: TeacherFormData = {
   dateOfJoining: undefined,
   classSubjects: [{ classId: "", classSubjectId: "" }],
   existingAssignments: [],
+  customFields: {},
 }
 
 export function AddTeacherDrawer({
@@ -331,6 +340,21 @@ export function AddTeacherDrawer({
     })
   }
 
+  const customDefs = useCustomFieldDefs("teacher")
+  const customSection = (section: string) => {
+    const defs = defsForSection(customDefs, section)
+    if (defs.length === 0) return null
+    return (
+      <CustomFieldsInputs
+        defs={defs}
+        values={form.customFields ?? {}}
+        onChange={(next) =>
+          setForm((prev) => ({ ...prev, customFields: next }))
+        }
+      />
+    )
+  }
+
   const isFormValid =
     form.fullName.trim() !== "" &&
     form.email.trim() !== "" &&
@@ -340,6 +364,11 @@ export function AddTeacherDrawer({
   // success it closes the drawer; on failure it toasts and leaves the drawer
   // open with every field intact so the admin can correct and retry.
   const handleSave = () => {
+    const missing = missingRequiredCustomFields(customDefs, form.customFields ?? {})
+    if (missing.length > 0) {
+      toast.error(`Fill the required field${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`)
+      return
+    }
     onSave(form)
   }
 
@@ -497,6 +526,8 @@ export function AddTeacherDrawer({
               </div>
             </div>
 
+            {customSection("basic")}
+
             <Separator />
 
             {/* Professional Details */}
@@ -614,6 +645,19 @@ export function AddTeacherDrawer({
                 </Popover>
               </div>
             </div>
+
+            {customSection("professional")}
+
+            {defsForSection(customDefs, "additional").length > 0 && (
+              <>
+                <Separator />
+                {/* Additional details — school-defined custom fields (/setup) */}
+                <p className="text-xs font-medium text-muted-foreground">
+                  Additional Details
+                </p>
+                {customSection("additional")}
+              </>
+            )}
 
             <Separator />
 

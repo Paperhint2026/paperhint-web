@@ -10,6 +10,7 @@ import {
 import { isNavItemActive, navForRole } from "@/data/nav"
 import { useViewRole } from "@/lib/view-role"
 import { useAuth } from "@/lib/auth"
+import { useFeatures } from "@/hooks/use-features"
 import {
   useTeacherAssignments,
   classLabel,
@@ -55,6 +56,9 @@ export function AppSidebar() {
   const { assignments } = useTeacherAssignments()
   const { role: viewRole } = useViewRole()
   const isTeacher = viewRole === "teacher"
+  // PaperHint team accounts see only the console — they have no school.
+  const isPlatform = user?.role === "platform"
+  const { isEnabled } = useFeatures()
 
   const closeMobileThen = (fn: () => void) => {
     if (isMobile) {
@@ -77,19 +81,24 @@ export function AppSidebar() {
   }
 
   // The menu is per role; the shell is shared. See src/data/nav.ts.
-  const navGroups = navForRole(viewRole).map((group) => ({
-    label: group.label,
-    items: group.items.map((item) => ({
-      title: item.title,
-      icon: item.icon,
-      soon: item.status === "soon",
-      isActive: isNavItemActive(item, location.pathname),
-      onClick: () => handleNav(item.path),
-    })),
-  }))
+  // Rows behind a plan feature disappear when the school's plan lacks it.
+  const navGroups = navForRole(isPlatform ? "platform" : viewRole)
+    .map((group) => ({
+      label: group.label,
+      items: group.items
+        .filter((item) => !item.feature || isEnabled(item.feature))
+        .map((item) => ({
+          title: item.title,
+          icon: item.icon,
+          soon: item.status === "soon",
+          isActive: isNavItemActive(item, location.pathname),
+          onClick: () => handleNav(item.path),
+        })),
+    }))
+    .filter((group) => group.items.length > 0)
 
   const workspaces =
-    isTeacher && assignments.length > 0
+    isTeacher && !isPlatform && assignments.length > 0
       ? [
           {
             name: "Your classes",
@@ -170,7 +179,7 @@ export function AppSidebar() {
         {/* One hover key for every group, cleared once on leaving the whole
             nav — per-list state let two groups both claim the pill mid-move. */}
         <div
-          className="flex min-h-0 flex-col"
+          className="flex min-h-0 flex-1 flex-col"
           onMouseLeave={() => setHoveredNav(null)}
         >
           {navGroups.map((group, i) => (

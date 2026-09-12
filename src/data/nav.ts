@@ -1,4 +1,5 @@
 import type { Icon } from "@phosphor-icons/react"
+import type { FeatureKey } from "@/hooks/use-features"
 import {
   ArchiveIcon,
   BellIcon,
@@ -12,7 +13,6 @@ import {
   ChalkboardTeacherIcon,
   ChartBarIcon,
   ClipboardTextIcon,
-  ClockIcon,
   FilesIcon,
   GraduationCapIcon,
   HouseIcon,
@@ -47,6 +47,8 @@ export type NavItem = {
   status: NavStatus
   /** Active when the current path matches. Default: startsWith(path). */
   match?: "exact" | "prefix"
+  /** Plan feature that must be enabled for the row to show (see use-features). */
+  feature?: FeatureKey
   /** Handoff code (A1, T4…) — shown on the placeholder page. */
   code?: string
   /** One-paragraph description from the handoff — placeholder page body. */
@@ -92,33 +94,28 @@ export const ADMIN_NAV: NavGroup[] = [
         icon: SparkleIcon,
         path: "/ask",
         status: "live",
+        feature: "copilot",
       },
     ],
   },
   {
     label: "Setup",
     items: [
-      soon(
-        "school",
-        "School & year",
-        BuildingsIcon,
-        "A1",
-        "School profile; open and close an academic year. Everything else in the school dates from the year that is open here."
-      ),
+      {
+        key: "setup",
+        title: "School setup",
+        icon: BuildingsIcon,
+        path: "/setup",
+        status: "live",
+      },
       {
         key: "calendar",
         title: "Calendar",
         icon: CalendarDotsIcon,
         path: "/calendar",
         status: "live",
+        feature: "calendar",
       },
-      soon(
-        "school-day",
-        "School day",
-        ClockIcon,
-        "A3",
-        "The shape of the school day: period templates with their times and breaks, assigned per grade, plus working days and week start. The timetable is built on top of this."
-      ),
       soon(
         "departments",
         "Departments & subjects",
@@ -177,6 +174,7 @@ export const ADMIN_NAV: NavGroup[] = [
         icon: TableIcon,
         path: "/timetable",
         status: "live",
+        feature: "timetable",
       },
     ],
   },
@@ -286,6 +284,7 @@ export const TEACHER_NAV: NavGroup[] = [
         icon: SparkleIcon,
         path: "/ask",
         status: "live",
+        feature: "copilot",
       },
       {
         key: "classes",
@@ -314,6 +313,7 @@ export const TEACHER_NAV: NavGroup[] = [
         icon: CalendarDotsIcon,
         path: "/calendar",
         status: "live",
+        feature: "calendar",
       },
       {
         key: "timetable",
@@ -321,6 +321,7 @@ export const TEACHER_NAV: NavGroup[] = [
         icon: TableIcon,
         path: "/timetable",
         status: "live",
+        feature: "timetable",
       },
     ],
   },
@@ -346,7 +347,23 @@ export const TEACHER_NAV: NavGroup[] = [
   },
 ]
 
+/** PaperHint team accounts: no school, only the console. */
+export const PLATFORM_NAV: NavGroup[] = [
+  {
+    items: [
+      {
+        key: "platform",
+        title: "Platform Console",
+        icon: BuildingsIcon,
+        path: "/platform",
+        status: "live",
+      },
+    ],
+  },
+]
+
 export function navForRole(role: string | undefined): NavGroup[] {
+  if (role === "platform") return PLATFORM_NAV
   return role === "teacher" ? TEACHER_NAV : ADMIN_NAV
 }
 

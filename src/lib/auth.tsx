@@ -6,6 +6,7 @@ import {
   type User,
 } from "@/store/auth-slice"
 import { fetchSchool, clearSchool } from "@/store/school-slice"
+import { resetFeaturesCache } from "@/hooks/use-features"
 
 export type { User }
 
@@ -29,6 +30,7 @@ export function useAuth() {
   const logout = useCallback(() => {
     dispatch(logoutAction())
     dispatch(clearSchool())
+    resetFeaturesCache() // next login refetches this school's license map
   }, [dispatch])
 
   return {

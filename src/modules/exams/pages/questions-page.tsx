@@ -20,6 +20,7 @@ import rehypeRaw from "rehype-raw"
 import rehypeSanitize from "rehype-sanitize"
 
 import { sanitizeSchema } from "@/lib/markdown-sanitize"
+import { formatAnswerKey } from "@/lib/answer-key"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import { toast } from "sonner"
@@ -648,9 +649,14 @@ export function QuestionsPage() {
                                         <p className="mb-1 text-[10px] font-semibold text-green-600 dark:text-green-400">
                                           Answer Key
                                         </p>
-                                        <p className="text-xs leading-relaxed text-green-700 dark:text-green-300">
-                                          {q.answer_key}
-                                        </p>
+                                        <div className="text-xs leading-relaxed text-green-700 dark:text-green-300 [&_p+p]:mt-1.5">
+                                          <ReactMarkdown
+                                            remarkPlugins={[remarkMath, remarkGfm]}
+                                            rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
+                                          >
+                                            {formatAnswerKey(q.answer_key)}
+                                          </ReactMarkdown>
+                                        </div>
                                       </div>
                                     )}
                                   </div>

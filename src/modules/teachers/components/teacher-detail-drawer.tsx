@@ -22,6 +22,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react"
 import { apiClient } from "@/lib/api-client"
+import { CustomFieldsDisplay } from "@/components/shared/custom-fields"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -94,6 +95,7 @@ interface TeacherOverview {
   assignments: Assignment[]
   classes: ClassInfo[]
   subjects: SubjectInfo[]
+  custom_fields?: Record<string, string | number> | null
   custom_duties?: {
     label: string
     class: {
@@ -769,6 +771,10 @@ export function TeacherDetailDrawer({
                         value={joined}
                       />
                     </div>
+                    <CustomFieldsDisplay
+                      entity="teacher"
+                      values={teacher.custom_fields}
+                    />
                   </motion.div>
                 </motion.div>
               </div>

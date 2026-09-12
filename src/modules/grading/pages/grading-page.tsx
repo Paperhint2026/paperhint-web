@@ -237,9 +237,16 @@ export function GradingPage() {
 
   const [exams, setExams] = useState<Exam[]>([])
   const [isLoadingExams, setIsLoadingExams] = useState(false)
-  const [searchParams] = useSearchParams()
-  const [selectedExamId, setSelectedExamId] = useState(
-    () => searchParams.get("exam") ?? ""
+  // The selected exam lives in the URL (?exam=), not component state, so
+  // review-page back links, browser back, refresh, and shared links all land
+  // on the same exam's student list instead of resetting to the cards.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedExamId = searchParams.get("exam") ?? ""
+  const setSelectedExamId = useCallback(
+    (id: string) => {
+      setSearchParams(id ? { exam: id } : {}, { replace: false })
+    },
+    [setSearchParams]
   )
 
   const [students, setStudents] = useState<Student[]>([])
@@ -261,7 +268,6 @@ export function GradingPage() {
 
   const fetchExams = useCallback(async (csId: string) => {
     setIsLoadingExams(true)
-    setSelectedExamId("")
     setStudents([])
     setSubmissions([])
     try {

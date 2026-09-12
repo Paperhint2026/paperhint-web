@@ -34,6 +34,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { ClassItem } from "@/modules/students/components/student-class-card"
+import {
+  CustomFieldsInputs,
+  defsForSection,
+  missingRequiredCustomFields,
+  useCustomFieldDefs,
+  type CustomFieldValues,
+} from "@/components/shared/custom-fields"
+import { toast } from "sonner"
 
 export interface ElectiveChoice {
   elective_group_id: string
@@ -58,6 +66,7 @@ export interface StudentEntry {
   emergency_contact_relationship: string
   emergency_contact_phone: string
   elective_choices?: ElectiveChoice[]
+  custom_fields?: CustomFieldValues
 }
 
 export interface StudentFieldError {
@@ -263,6 +272,21 @@ export function AddStudentDrawer({
     )
   }
 
+  const customDefs = useCustomFieldDefs("student")
+  const customSection = (section: string) => {
+    const defs = defsForSection(customDefs, section)
+    if (defs.length === 0) return null
+    return (
+      <CustomFieldsInputs
+        defs={defs}
+        values={entry.custom_fields ?? {}}
+        onChange={(next) =>
+          setEntry((prev) => ({ ...prev, custom_fields: next }))
+        }
+      />
+    )
+  }
+
   const isFormValid =
     entry.full_name.trim() !== "" &&
     entry.date_of_birth !== "" &&
@@ -272,6 +296,11 @@ export function AddStudentDrawer({
 
   const handleSave = () => {
     if (!isFormValid) return
+    const missing = missingRequiredCustomFields(customDefs, entry.custom_fields ?? {})
+    if (missing.length > 0) {
+      toast.error(`Fill the required field${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`)
+      return
+    }
     onSave(entry)
   }
 
@@ -415,6 +444,8 @@ export function AddStudentDrawer({
                 </SelectContent>
               </Select>
             </div>
+
+            {customSection("personal")}
 
             <Separator />
 
@@ -615,6 +646,8 @@ export function AddStudentDrawer({
               </div>
             </div>
 
+            {customSection("academic")}
+
             <Separator />
 
             {/* Address */}
@@ -647,6 +680,8 @@ export function AddStudentDrawer({
                 onChange={(e) => update("contact_number", e.target.value)}
               />
             </div>
+
+            {customSection("address")}
 
             <Separator />
 
@@ -692,6 +727,22 @@ export function AddStudentDrawer({
             </div>
           </div>
         </div>
+
+        {/* Emergency-section + Additional custom fields (/setup builder) */}
+        {(defsForSection(customDefs, "emergency").length > 0 ||
+          defsForSection(customDefs, "additional").length > 0) && (
+          <div className="flex flex-col gap-4 px-4 pb-4 sm:px-6">
+            {customSection("emergency")}
+            {defsForSection(customDefs, "additional").length > 0 && (
+              <>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Additional Details
+                </p>
+                {customSection("additional")}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <SheetFooter className="flex-col border-t bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
