@@ -194,3 +194,17 @@ changes. Dated. "Unknown until pilot" is a valid answer and is recorded as such.
   they already use; sync **Google Workspace calendars** where schools run on Google.
   Must feel easy, never a new process.
 - Admin Home after setup: today's gaps — unfilled periods and registers not yet taken.
+
+## Landed on main by the dev (2026-09-11, observed 2026-09-12)
+
+- **School setup page at `/setup`** with sections Working week, Bell timing, Student
+  form, Teacher form. The two forms are a **form builder for custom fields** on students
+  and teachers (`GET /api/custom-fields?entity=`). This answers the `custom_fields`
+  question: it is a real feature. Modules 01 (academic year) and 04 (period templates)
+  build **inside this page as new sections**, not as separate pages.
+- **Plan feature flags**: `timetable`, `calendar`, `copilot`, `grading` from
+  `/api/auth/features`; rows and routes hide when a school's plan lacks them. The nav
+  definition carries `feature` per row.
+- **Platform role**: PaperHint team accounts with no school; they see only the Platform
+  Console (school provisioning, module licensing). `navForRole("platform")`.
+- Grading UX and Ask Hint retry changes (no scheme impact).

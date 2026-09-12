@@ -59,3 +59,7 @@ does not map the school's physical layout.
 
 Rollover mechanics (A15, own document). Department list (02). Period templates (03).
 Custom staff fields (decision pending on `users.custom_fields`).
+
+## Post-merge note (2026-09-12)
+
+Builds as a new **Academic year** section of the dev's `/setup` page (School setup), beside Working week, Bell timing, Student form, Teacher form. School profile fields join the same page. `custom_fields` is resolved: the form builder already edits them.

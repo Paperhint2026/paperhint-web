@@ -59,3 +59,7 @@ Per-day variant UI (schema is ready; UI when a pilot school needs it). Clash rul
 
 - The timetable is constant for the year; template edits after sharing are rare. The
   warning on edit stays, and the copy should say why ("6 sections use this template").
+
+## Post-merge note (2026-09-12)
+
+The Bell timing section of `/setup` is the surface this module upgrades to period templates per grade; Working week already lives there. No separate School day page.
