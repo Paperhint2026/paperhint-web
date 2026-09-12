@@ -22,6 +22,8 @@ export type NavMainItem = {
    *  at `fill` weight, which needs the component. */
   icon: Icon
   isActive?: boolean
+  /** Not built yet: rendered muted with a "Soon" tag, still navigable. */
+  soon?: boolean
   onClick: () => void
 }
 
@@ -66,10 +68,18 @@ export function NavMain({
                 isActive={item.isActive}
                 tooltip={item.title}
                 onClick={item.onClick}
-                className={cn(animated && NAV_PILL_BUTTON_RESET)}
+                className={cn(
+                  animated && NAV_PILL_BUTTON_RESET,
+                  item.soon && "text-sidebar-label"
+                )}
               >
                 <item.icon weight={item.isActive ? "fill" : "regular"} />
-                <span>{item.title}</span>
+                <span className="flex-1 truncate">{item.title}</span>
+                {item.soon ? (
+                  <span className="ml-auto rounded-full border border-border/60 px-1.5 py-px text-[10px] leading-4 text-sidebar-label group-data-[collapsible=icon]:hidden">
+                    Soon
+                  </span>
+                ) : null}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

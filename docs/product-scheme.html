@@ -1,0 +1,718 @@
+<title>Paperhint Product Scheme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..600&family=Merriweather:ital,wght@1,400&display=swap">
+<style>
+  :root {
+    --ground: #FCFBF8;
+    --surface: #F3F0E8;
+    --surface-2: #EAE6DB;
+    --line: #E2DDD1;
+    --line-strong: #CFC9BB;
+    --ink: #14201A;
+    --ink-2: #3E4A43;
+    --muted: #6B776F;
+    --accent: #0B8A5C;
+    --accent-soft: #E3F3EB;
+    --amber: #B7791F;
+    --amber-soft: #FBF1DD;
+    --violet: #6B4FE0;
+    --violet-soft: #ECE7FB;
+    --build: #8A9188;
+    --code-bg: #F1EEE6;
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --serif: "Merriweather", Georgia, "Times New Roman", serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0A0F0C; --surface: #121A15; --surface-2: #192219; --line: #24302A;
+      --line-strong: #34443B; --ink: #F2EEE3; --ink-2: #C9C6BC; --muted: #8E978F;
+      --accent: #31D492; --accent-soft: #10291E; --amber: #E0A93F; --amber-soft: #2A2113;
+      --violet: #A08BFF; --violet-soft: #1E1A33; --build: #7C857D; --code-bg: #141C17;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0A0F0C; --surface: #121A15; --surface-2: #192219; --line: #24302A;
+    --line-strong: #34443B; --ink: #F2EEE3; --ink-2: #C9C6BC; --muted: #8E978F;
+    --accent: #31D492; --accent-soft: #10291E; --amber: #E0A93F; --amber-soft: #2A2113;
+    --violet: #A08BFF; --violet-soft: #1E1A33; --build: #7C857D; --code-bg: #141C17;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  em.ac { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--accent); }
+
+  .frame { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto; padding: 40px 32px 96px; }
+  @media (max-width: 900px) { .frame { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px 72px; } .toc { position: static; } }
+
+  .toc { position: sticky; top: 24px; align-self: start; font-size: 13px; }
+  .toc .mark { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-weight: 500; letter-spacing: -0.01em; }
+  .toc .mark svg { width: 20px; height: 20px; color: var(--accent); }
+  .toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .toc a { display: block; padding: 5px 8px; border-radius: 6px; color: var(--ink-2); }
+  .toc a:hover { background: var(--surface); text-decoration: none; color: var(--ink); }
+  .toc .meta { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+  main { min-width: 0; }
+  header.head { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 40px; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  h1 { font-size: 40px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 500; margin: 8px 0 12px; text-wrap: balance; }
+  .lede { font-size: 17px; color: var(--ink-2); max-width: 62ch; margin: 0; }
+  h2 { font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 500; margin: 0 0 6px; text-wrap: balance; }
+  h3 { font-size: 16px; font-weight: 500; letter-spacing: -0.01em; margin: 0 0 6px; }
+  section { margin-bottom: 56px; }
+  section > .sub { color: var(--muted); margin: 0 0 20px; max-width: 65ch; }
+  p { max-width: 65ch; margin: 0 0 12px; }
+  ul, ol { padding-left: 20px; max-width: 65ch; }
+  li { margin-bottom: 6px; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.92em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre.mermaid { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x: auto; margin: 0; }
+
+  /* status + kind grammar */
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--ink-2); white-space: nowrap; }
+  .tag.done { color: var(--accent); border-color: transparent; background: var(--accent-soft); }
+  .tag.tweak { color: var(--amber); border-color: transparent; background: var(--amber-soft); }
+  .tag.move { color: var(--violet); border-color: transparent; background: var(--violet-soft); }
+  .tag.build { color: var(--build); border-style: dashed; }
+  .tag.live { color: var(--accent); border-color: var(--accent); }
+  .code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--muted); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 18px; align-items: center; color: var(--muted); font-size: 13px; }
+
+  /* nav map */
+  .groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .group { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .group h3 { padding: 10px 14px 8px; margin: 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; }
+  .group h3 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .group ul { list-style: none; margin: 0; padding: 6px; max-width: none; }
+  .group li { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 7px 8px; border-radius: 8px; margin: 0; font-size: 14px; }
+  .group li .code { margin-left: 6px; }
+  .group li.soon { color: var(--muted); }
+
+  /* layer bands */
+  .bands { display: grid; gap: 10px; }
+  .band { display: grid; grid-template-columns: 130px 1fr; gap: 16px; align-items: start; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); }
+  .band.h { background: var(--surface); }
+  .band.j { border-style: dashed; }
+  .band.v { background: transparent; }
+  .band .role { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .band .role b { display: block; color: var(--ink); font-weight: 500; font-size: 14px; margin-bottom: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 13px; padding: 4px 10px; border: 1px solid var(--line-strong); background: var(--ground); }
+  .chip.pill { border-radius: 999px; }
+  .chip.tile { border-radius: 4px; }
+  .chip.junc { border-radius: 6px; border-style: dashed; }
+  .chip.new { color: var(--violet); border-color: var(--violet); }
+  .chip .code { margin-left: 5px; }
+  @media (max-width: 640px) { .band { grid-template-columns: 1fr; } }
+
+  /* rules */
+  .rules { display: grid; gap: 10px; counter-reset: rule; }
+  .rule { display: grid; grid-template-columns: 34px 1fr; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
+  .rule::before { counter-increment: rule; content: counter(rule); font-family: var(--serif); font-style: italic; font-size: 22px; color: var(--accent); line-height: 1; }
+  .rule b { font-weight: 500; }
+  .rule p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+  .tier { display: grid; grid-template-columns: 58px 1fr; gap: 10px; font-size: 14px; margin-top: 8px; }
+  .tier span:first-child { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 2px; }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 500; font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); background: var(--surface); position: sticky; top: 0; }
+  tr:last-child td { border-bottom: 0; }
+  td.c { text-align: center; }
+  td .D { color: var(--accent); font-weight: 500; }
+  td .d { color: var(--muted); }
+  td .n { color: var(--line-strong); }
+
+  /* plan */
+  .plan { display: grid; gap: 8px; }
+  .step { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: start; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
+  .step .no { font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--accent); line-height: 1.1; }
+  .step b { font-weight: 500; }
+  .step p { margin: 3px 0 0; font-size: 14px; color: var(--ink-2); max-width: none; }
+  .step .dep { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .step.now { border-color: var(--accent); background: var(--accent-soft); }
+  @media (max-width: 640px) { .step { grid-template-columns: 34px 1fr; } .step .tag { grid-column: 2; justify-self: start; } }
+
+  /* module documents */
+  .docs { display: grid; gap: 8px; }
+  details.doc { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  details.doc[open] { background: transparent; }
+  details.doc summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: baseline; padding: 12px 16px; }
+  details.doc summary::-webkit-details-marker { display: none; }
+  details.doc summary:hover { background: var(--surface); }
+  details.doc summary .no { font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--accent); }
+  details.doc summary .t { font-weight: 500; }
+  details.doc summary .src { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--muted); }
+  details.doc .body { padding: 4px 16px 18px 68px; border-top: 1px solid var(--line); }
+  details.doc .body h4 { font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; font-weight: 500; }
+  details.doc .body p, details.doc .body ul, details.doc .body ol { font-size: 14px; color: var(--ink-2); max-width: 72ch; }
+  details.doc .body li { margin-bottom: 4px; }
+  @media (max-width: 640px) { details.doc .body { padding-left: 16px; } details.doc summary .src { display: none; } }
+
+  .log { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .log div { display: grid; grid-template-columns: 96px 1fr; gap: 14px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .log div:last-child { border-bottom: 0; }
+  .log .d { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; padding-top: 1px; }
+  .open li { color: var(--ink-2); }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="frame">
+  <nav class="toc" aria-label="Sections">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 3.9L18 4.5l-1.4 4.2L20.5 12l-3.9 3.3L18 19.5l-4.2-1.4L12 22l-1.8-3.9L6 19.5l1.4-4.2L3.5 12l3.9-3.3L6 4.5l4.2 1.4z"/></svg>
+      Product Scheme
+    </div>
+    <ol>
+      <li><a href="#principles">Principles</a></li>
+      <li><a href="#map">Admin map</a></li>
+      <li><a href="#index">Every module</a></li>
+      <li><a href="#layers">Horizontals, junctions, verticals</a></li>
+      <li><a href="#rules">Pick rules</a></li>
+      <li><a href="#artefacts">Artefacts and tags</a></li>
+      <li><a href="#chains">Provenance chains</a></li>
+      <li><a href="#profiles">Profile pages</a></li>
+      <li><a href="#schema">Schema deltas</a></li>
+      <li><a href="#plan">Build plan</a></li>
+      <li><a href="#documents">Module documents</a></li>
+      <li><a href="#decisions">Decisions</a></li>
+      <li><a href="#open">Open questions</a></li>
+    </ol>
+    <div class="meta">Revision 7 · 10 Sept 2026<br>Interview answers in <code>docs/truth.md</code>.<br>Execution docs 00–10 rendered in <a href="#documents">Module documents</a>.<br>Source: <code>docs/</code> in paperhint-web, branch <code>feat/timetable-ia</code>. Redeployed as decisions land.</div>
+  </nav>
+
+  <main>
+    <header class="head">
+      <div class="eyebrow">Paperhint · admin build · working reference</div>
+      <h1>How the school fits <em class="ac">together</em></h1>
+      <p class="lede">Every module, what it owns, what it picks from, and what it produces. The shared reference for founder, Claude and the dev while the admin shell is rebuilt module by module. When something here changes, the page changes.</p>
+      <div class="legend">
+        <span>Handoff status:</span>
+        <span class="tag done">done</span><span class="tag tweak">tweak</span><span class="tag move">move</span><span class="tag build">build</span>
+        <span style="margin-left:8px">Kind:</span>
+        <span class="chip pill" style="font-size:12px;padding:2px 9px">horizontal</span>
+        <span class="chip junc" style="font-size:12px;padding:2px 9px">junction</span>
+        <span class="chip tile" style="font-size:12px;padding:2px 9px">vertical</span>
+      </div>
+    </header>
+
+    <section id="principles">
+      <div class="eyebrow">Governing rule</div>
+      <h2>The whole app should be <em class="ac">seamless</em></h2>
+      <p class="sub">The founder's rule, made testable. Every module document is checked against these five.</p>
+      <div class="rules">
+        <div class="rule"><div><b>No dead ends.</b><p>Every nav row opens something. Every artefact opens from every horizontal it is tagged with. Every empty state names the next action and links to it.</p></div></div>
+        <div class="rule"><div><b>Pickers are pre-filtered, never full lists.</b><p>Candidates come from the junction: allotment, department, roster, free-at-period. "Show all" sits behind a step.</p></div></div>
+        <div class="rule"><div><b>One record, many views.</b><p>The same rows serve admin and teacher. Scope changes, the data does not. Never a second table for a second role.</p></div></div>
+        <div class="rule"><div><b>Setup flows into use.</b><p>Finishing one setup step offers the next. Data entered once is picked everywhere. Nothing is typed twice.</p></div></div>
+        <div class="rule"><div><b>Tags and provenance are mandatory.</b><p>Every artefact row carries its horizontal keys and a link to what it was made from.</p></div></div>
+      </div>
+    </section>
+
+    <section id="map">
+      <div class="eyebrow">Shell · shipped in PR #5</div>
+      <h2>The admin map</h2>
+      <p class="sub">Five groups plus Home and Ask Hint. Every handoff module has exactly one home. Unbuilt ones stay visible as "Soon" rows so the map is complete from day one. Settings (profile, appearance, security, roles) stays in the user menu: it configures the app, not the school.</p>
+      <div class="groups">
+        <div class="group"><h3>Setup <small>configure once</small></h3><ul>
+          <li class="soon"><span>School &amp; year<span class="code">A1</span></span><span class="tag tweak">tweak</span></li>
+          <li><span>Calendar<span class="code">A2</span></span><span class="tag live">live</span></li>
+          <li class="soon"><span>School day<span class="code">A3·cfg</span></span><span class="tag build">build</span></li>
+          <li class="soon"><span>Departments &amp; subjects<span class="code">A5</span></span><span class="tag tweak">tweak</span></li>
+          <li><span>Batches → Year rollover<span class="code">A15</span></span><span class="tag tweak">tweak</span></li>
+        </ul></div>
+        <div class="group"><h3>People <small>directories</small></h3><ul>
+          <li><span>Teachers<span class="code">A7</span></span><span class="tag done">done</span></li>
+          <li><span>Students<span class="code">A6</span></span><span class="tag done">done</span></li>
+        </ul></div>
+        <div class="group"><h3>Classes <small>structure, staffing, schedule</small></h3><ul>
+          <li><span>Classes &amp; sections<span class="code">A4</span></span><span class="tag done">done</span></li>
+          <li class="soon"><span>Allotments<span class="code">A8</span></span><span class="tag move">move</span></li>
+          <li><span>Timetable<span class="code">A3</span></span><span class="tag tweak">tweak</span></li>
+        </ul></div>
+        <div class="group"><h3>Exams &amp; papers <small>assessment</small></h3><ul>
+          <li class="soon"><span>Exam manager<span class="code">A12</span></span><span class="tag build">build</span></li>
+          <li class="soon"><span>Question papers<span class="code">T13</span></span><span class="tag move">move</span></li>
+          <li class="soon"><span>Grading<span class="code">T14</span></span><span class="tag move">move</span></li>
+          <li class="soon"><span>Results &amp; report cards<span class="code">A13</span></span><span class="tag build">build</span></li>
+        </ul></div>
+        <div class="group"><h3>Operations <small>the running school</small></h3><ul>
+          <li class="soon"><span>Attendance<span class="code">A9</span></span><span class="tag tweak">tweak</span></li>
+          <li class="soon"><span>Leave &amp; substitution<span class="code">A10</span></span><span class="tag build">build</span></li>
+          <li class="soon"><span>Notifications &amp; circulars<span class="code">A11</span></span><span class="tag build">build</span></li>
+          <li class="soon"><span>Reports &amp; KPI<span class="code">A14</span></span><span class="tag build">build</span></li>
+        </ul></div>
+        <div class="group"><h3>Knowledge <small>sources</small></h3><ul>
+          <li><span>Knowledge Library → Class knowledge<span class="code">A17</span></span><span class="tag done">done</span></li>
+          <li><span>Shared Library<span class="code">T11</span></span><span class="tag done">done</span></li>
+        </ul></div>
+      </div>
+      <p style="margin-top:16px;font-size:14px;color:var(--muted)">Teacher menu: unchanged for now, expressed from the same nav definition. Its restructure, ordered by the teacher's day (T1–T17), is a later pass. An admin previews it with the <b>View as</b> switch.</p>
+    </section>
+
+    <section id="index">
+      <div class="eyebrow">Complete inventory</div>
+      <h2>Every module in the handoff</h2>
+      <p class="sub">All 41 entries from the Sept 2026 module list — teacher, admin, Phase 2 and shared platform — with the home this scheme gives each, its status as verified on 3 Sept, what it depends on, what it feeds (from the associations document), and which execution document carries it. Teacher rows are placed but not built in this pass.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Code</th><th>Module</th><th>Role</th><th>Home in the scheme</th><th>Status</th><th>Depends on</th><th>Feeds</th><th>Doc</th></tr></thead>
+          <tbody>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T1</td><td><b style="font-weight:500">My Schedule (My Day)</b></td><td>Teacher</td><td>Teacher menu › top</td><td><span class="tag build">build</span></td><td>A2 → A3</td><td>T2, T4, calendar sync</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T2</td><td><b style="font-weight:500">Period Exchange — borrow &amp; fill</b></td><td>Teacher</td><td>Class page timetable · My Day</td><td><span class="tag build">build</span></td><td>A3, T1, T17</td><td>A10, T1, A11, T4</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T3</td><td><b style="font-weight:500">Ask Hint (assistant)</b></td><td>Teacher</td><td>Top</td><td><span class="tag done">done</span></td><td>T10 knowledge</td><td>T4 capture, T9, T13</td><td class="code" style="font-size:12px">—</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T4</td><td><b style="font-weight:500">Period Log</b></td><td>Teacher</td><td>My Day period card</td><td><span class="tag build">build</span></td><td>T1, T3</td><td>T5, T6, T7, T12, A14</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T5</td><td><b style="font-weight:500">Syllabus Tracker</b></td><td>Teacher</td><td>Class pipeline step 5 · Portion</td><td><span class="tag build">build</span></td><td>T4, grade_subjects</td><td>T6, T9 next chapter</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T6</td><td><b style="font-weight:500">Portion completion — teacher KPI</b></td><td>Teacher</td><td>My stats</td><td><span class="tag build">build</span></td><td>T4, T5</td><td>A14</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T7</td><td><b style="font-weight:500">Recap Card</b></td><td>Teacher</td><td>My Day period card</td><td><span class="tag build">build</span></td><td>T4, T8</td><td>—</td><td class="code" style="font-size:12px">10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T8</td><td><b style="font-weight:500">Attendance (mark / scan)</b></td><td>Teacher</td><td>Period card</td><td><span class="tag tweak">tweak</span></td><td>roster</td><td>A11, T7, A9, A13</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T9</td><td><b style="font-weight:500">Teaching Notes</b></td><td>Teacher</td><td>Class › Knowledge · Library</td><td><span class="tag tweak">tweak</span></td><td>T10, T5</td><td>T11</td><td class="code" style="font-size:12px">08</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T10</td><td><b style="font-weight:500">Knowledge (class sources)</b></td><td>Teacher</td><td>Class › Knowledge</td><td><span class="tag done">done</span></td><td>A17, grade_subjects</td><td>T3, T9, T13</td><td class="code" style="font-size:12px">08</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T11</td><td><b style="font-weight:500">Personal &amp; Shared Library</b></td><td>Teacher</td><td>Knowledge › Shared library</td><td><span class="tag done">done</span></td><td>T9, T13</td><td>A17</td><td class="code" style="font-size:12px">08</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T12</td><td><b style="font-weight:500">Homework &amp; Assignments</b></td><td>Teacher</td><td>Class page (preparation only, no submissions)</td><td><span class="tag build">build</span></td><td>T4, roster</td><td>A11, T14 reuse</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T13</td><td><b style="font-weight:500">Question Papers</b></td><td>Teacher</td><td>Class › Exams · school view in Exams &amp; papers</td><td><span class="tag done">done</span></td><td>T10</td><td>A12, T14</td><td class="code" style="font-size:12px">08 · 09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T14</td><td><b style="font-weight:500">Grading (answer sheets)</b></td><td>Teacher</td><td>Class › Grading · school view</td><td><span class="tag done">done</span></td><td>T13, roster</td><td>T15</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T15</td><td><b style="font-weight:500">Results (marks &amp; records)</b></td><td>Teacher</td><td>Class › Results</td><td><span class="tag done">done</span></td><td>T14</td><td>A13, A14, A11</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T16</td><td><b style="font-weight:500">Students (teacher app)</b></td><td>Teacher</td><td>Class › Students (roster scope of A6)</td><td><span class="tag move">move</span></td><td>A6, roster</td><td>—</td><td class="code" style="font-size:12px">03 · 10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">T17</td><td><b style="font-weight:500">Teachers &amp; My Department</b></td><td>Teacher</td><td>Teacher menu · People</td><td><span class="tag tweak">tweak</span></td><td>A7, A3 availability</td><td>T2 entry point</td><td class="code" style="font-size:12px">02 · 10</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">P2-1</td><td><b style="font-weight:500">Classwork / Quick Quiz</b></td><td>Teacher</td><td>Class page</td><td><span class="tag build">build</span></td><td>T4</td><td>student record</td><td class="code" style="font-size:12px">later</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">P2-2</td><td><b style="font-weight:500">PTM One-pager</b></td><td>Teacher</td><td>Student profile</td><td><span class="tag build">build</span></td><td>T15, T8, T4</td><td>—</td><td class="code" style="font-size:12px">later</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">P2-3</td><td><b style="font-weight:500">Remedial Follow-up</b></td><td>Teacher</td><td>Class › Results</td><td><span class="tag build">build</span></td><td>T14, T15</td><td>A11</td><td class="code" style="font-size:12px">later</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A1</td><td><b style="font-weight:500">School Setup &amp; Academic Year</b></td><td>Admin</td><td>Setup › School &amp; year</td><td><span class="tag tweak">tweak</span></td><td>—</td><td>everything dates from it</td><td class="code" style="font-size:12px">01</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A2</td><td><b style="font-weight:500">School Calendar</b></td><td>Admin</td><td>Setup › Calendar</td><td><span class="tag tweak">tweak</span></td><td>A1</td><td>A3, A12, T1</td><td class="code" style="font-size:12px">01 (week settings) · 04</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A3</td><td><b style="font-weight:500">Timetable</b></td><td>Admin</td><td>Classes › Timetable · config in Setup › School day</td><td><span class="tag tweak">tweak</span></td><td>A2, A8, School day</td><td>T1, T2, T4, A10, sync</td><td class="code" style="font-size:12px">04 · 05</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A4</td><td><b style="font-weight:500">Classes &amp; Sections</b></td><td>Admin</td><td>Classes › Classes &amp; sections</td><td><span class="tag done">done</span></td><td>A1, grade_subjects</td><td>A8, A3, roster</td><td class="code" style="font-size:12px">03</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A5</td><td><b style="font-weight:500">Departments &amp; Subjects (was Subjects &amp; books)</b></td><td>Admin</td><td>Setup › Departments &amp; subjects</td><td><span class="tag tweak">tweak</span></td><td>A1</td><td>A4 subject sets, A8 picker, T10, T17</td><td class="code" style="font-size:12px">02</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A6</td><td><b style="font-weight:500">Students</b></td><td>Admin</td><td>People › Students</td><td><span class="tag done">done</span></td><td>A4</td><td>roster, T16, A13</td><td class="code" style="font-size:12px">—</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A7</td><td><b style="font-weight:500">Teachers</b></td><td>Admin</td><td>People › Teachers</td><td><span class="tag done">done</span></td><td>A5 departments</td><td>A8, T17</td><td class="code" style="font-size:12px">02 (departments) · 03</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A8</td><td><b style="font-weight:500">Allotments (staffing)</b></td><td>Admin</td><td>Classes › Allotments</td><td><span class="tag move">move</span></td><td>A4, A5, A7</td><td>A3 picker, Home gaps</td><td class="code" style="font-size:12px">03</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A9</td><td><b style="font-weight:500">Attendance Oversight</b></td><td>Admin</td><td>Operations › Attendance</td><td><span class="tag tweak">tweak</span></td><td>T8, roster</td><td>A11, A13, A14</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A10</td><td><b style="font-weight:500">Leave &amp; Substitution (office)</b></td><td>Admin</td><td>Operations › Leave &amp; substitution</td><td><span class="tag build">build</span></td><td>A3, T2</td><td>T1, A11, T4</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A11</td><td><b style="font-weight:500">Notifications &amp; Circulars</b></td><td>Admin</td><td>Operations › Notifications</td><td><span class="tag build">build</span></td><td>rail first</td><td>every publisher</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A12</td><td><b style="font-weight:500">Exam Manager</b></td><td>Admin</td><td>Exams &amp; papers › Exam manager</td><td><span class="tag build">build</span></td><td>A2, T13, T14</td><td>T15 publish, A13</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A13</td><td><b style="font-weight:500">Report Cards</b></td><td>Admin</td><td>Exams &amp; papers › Results (internal view only; printed card stays the school's) — parked</td><td><span class="tag build">build</span></td><td>T15, T8</td><td>A14, PTM</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A14</td><td><b style="font-weight:500">Reports &amp; KPI Dashboard</b></td><td>Admin</td><td>Operations › Reports &amp; KPI</td><td><span class="tag build">build</span></td><td>T4, T6, T15, A9</td><td>export</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A15</td><td><b style="font-weight:500">Batch Migration → Year rollover</b></td><td>Admin</td><td>Setup › Year rollover</td><td><span class="tag tweak">tweak</span></td><td>A1</td><td>A4, A8, A3, A6, archives all verticals</td><td class="code" style="font-size:12px">06</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A16</td><td><b style="font-weight:500">Ask Hint (office assistant)</b></td><td>Admin</td><td>Top</td><td><span class="tag tweak">tweak</span></td><td>every admin action</td><td>confirm-before-write (edge 10)</td><td class="code" style="font-size:12px">—</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">A17</td><td><b style="font-weight:500">Knowledge &amp; Shared Libraries</b></td><td>Admin</td><td>Knowledge › Class knowledge · Shared library</td><td><span class="tag done">done</span></td><td>A5 grade_subjects</td><td>T10, T3, T9, T13</td><td class="code" style="font-size:12px">08</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">—</td><td><b style="font-weight:500">Notifications engine (rail)</b></td><td>Both</td><td>Operations › Notifications (infrastructure)</td><td><span class="tag build">build</span></td><td>—</td><td>A11 publishers, digest per day</td><td class="code" style="font-size:12px">09</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">—</td><td><b style="font-weight:500">Calendar sync (one-way out)</b></td><td>Both</td><td>Settings › integrations · T1</td><td><span class="tag build">build</span></td><td>A3 versions</td><td>T1, edge cases 2 &amp; 13</td><td class="code" style="font-size:12px">05 (diff endpoint)</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">—</td><td><b style="font-weight:500">Roles &amp; permissions</b></td><td>Both</td><td>Settings</td><td><span class="tag tweak">tweak</span></td><td>HoD marker (02)</td><td>one shell, role-gated</td><td class="code" style="font-size:12px">02</td></tr>
+<tr><td class="code" style="font-size:12px;color:var(--ink-2)">—</td><td><b style="font-weight:500">Data import (CSV)</b></td><td>Admin</td><td>Home checklist › Import → People</td><td><span class="tag build">build</span></td><td>A1</td><td>A6, A7</td><td class="code" style="font-size:12px">01 · 07</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:12px;font-size:13px;color:var(--muted)">Statuses follow the handoff tags. A2 and A3 were BUILD there and have since landed (calendar, bell schedule, builder, drafts); shown as tweak. Codes with "—" are the shared platform, which the handoff lists without numbers.</p>
+    </section>
+
+    <section id="layers">
+      <div class="eyebrow">Architecture</div>
+      <h2>Horizontals, junctions, verticals</h2>
+      <p class="sub">A horizontal is reference data the school agrees on and never carries workflow state. A junction is where two horizontals meet and become one pickable thing. A vertical is a workflow that produces records by picking through junctions. Purple marks what the schema does not have yet.</p>
+      <div class="bands">
+        <div class="band h">
+          <div class="role"><b>Horizontals</b>who, what, when, where. Owned by Setup and People.</div>
+          <div class="chips">
+            <span class="chip pill">School</span>
+            <span class="chip pill new">Academic year</span>
+            <span class="chip pill">Calendar</span>
+            <span class="chip pill new">School day · period templates</span>
+            <span class="chip pill">Department<span class="code">+ head</span></span>
+            <span class="chip pill">Subject</span>
+            <span class="chip pill">Grade + Section</span>
+            <span class="chip pill">Teacher</span>
+            <span class="chip pill">Student</span>
+          </div>
+        </div>
+        <div class="band j">
+          <div class="role"><b>Junctions</b>where horizontals meet. These make every picker small.</div>
+          <div class="chips">
+            <span class="chip junc new">Department ↔ Subject</span>
+            <span class="chip junc new">Subject × Grade<span class="code">Grade 6 Maths</span></span>
+            <span class="chip junc">Subject × Section<span class="code">6A Maths</span></span>
+            <span class="chip junc">Teacher × Subject-Section × Year<span class="code">allotment</span></span>
+            <span class="chip junc">Student × Section × Year<span class="code">roster</span></span>
+            <span class="chip junc">Student × Elective</span>
+          </div>
+        </div>
+        <div class="band v">
+          <div class="role"><b>Verticals</b>workflows that produce artefacts.</div>
+          <div class="chips">
+            <span class="chip tile">Allotments</span><span class="chip tile">Timetable</span><span class="chip tile">Period exchange · substitution</span>
+            <span class="chip tile">Attendance</span><span class="chip tile">Period log</span><span class="chip tile">Syllabus · portion</span>
+            <span class="chip tile">Knowledge</span><span class="chip tile">Question papers</span><span class="chip tile">Exams · grading · results</span>
+            <span class="chip tile">Report cards</span><span class="chip tile">Homework</span><span class="chip tile">Notifications</span>
+            <span class="chip tile">Reports · KPI</span><span class="chip tile">Year rollover</span>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:16px">Subject × Grade sits above Subject × Section: every 6A, 6B and 6C Maths row points at the one Grade 6 Maths row. That single fact is what makes knowledge and syllabus constant across sections, and it is why the Departments &amp; subjects module must land the grade junction, not only the department link.</p>
+    </section>
+
+    <section id="rules">
+      <div class="eyebrow">Behaviour</div>
+      <h2>Pick rules</h2>
+      <p class="sub">The founder's example, generalised. Each rule is a filter over a junction, and each is an acceptance test in the module that implements it.</p>
+      <div class="rules">
+        <div class="rule"><div><b>Timetable cell, 6A Maths, Wednesday P3: who teaches it?</b>
+          <div class="tier"><span>Tier 1</span><span>Teachers with a <em>current allotment</em> on 6A Maths. Usually one. Pre-selected.</span></div>
+          <div class="tier"><span>Tier 2</span><span>Teachers in the department that owns Maths. Offered as "also in Mathematics", not selected.</span></div>
+          <div class="tier"><span>Tier 3</span><span>Anyone, behind "show all". The slot is flagged as outside allotment.</span></div>
+          <div class="tier"><span>Always</span><span>Blocked: a teacher already placed elsewhere at that period.</span></div>
+        </div></div>
+        <div class="rule"><div><b>Allotment board, 6A Maths: who can be allotted?</b><p>Default list is the Maths department. Anyone else behind "show all". Load shown per teacher from current allotments and timetable.</p></div></div>
+        <div class="rule"><div><b>Knowledge for 6A Maths</b><p>Is the Grade 6 Maths set. A teacher adds a section-only extra by attaching to 6A Maths; it never leaks to 6B.</p></div></div>
+        <div class="rule"><div><b>A fill request for 6A Maths, Wednesday P3</b><p>Candidates are teachers with no slot at that period, same department first, then anyone free. Without a published timetable the list degrades to the plain department list.</p></div></div>
+        <div class="rule"><div><b>A question paper for 6A Maths</b><p>Draws from rule 3's set, so 6A and 6B papers share sources unless the section added extras. The paper stores which sources it used.</p></div></div>
+        <div class="rule"><div><b>Every vertical row dates from the year</b><p>Directly or through its class. Rollover never rewrites verticals: it creates next year's classes and memberships and marks the old year read-only.</p></div></div>
+      </div>
+    </section>
+
+    <section id="artefacts">
+      <div class="eyebrow">Relatability</div>
+      <h2>Artefacts and their tags</h2>
+      <p class="sub">Everything a vertical produces is an artefact. Each carries foreign keys to the horizontals it belongs to, never free text. Department is always derived, through the subject or the teacher.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Artefact</th><th>Year</th><th>Grade × Subject</th><th>Section</th><th>Teacher</th><th>Student</th><th>Calendar date</th><th>Department</th></tr></thead>
+          <tbody>
+            <tr><td>Knowledge material <span class="code">T10 A17</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">opt</span></td><td class="c"><span class="D">D</span> uploader</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Teaching note <span class="code">T9</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">opt</span></td><td class="c"><span class="D">D</span> author</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Question paper <span class="code">T13</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">opt</span></td><td class="c"><span class="D">D</span> author</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Exam <span class="code">A12</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span> one or many</td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span> window</td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Answer sheet <span class="code">T14</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span> grader</td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Result <span class="code">T15</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Report card <span class="code">A13</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> term</td><td class="c"><span class="n">·</span></td></tr>
+            <tr><td>Attendance record <span class="code">T8 A9</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> marker</td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Period log <span class="code">T4</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> who taught</td><td class="c"><span class="d">mentions</span></td><td class="c"><span class="D">D</span> + period</td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Homework <span class="code">T12</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> assignees</td><td class="c"><span class="D">D</span> due</td><td class="c"><span class="d">d</span></td></tr>
+            <tr><td>Exchange request <span class="code">T2 A10</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span> from, to</td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="d">d</span> both</td></tr>
+            <tr><td>Notification <span class="code">A11</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="d">or ·</span></td><td class="c"><span class="D">D</span> parent</td><td class="c"><span class="D">D</span> sent</td><td class="c"><span class="n">·</span></td></tr>
+            <tr><td>Circular <span class="code">A11</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span> audience</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="D">D</span> audience</td></tr>
+            <tr><td>Library item <span class="code">T11</span></td><td class="c"><span class="d">d</span></td><td class="c"><span class="D">D</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="D">D</span> owner</td><td class="c"><span class="n">·</span></td><td class="c"><span class="n">·</span></td><td class="c"><span class="d">d</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:10px;font-size:13px;color:var(--muted)"><span class="D" style="color:var(--accent);font-weight:500">D</span> direct foreign key · <span>d</span> derived through a junction · · not applicable</p>
+    </section>
+
+    <section id="chains">
+      <div class="eyebrow">Provenance</div>
+      <h2>What is made from what</h2>
+      <p class="sub">Two chains carry most of the product. Each arrow is a stored link, so reuse is safe and "which sources did this paper use" is a query.</p>
+      <pre class="mermaid">
+flowchart LR
+  classDef h fill:#0B8A5C,stroke:#0B8A5C,color:#fff,rx:14,ry:14
+  classDef a fill:transparent,stroke:#8A9188,color:inherit
+  KM[Knowledge material]:::a --> TN[Teaching note]:::a --> LI[Library item]:::a --> SL[Shared library]:::a
+  KM --> QP[Question paper]:::a --> EX[Exam]:::a --> AS[Answer sheet]:::a --> RS[Result]:::a --> RC[Report card]:::a
+  RS --> KPI[Reports and KPI]:::a
+  TS([Timetable slot]):::h --> PL[Period log]:::a --> SY[Syllabus progress]:::a --> TK[Teacher KPI]:::a --> KPI
+  PL --> RE[Recap card]:::a
+  PL --> HW[Homework]:::a --> SB[Submission]:::a -.reuses grading.-> AS
+  AT[Attendance record]:::a --> NO[Notification]:::a
+  AT --> RE
+  AT --> RC
+  XR[Exchange request]:::a --> AL[Slot alteration]:::a --> PL
+      </pre>
+    </section>
+
+    <section id="profiles">
+      <div class="eyebrow">One shell, same data</div>
+      <h2>Profile pages come free</h2>
+      <p class="sub">Read the tag matrix by column and each horizontal has a profile page without new tables. This is how a teacher's Students page and admin's directory are one thing at two scopes.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Page</th><th>Shows</th></tr></thead>
+          <tbody>
+            <tr><td>Subject <span class="code">Grade 6 Maths</span></td><td>Knowledge, notes, papers, exams, syllabus progress, sections it runs in, teachers allotted</td></tr>
+            <tr><td>Section <span class="code">6A</span></td><td>Timetable, roster, subjects, attendance, exams, results</td></tr>
+            <tr><td>Teacher</td><td>Allotments, schedule, period logs, papers, notes, load, KPI</td></tr>
+            <tr><td>Student</td><td>Roster history, attendance, results, report card, homework</td></tr>
+            <tr><td>Department</td><td>Subjects owned, members, head, KPI slice. Entirely derived.</td></tr>
+            <tr><td>Academic year</td><td>Everything above, read-only once closed. The header year picker is how you get there.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="schema">
+      <div class="eyebrow">Data</div>
+      <h2>Schema deltas, all additive</h2>
+      <p class="sub">What the live database has, what each module adds. Migrations are hand-run in the Supabase SQL editor, idempotent, and recorded in the service repo's migrations README. Decision pending on a staging project before the first one runs.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Module</th><th>Adds</th><th>Fixes</th></tr></thead>
+          <tbody>
+            <tr><td>01 School &amp; year</td><td><code>academic_years</code> · <code>classes.academic_year_id</code> · profile fields on <code>schools</code></td><td>Year is a text tag today; one-open-per-school enforced by a partial unique index</td></tr>
+            <tr><td>02 Departments &amp; subjects</td><td><code>department_heads</code> · <code>department_grades</code> · <code>department_subjects</code> · <code>grade_subjects</code> · <code>class_subjects.grade_subject_id</code> · seeded General department</td><td>Departments cannot be created; subjects flat; knowledge uploaded per section</td></tr>
+            <tr><td>03 School day</td><td><code>period_templates</code> · <code>period_template_periods</code> · grade → template · <code>timetable_slots.period_id</code> points at template periods</td><td><code>school_periods</code> is one bell schedule per school; KG and grade 6 cannot differ</td></tr>
+            <tr><td>Knowledge</td><td><code>grade_subject_id</code> on materials, notes, papers · paper → source materials link</td><td>Provenance is not stored</td></tr>
+            <tr><td>Timetable</td><td>stable slot identity · versioned publishes · department periods (PT, Library)</td><td>Logs and exchanges need slots that do not move under them</td></tr>
+            <tr><td>Build modules</td><td>period logs, homework, exchanges, notifications tables</td><td>Each carries its tag columns and provenance links as acceptance criteria</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:12px">Already there and reused: <code>knowledge_materials.class_subject_id + teacher_id</code>, <code>exams.class_subject_id</code>, <code>student_submissions.exam_id</code>, <code>timetable_slots.class_subject_id + teacher_id</code>, <code>teacher_assignments</code> with tenure, <code>student_class_memberships</code>.</p>
+    </section>
+
+    <section id="plan">
+      <div class="eyebrow">Sequence</div>
+      <h2>Build plan</h2>
+      <p class="sub">Shell first, then horizontals and junctions in setup order, because every vertical's picker depends on them. Every step below now has an execution document (scope, schema, API, screens and pickers, acceptance, out of scope) in <code>docs/modules/</code>. This is also the setup checklist Home shows a new school. One branch per module in each repo, mock before code where the page shape is new, pull request when verified.</p>
+      <div class="plan">
+        <div class="step"><div class="no">0</div><div><b>Admin shell</b><p>Grouped nav per role, coming-soon rows, View-as switcher, IA evaluation and module map.</p><div class="dep">paperhint-web #5 · verified with a real admin session</div></div><span class="tag live">in review</span></div>
+        <div class="step now"><div class="no">1</div><div><b>School &amp; academic year</b><p>Profile, years with one open, header year picker with read-only past years. No rooms. Opening a year is step one of rollover.</p><div class="dep">Execution doc written · docs/modules/01</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">2</div><div><b>Departments &amp; subjects</b><p>Department list with head of department, subjects owned, grades each runs in. Lands the grade junction that knowledge and papers hang off.</p><div class="dep">Needs 1 for year scoping · docs/modules/02</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">3</div><div><b>Classes &amp; sections + Allotments board</b><p>Class creation moves in from Batches. One staffing board replaces assignment editing inside Teachers and Batches.</p><div class="dep">Needs 2 for department-first picking · docs/modules/03</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">4</div><div><b>School day</b><p>Period templates per grade, week settings pulled from Calendar. First migration that touches a table the live timetable reads.</p><div class="dep">Staging decision due here · docs/modules/04</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">5</div><div><b>Timetable under Classes</b><p>Split the 3,655-line file by surface, own sub-routes, tiered teacher picker, versioned publishes, stable slot identity.</p><div class="dep">Needs 3 and 4 · docs/modules/05</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">6</div><div><b>Year rollover</b><p>Batches renamed and moved to Setup. Mock first, per founder. Creates the year, promotes, closes.</p><div class="dep">Needs 1 · mock before code · docs/modules/06</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">7</div><div><b>Home as setup checklist</b><p>Nine steps with done state, folds into the operations view once a timetable is published. Teacher home kept.</p><div class="dep">Reads readiness from 1–5 · docs/modules/07</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">8</div><div><b>Knowledge: class-level and shared</b><p>Class knowledge at grade × subject inherited by sections; shared library kept separate with the teacher as provenance.</p><div class="dep">Needs 2 · docs/modules/08</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">9</div><div><b>Exams &amp; papers, Operations</b><p>Exam manager, results and report cards, attendance oversight, substitution, notifications rail, reports. Each replaces a Soon row.</p><div class="dep">Notifications rail before any publisher · docs/modules/09</div></div><span class="tag tweak">doc ready</span></div>
+        <div class="step"><div class="no">10</div><div><b>Teacher shell</b><p>Teacher menu ordered by her day, My Department grouping, class pipeline gains Portion. Screens untouched until then.</p><div class="dep">After the admin shell settles · docs/modules/10</div></div><span class="tag build">later</span></div>
+      </div>
+    </section>
+
+    <section id="documents">
+      <div class="eyebrow">Execution</div>
+      <h2>Module documents</h2>
+      <p class="sub">One document per build step, same six headings each: scope, schema, API, screens and pickers, acceptance, out of scope. Rendered from <code>docs/modules/*.md</code> by <code>scripts/build-scheme-docs.py</code>, so the repo and this page never disagree. Principles and step 1 are open; the rest expand on click.</p>
+      <div class="docs">
+<!-- modules:start -->
+<details class="doc" open id="doc-00-principles">
+  <summary><span class="no">00</span><span class="t">Execution principles (apply to every module document)</span><span class="src">00-principles.md</span></summary>
+  <div class="body"><p>Founder's rule, 2026-09-10: <b>the whole app should be seamless.</b> In testable terms:</p>
+<ol><li><b>No dead ends.</b> Every nav row opens something. Every artefact opens from every horizontal it is tagged with (subject, section, teacher, student, year). Every empty state names the next action and links to it.</li><li><b>Pickers are pre-filtered, never full lists.</b> Candidates come from the junction (allotment, department, roster, free-at-period), with "show all" behind a step.</li><li><b>One record, many views.</b> The same rows serve admin and teacher; scope changes, the data does not. Never build a second table for a second role.</li><li><b>Setup flows into use.</b> Finishing one setup step offers the next. Data entered once is picked everywhere; nothing is typed twice.</li><li><b>Tags and provenance are mandatory.</b> Every artefact row carries its horizontal keys and a link to what it was made from (see <code>docs/module-map.md</code>).</li></ol>
+<p>Each module document has the same six headings: Scope · Schema · API · Screens and pickers · Acceptance · Out of scope. Migrations are additive, idempotent, and recorded in <code>paperhint-service/migrations/README.md</code> in the same commit.</p></div>
+</details>
+<details class="doc" open id="doc-01-school-and-year">
+  <summary><span class="no">01</span><span class="t">School &amp; academic year (A1)</span><span class="src">01-school-and-year.md</span></summary>
+  <div class="body"><p>Group: Setup · Status: TWEAK in handoff (batch tag exists, no year module) · First module in setup order; everything else dates from the year that is open here.</p>
+<h4>Scope</h4>
+<p>One page with two parts. <b>School profile</b>: name, board, address, contact, logo, week start and working days (moved here from Calendar's form; School day keeps the period templates). <b>Academic years</b>: the list of years, exactly one <em>open</em> (truth.md: never two), the rest <em>closed</em> (read-only, no reopen). Opening a year is the first step of Year rollover, not a separate action: "Start new academic year" on this page hands off to the rollover flow, which creates the year, promotes classes and memberships, and closes the old year at the end. Rooms are <b>not</b> modelled (truth.md): Paperhint stays at class and section level and does not map the school's physical layout.</p>
+<h4>Schema (additive; migration 023)</h4>
+<ul><li><code>academic_years (id, school_id, label text e.g. "2026–27", start_date, end_date, status enum open|closed, created_at)</code>; UNIQUE (school_id, label); at most one <code>open</code> per school (partial unique index).</li><li><code>classes.academic_year_id uuid REFERENCES academic_years</code> — nullable at first; backfill from the existing <code>classes.academic_year</code> text tag (one row per distinct tag per school), then keep the text column until every reader moves.</li><li><code>schools</code>: add <code>board text</code>, <code>address text</code>, <code>contact_email text</code>, <code>contact_phone text</code>, <code>logo_url text</code>. <code>week_start</code> / <code>working_days</code> already exist (018).</li><li>RLS: enabled, no policies, service-role only — same posture as 020.</li></ul>
+<h4>API</h4>
+<ul><li><code>GET /api/schools/me</code> → profile + open year + counts (exists in part; extend).</li><li><code>PATCH /api/schools/me</code> — profile fields, week settings.</li><li><code>GET /api/academic-years</code> · <code>POST /api/academic-years</code> (used by rollover) · <code>PATCH /api/academic-years/:id</code> (dates, label) · <code>POST /api/academic-years/:id/close</code>.</li><li>Every list endpoint that is year-scoped (classes, allotments, timetable, exams) accepts <code>?year=&lt;id&gt;</code> and defaults to the open year.</li></ul>
+<h4>Screens and pickers</h4>
+<ul><li><b>Setup › School &amp; year</b>: profile card (edit in place), Years list with the open year pinned and "Start new academic year →" (hands off to Year rollover), Admin only.</li><li><b>Year picker in the header</b> (shell): defaults to the open year; choosing a closed year puts the app in read-only mode with a visible band. This is how a teacher opens last year's paper without anything being editable.</li><li>Calendar page loses its week-settings form; it links here instead.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>A brand-new school lands on Home's setup checklist at step 1 and can complete the profile and open its first year without touching the database.</li><li>Exactly one open year per school is enforced by the database, not the UI.</li><li>Every existing class resolves to an <code>academic_years</code> row after backfill; no class left with a null year.</li><li>Selecting a closed year renders every page read-only; no write endpoint accepts a closed year.</li><li>Closing a year is admin-only and irreversible; the UI says so before confirm.</li></ul>
+<h4>Out of scope</h4>
+<p>Rollover mechanics (A15, own document). Department list (02). Period templates (03). Custom staff fields (decision pending on <code>users.custom_fields</code>).</p></div>
+</details>
+<details class="doc" id="doc-02-departments-and-subjects">
+  <summary><span class="no">02</span><span class="t">Departments &amp; subjects (A5)</span><span class="src">02-departments-and-subjects.md</span></summary>
+  <div class="body"><p>Group: Setup · Handoff: TWEAK ("Subjects &amp; books") · Renamed by founder decision. Second in setup order. Lands the two junctions that Knowledge, Papers, Allotments and Period Exchange all hang off.</p>
+<h4>Scope</h4>
+<p>One page, a hierarchy: <b>Department</b> → <b>subjects it owns</b> → <b>grades each subject runs in</b>. Departments carry one or more heads (teachers), the <b>grades they serve</b>, and derive their members from <code>users.department_id</code>. Departments without subjects (Physical Training, Library) are valid: they have teachers and grades and can hold timetable slots. A default <b>General</b> department catches any subject without a natural home; every subject belongs to a department (truth.md). Books do not appear as a top-level word: a subject-in-a-grade shows a count of attached materials and links to Knowledge › Class knowledge. Handles the primary-section case: a "Primary" department may own every subject for grades 1–5.</p>
+<h4>Schema (additive; migration 024)</h4>
+<ul><li><code>department_heads (department_id, user_id, PRIMARY KEY (department_id, user_id))</code> — multiple heads per department.</li><li><code>department_grades (department_id, grade int, PRIMARY KEY (department_id, grade))</code> — the grades a department serves; the translucent "band".</li><li>Seed one <code>General</code> department per school; <code>subjects</code> without an owner attach to it.</li><li><code>department_subjects (department_id, subject_id, PRIMARY KEY (department_id, subject_id))</code>. A subject may sit in more than one department (Primary owns Maths for 1–5, Mathematics owns it for 6–12) — scope by grade via <code>grade_subjects</code>, not by uniqueness here.</li><li><code>grade_subjects (id, school_id, grade int, subject_id, academic_year_id NULL, created_at)</code>; UNIQUE (school_id, grade, subject_id, academic_year_id). Year nullable so curriculum can be school-constant; a year-specific row overrides.</li><li><code>class_subjects.grade_subject_id uuid NULL REFERENCES grade_subjects</code> — backfilled from (class.grade, subject_id); trigger or service layer keeps it set on insert.</li><li>RLS: service-role only, as 020.</li></ul>
+<h4>API</h4>
+<ul><li><code>GET /api/schools/departments</code> (exists) · <code>POST /api/schools/departments</code> (exists, no UI today) · add <code>PATCH /api/schools/departments/:id</code> (name) · <code>PUT /:id/heads</code> · <code>PUT /:id/grades</code> · <code>DELETE</code> refused while members or subjects exist.</li><li><code>GET|POST /api/subjects</code> (exist) · add <code>PATCH /api/subjects/:id</code>.</li><li><code>PUT /api/departments/:id/subjects</code> — replace the owned-subject set.</li><li><code>GET|PUT /api/grade-subjects?grade=6</code> — the grades a subject runs in; PUT replaces.</li><li><code>GET /api/departments/:id/members</code> — derived; includes head flag and load once Timetable exists.</li></ul>
+<h4>Screens and pickers</h4>
+<ul><li><b>Setup › Departments &amp; subjects</b>: left list of departments with member count and head; right panel: heads (multi-pick; this department's teachers first, then all), grades served (1–12 toggles), owned subjects as chips with add, and per subject the grade range as toggles (1–12). Material counts per subject-grade link to Class knowledge.</li><li><b>Teachers</b>: department picker reads this list; creation moves here. HoD badge on the card and profile.</li><li><b>Classes</b>: when a class is created, its subject set defaults to the grade's <code>grade_subjects</code>; electives still configured per section.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>A new school can create departments, name heads, and attach subjects without the database. Deleting a department with members is refused with the member count.</li><li>Every existing <code>class_subjects</code> row resolves a <code>grade_subject_id</code> after backfill.</li><li>Allotment picker (module 03) defaults to the owning department's teachers.</li><li>Heads gain no new role; permission checks read <code>department_heads</code>.</li><li>A department with zero subjects (PT) can be created and allotted to sections.</li></ul>
+<h4>Out of scope</h4>
+<p>Department KPI slice (A14). Department-scoped approvals (A10). Material upload (Knowledge).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>Teacher ↔ department is many-to-many with a primary: <code>teacher_departments (user_id, department_id, is_primary)</code> replaces reliance on <code>users.department_id</code> (keep the column as the primary for compatibility; backfill).</li><li>Non-teaching staff belong to departments too (Library, PT, Office). Department members include staff.</li><li>Designation becomes a tag: <code>designation_tags (school_id, label)</code>; <code>users.designation</code> keeps the text; picker offers existing tags, creates on new text.</li></ul>
+<h4>From interview batch 3 (truth.md)</h4>
+<ul><li><b>Chapters</b> are school data here: <code>chapters (grade_subject_id, position, title, board_ref)</code> pre-loadable from the board; a department or teacher <b>plan</b> reorders and sets deadlines without changing the list (<code>chapter_plans</code>, later, with T5).</li></ul></div>
+</details>
+<details class="doc" id="doc-03-classes-and-allotments">
+  <summary><span class="no">03</span><span class="t">Classes &amp; sections (A4) + Allotments board (A8)</span><span class="src">03-classes-and-allotments.md</span></summary>
+  <div class="body"><p>Group: Classes · Handoff: A4 DONE, A8 DONE but edited in the wrong places (Teachers drawer, Batches page). One module because allotment is a property of a section's subject.</p>
+<h4>Scope</h4>
+<p><b>Classes &amp; sections</b> keeps today's page (grades, sections, subject sets, electives, archive) and gains class creation moved in from Batches (<code>POST /batches/prepare-class</code>, <code>GET /batches/class-template</code> → move to <code>/api/classes</code>). <b>Allotments</b> becomes one school-wide board: rows = sections × subjects, cell = allotted teacher(s) with tenure; department-first picker; gaps flagged; a teacher-load column from the timetable once it exists. Teachers page and Batches page show allotments read-only and link here.</p>
+<h4>Schema</h4>
+<p>No new tables. <code>teacher_assignments</code> already has tenure (012) and <code>is_current</code>. Add <code>teacher_assignments.grade_subject_id</code> denormalised? <b>No</b> — derive via <code>class_subjects</code>. Add index on <code>(class_subject_id, is_current)</code> if missing.</p>
+<h4>API</h4>
+<ul><li>Classes: <code>GET /api/classes</code>, <code>/grouped</code>, <code>/grade/:grade/overview</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code> (exist). Move <code>prepare-class</code> and <code>class-template</code> here from batches.</li><li>Class subjects: exist. Ensure <code>POST</code> sets <code>grade_subject_id</code> (02).</li><li>Allotments: <code>POST /api/teacher-assignments</code> and <code>/unassign</code> exist. Add <code>GET /api/teacher-assignments/board?year=</code> returning sections × subjects × teacher with gaps, and <code>GET /api/teacher-assignments/candidates?class_subject_id=</code> returning the tiered list (allotted · department · all) with current load.</li></ul>
+<h4>Screens and pickers</h4>
+<ul><li><b>Classes › Classes &amp; sections</b>: today's page + "New class" (from Batches). Archive is a flag, never a delete (edge case 6).</li><li><b>Classes › Allotments</b>: grid by grade; filters by department, unassigned only; cell click opens the tiered picker; swap keeps history (ends old tenure, starts new).</li><li><b>Teachers</b> drawer: allotments read-only with "Change in Allotments →".</li><li><b>Home › Needs a look</b>: staffing gaps come from the board endpoint.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>No section-subject without a teacher is invisible: the board shows every gap.</li><li>Assigning from the board, the Teachers drawer, or Batches is one code path (the drawer and Batches lose their editors).</li><li>Candidate list order: allotted, then owning department, then all; load shown.</li><li>Mid-term swap keeps the old tenure row with <code>ended_at</code> (association 2 depends on it).</li></ul>
+<h4>Out of scope</h4>
+<p>Ripple into a published timetable (module 05 handles: slots on the old allotment move to the new teacher, pending exchanges invalidated).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li><b>Class teacher</b>: <code>classes.class_teacher_id</code> (nullable → users). Owns the class; shown on the section card and the roster; attendance per period is by the period's teacher.</li><li><b>Replace teacher</b> is a first-class action on the board and on a deactivated teacher's profile: pick the section-subjects they held, pick the replacement (tiered), and every slot, upcoming duty and pending request moves in one transaction. Old tenure ends.</li><li>Shared allotment (two teachers, one subject-section) allowed; UI neutral.</li><li>Optional <code>teacher_load_limit</code> per school or per teacher; board warns past it.</li><li>Combined class: two sections, same teacher, same period is allowed by the clash rule when the slots are marked as a combined block (<code>block_id</code> already exists on slots).</li><li>Guardian contacts (Students): three slots, two mandatory — <code>student_guardians (student_id, name, relation, phone, email, is_primary, position 1..3)</code>.</li><li>Roles as a set: <code>user_roles (user_id, role)</code> with <code>admin | teacher | staff</code>; the principal holds admin + teacher. <code>users.role</code> kept as the primary for compatibility.</li></ul></div>
+</details>
+<details class="doc" id="doc-04-school-day">
+  <summary><span class="no">04</span><span class="t">School day (A3 configuration)</span><span class="src">04-school-day.md</span></summary>
+  <div class="body"><p>Group: Setup · Handoff: part of A3 (BUILD) · Today: one bell schedule per school in a Timetable dialog; week settings in a Calendar form. <b>First migration that touches a table the live timetable reads — staging decision due before this ships.</b></p>
+<h4>Scope</h4>
+<p>The shape of the school day, per grade. <b>Period templates</b>: named sets of periods and breaks with times (KG: 5 periods; grades 6–12: 8). <b>Grade → template</b> assignment done as a multi-select of grades, so a band (primary, seniors) is one action without a band object (truth.md: bands stay translucent). A school with one shape assigns one template everywhere. <b>Week</b>: working days and week start (moved from Calendar; shown here, stored on <code>schools</code> as today).</p>
+<h4>Schema (additive; migration 025)</h4>
+<ul><li><code>period_templates (id, school_id, name, is_default bool, created_at)</code>.</li><li><code>period_template_periods (id, template_id, period_number, name, start_time, end_time, is_break, day_of_week smallint NULL)</code>; NULL = every working day. UNIQUE (template_id, period_number, day_of_week); CHECK end &gt; start. The nullable day is the readiness for a short-Saturday variant later (truth.md: not seen yet, be ready) without another migration.</li><li><code>grade_period_templates (school_id, grade, template_id, PRIMARY KEY (school_id, grade))</code>.</li><li>Migration copies each school's <code>school_periods</code> into one template named "Default", marks it default, assigns it to every grade in use, and adds <code>timetable_slots.template_period_id</code> backfilled by matching <code>period_id</code> → same period_number. <code>school_periods</code> and <code>period_id</code> stay until the Timetable module switches readers, then a later migration drops them.</li></ul>
+<h4>API</h4>
+<ul><li><code>GET|POST|PATCH|DELETE /api/timetable/templates</code> · <code>PUT /:id/periods</code> (replace set) · <code>PUT /api/timetable/grade-templates</code> (grade → template map).</li><li><code>GET /api/timetable/periods</code> (exists) gains <code>?grade=</code> and returns that grade's template periods; without grade returns the default template (keeps today's callers working).</li><li><code>PATCH /api/calendar/week-settings</code> (exists) is called from this page now.</li></ul>
+<h4>Screens and pickers</h4>
+<ul><li><b>Setup › School day</b>: templates as cards (periods rendered as a day strip); "New template" generator (start, end, period length, breaks → rows, editable, as today's BellScheduleSetup does); grade assignment as a 1–12 row of template pickers; Week panel. The Timetable page's Bell schedule dialog is removed and links here.</li><li><b>Timetable</b>: grid rows come from the class's grade template.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>Existing schools see one "Default" template on every grade with their current periods; no timetable cell changes.</li><li>KG on 5 periods and grade 6 on 8 render as different grids.</li><li>Changing a template that has published slots warns with the affected section count and requires confirm; slots on removed periods are listed, not silently dropped.</li><li>Calendar page no longer edits week settings.</li></ul>
+<h4>Out of scope</h4>
+<p>Per-day variant UI (schema is ready; UI when a pilot school needs it). Clash rules (05).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>The timetable is constant for the year; template edits after sharing are rare. The warning on edit stays, and the copy should say why ("6 sections use this template").</li></ul></div>
+</details>
+<details class="doc" id="doc-05-timetable">
+  <summary><span class="no">05</span><span class="t">Timetable (A3)</span><span class="src">05-timetable.md</span></summary>
+  <div class="body"><p>Group: Classes · Handoff: BUILD, since landed (builder, AI fill, drafts, teacher view). Today: one 3,655-line file, admin and teacher forked at runtime, config in dialogs.</p>
+<h4>Scope</h4>
+<p>Keep what works (grid builder, readiness strip, drafts, AI generation, validation, copy-day, teacher load) and restructure: own sub-routes, components by surface, tiered teacher picker, stable slot identity for logs and exchanges, allotment ripple. Teacher view stays as it is (My schedule · any class) on <code>/timetable/my-schedule</code>.</p>
+<h4>Schema (additive; migration 026)</h4>
+<ul><li><code>timetable_slots.template_period_id</code> becomes the read path (from 04); <code>period_id</code> dropped in a later migration once no reader remains.</li><li>Slot identity: rows are already UUID; add <code>published_at</code> on a <code>timetables (id, class_id, academic_year_id, version, published_at)</code> header so drafts and published grids are versioned; slots reference the header. Period logs (T4) and exchanges (T2) reference slot id + date.</li><li>Unique clash guards as DB constraints: <code>(teacher_id, day_of_week, template_period_id, timetable_version)</code> partial on published rows. No room clash: rooms are not modelled (truth.md).</li></ul>
+<h4>API</h4>
+<p>Existing: periods, readiness, teacher-busy, teacher-load, my-schedule, align-elective, <code>/:classId</code> get, slots replace, validate, generate, draft get/save/delete. Add: <code>GET /api/timetable/candidates?class_subject_id=&amp;day=&amp;period=</code> (tiered, excludes busy), <code>POST /api/timetable/:classId/publish</code> (creates a version), <code>GET /api/timetable/changes?since=</code> for the calendar-sync diff (edge case 2).</p>
+<h4>Screens and pickers</h4>
+<ul><li><code>/timetable</code> — section grid (default), class picker, readiness strip.</li><li><code>/timetable/teacher-load</code> — page, not dialog.</li><li><code>/timetable/my-schedule</code> — teacher default; admins can open it via View as.</li><li>Bell schedule dialog removed → Setup › School day.</li><li>Cell editor: teacher field pre-selected from allotment; tiers as rule 1; busy teachers greyed with where they are.</li><li>Class page (<code>/class/:id</code>) gains a read-only timetable tab — the surface T2 borrows from.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>A slot may hold a department period (PT, Library) with no class-subject: <code>kind</code> + <code>department_id</code> on the slot (truth.md).</li></ul>
+<ul><li>Split: no file over ~600 lines; <code>modules/timetable/components/*</code> by surface.</li><li>Picker tiers verified with a section whose allotted teacher is busy at that period.</li><li>Two sections cannot both publish the same teacher at the same period (DB refuses).</li><li>Allotment swap (03) moves that teacher's slots and lists pending exchanges to cancel.</li><li>Publishing a new version emits a diff of moved slots per teacher.</li></ul>
+<h4>Out of scope</h4>
+<p>Calendar sync itself (Settings integration). Period Exchange (T2, teacher pass).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li><b>Share, not Publish</b>, in every label. Draft until shared; sharing writes every teacher's schedule (layer 3 below).</li><li>Three calendar layers: school calendar (master) · timetable (office) · <b>teacher schedules</b> (derived, calendar-shaped, what teachers actually see). <code>/timetable/ my-schedule</code> renders layer 3; the grid is admin-only.</li><li>Schedules are the surface for <b>borrow</b> and <b>substitute</b> (T2): add a colleague's schedule like Google Calendar; request a period from it; request a fill on your own. Accepted requests land on both schedules and the dashboard as upcoming duties. Design the schedule view now so T2 attaches without rework: each rendered period carries its slot id + date.</li><li>Combined classes: one teacher, two sections, one period — allowed via <code>block_id</code>.</li><li>Staff periods (Library, PT) are department slots with a staff user as the owner.</li><li>Committee builds, admin enters: no multi-editor requirement in v1; drafts already exist.</li></ul></div>
+</details>
+<details class="doc" id="doc-06-year-rollover">
+  <summary><span class="no">06</span><span class="t">Year rollover (A15) — Batches renamed and moved</span><span class="src">06-year-rollover.md</span></summary>
+  <div class="body"><p>Group: Setup · Handoff: TWEAK · <b>Founder wants a mock before code.</b> Today the Batches page already has Year Rollover and Past Batches tabs, "Start new academic year", class creation, and student transfer/withdraw/history.</p>
+<h4>Scope</h4>
+<p>Rename <b>Batches → Year rollover</b> under Setup. The page keeps: rollover preview and execute (<code>/rollover/preview</code>, <code>/execute</code>, <code>/execute-plan</code>, <code>/promotion-draft</code>), past years (<code>/past</code>, <code>/past/:classId/students</code>), per-student history, transfer and withdraw, annual result flag. Class creation leaves for Classes (03). Opening a year <em>is</em> the first step here: "Start new academic year" creates the <code>academic_years</code> row (01), then the promotion plan, then closes the old year at the end.</p>
+<h4>Schema</h4>
+<p>Uses <code>academic_years</code> (01) and <code>student_class_memberships</code> (013). Add <code>academic_years.closed_at</code> and <code>rolled_from_year_id</code> for lineage. Nothing else.</p>
+<h4>API</h4>
+<p>Existing batches routes stay, mounted additionally at <code>/api/rollover/*</code> with the old paths kept as aliases for one release. <code>POST /switch-year</code> becomes a write to <code>academic_years.status</code>. <code>prepare-class</code> and <code>class-template</code> move to <code>/api/classes</code>.</p>
+<h4>Screens and pickers</h4>
+<ul><li><b>Setup › Year rollover</b>: year header (open year, dates), the promotion plan grid (grade → target grade, sections mapped), review, execute; Past years list; student history/transfer stays reachable from the Student profile too (one record, two views).</li><li>Mock first: two screens — the plan grid, and the Past years view — for founder sign-off.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>Rollover never rewrites verticals; every artefact of the closed year stays tagged and read-only (edge case 1). Verified by opening a past year in the header picker.</li><li>Transfer within school carries every record; transfer out produces a partial-year report card export (edge case 4).</li><li>Archived sections hide from pickers, stay queryable (edge case 6).</li></ul>
+<h4>Out of scope</h4>
+<p>Report card generation itself (A13); allotment re-staffing UI (03 does it against the new year).</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>Default promotion is whole sections (6A → 7A, same students). Exceptions per student: hold back, remove, add transfer-in. The copilot proposes hold-backs from results.</li><li><b>Reshuffle</b> step: section → student remapping by uploading a list or typing names, reviewed, then applied. Optional; off by default.</li></ul></div>
+</details>
+<details class="doc" id="doc-07-home-setup-checklist">
+  <summary><span class="no">07</span><span class="t">Home as setup checklist</span><span class="src">07-home-setup-checklist.md</span></summary>
+  <div class="body"><p>Handoff: not a module; the founder's call (2026-09-10). Teacher home kept. Admin home already has "Set up your school", "Needs a look", "Staffing".</p>
+<h4>Scope</h4>
+<p>For a school that has not published a timetable, Home leads with a nine-step checklist, each step linking into its page, done state computed live: School &amp; year → Calendar → Departments &amp; subjects → Classes &amp; sections → Teachers → Students → Allotments → School day → Timetable published. Once published, the checklist folds into a compact "setup complete" line and the operations view (Needs a look: gaps, missing registers, pending exchanges) leads. The View-as switch previews the teacher home.</p>
+<h4>Schema</h4>
+<p>None. Readiness is derived.</p>
+<h4>API</h4>
+<p><code>GET /api/schools/readiness</code> — one call returning each step's state and count (reuses <code>/api/timetable/readiness</code>, allotment board gaps, counts of departments, classes, teachers, students, calendar published, open year).</p>
+<h4>Screens and pickers</h4>
+<p>Admin home: greeting; checklist card with progress (done / total); each row: step, state, count, "Open →". Below it today's Needs a look and Staffing, unchanged. When all done: checklist collapses to one line with "Setup complete · 9 of 9".</p>
+<h4>Acceptance</h4>
+<ul><li>New school: step 1 open, others pending, every row links to the correct Setup page.</li><li>Completing a step elsewhere updates the row on return without reload.</li><li>Published timetable collapses the checklist.</li></ul>
+<h4>Out of scope</h4>
+<p>Teacher home changes; Ask Hint panel changes.</p>
+<h4>From interview batch 3 (truth.md)</h4>
+<ul><li>Post-setup Home leads with today's gaps: unfilled periods and registers not taken.</li><li>Setup checklist gains <b>Import</b>: from a table (CSV/XLSX) for students and teachers; Google Workspace calendar sync as an option on the Calendar step.</li></ul></div>
+</details>
+<details class="doc" id="doc-08-knowledge">
+  <summary><span class="no">08</span><span class="t">Knowledge: Class knowledge (A17/T10) and Shared library (T11)</span><span class="src">08-knowledge.md</span></summary>
+  <div class="body"><p>Group: Knowledge · Handoff: DONE. Today: materials attach per section; Knowledge Library and Shared Library pages exist; nav labels kept matching page titles until this ships.</p>
+<h4>Scope</h4>
+<p>Two pages, never confused. <b>Class knowledge</b>: curriculum sources at grade × subject, inherited by every section; a section may add its own extras that never leak. Admin curates school-wide; teachers see their subjects' sets. <b>Shared library</b>: teacher-made items shared to the school shelf; provenance is the teacher. Every paper and note records the materials it used.</p>
+<h4>Schema (additive; migration 027)</h4>
+<ul><li><code>knowledge_materials.grade_subject_id uuid NULL REFERENCES grade_subjects</code> — backfill from each material's class_subject's grade+subject; materials attached to several sections of one grade collapse to one grade-level row (dedupe by file hash / title, report the rest for manual merge).</li><li><code>knowledge_material_class_subjects</code> stays for section-only extras.</li><li><code>paper_sources (paper_id, material_id)</code> and <code>note_sources (note_id, material_id)</code>.</li><li><code>exams.paper_id</code> if papers are not first-class today (verify in exams module).</li></ul>
+<h4>API</h4>
+<p>Knowledge routes exist (upload, analyze, visibility). Add <code>?grade_subject_id=</code> filters, <code>POST /api/knowledge/:id/scope</code> (section-only ↔ grade-wide), and sources endpoints on exams/blueprints. <code>match_knowledge_materials</code> RPC gains a grade_subject filter.</p>
+<h4>Screens and pickers</h4>
+<ul><li><b>Knowledge › Class knowledge</b>: grade × subject matrix with counts; drill to the set; upload attaches at grade level by default with "only for this section" toggle.</li><li><b>Knowledge › Shared library</b>: as today, plus source links on each item.</li><li><b>Class page › Knowledge tab</b>: inherited set + section extras, labelled.</li><li><b>Setup › Departments &amp; subjects</b>: counts link here.</li></ul>
+<h4>Acceptance</h4>
+<ul><li>Upload once for Grade 6 Maths → visible in 6A, 6B, 6C knowledge tabs.</li><li>Section extra never appears in another section.</li><li>A generated paper lists its sources; Ask Hint answers cite grade-level sources.</li></ul>
+<h4>Out of scope</h4>
+<p>Rename of nav labels lands here (Knowledge Library → Class knowledge).</p>
+<h4>From interview batch 3 (truth.md)</h4>
+<ul><li>Uploaders are the office and department heads; teachers add personal material and share. Board textbooks pre-loaded per grade × subject (crawl or upload) as the seed set.</li><li>Visibility: <code>private</code> (only me) · <code>shared</code> with an explicit audience: people or a whole department (<code>material_shares (material_id, user_id | department_id)</code>) · <code>school</code>.</li><li>Class knowledge page gets a <b>Pre-load board textbooks</b> action on an empty grade-subject.</li></ul></div>
+</details>
+<details class="doc" id="doc-09-exams-and-operations">
+  <summary><span class="no">09</span><span class="t">Exams &amp; papers and Operations (A12, A13, A9, A10, A11, A14)</span><span class="src">09-exams-and-operations.md</span></summary>
+  <div class="body"><p>All BUILD. Each replaces one "Soon" row. Written as one document so the shared dependency — the Notifications rail — is decided once.</p>
+<h4>Order</h4>
+<ol><li><b>Notifications rail (A11)</b> first, as infrastructure: <code>notifications (id, school_id, recipient_user_id | student_id (parent), channel, kind, source_type, source_id, payload, status, sent_at)</code> + daily digest per recipient per channel (edge case 12). Publishers: attendance, homework, results, exchanges, circulars.</li><li><b>Attendance oversight (A9)</b>: web surface over the mobile scan flow; day view per section, missing registers, resend. Tags: section, date, marker, student.</li><li><b>Exam manager (A12)</b>: <code>exams</code> gains <code>academic_year_id</code> and a calendar <b>exam window</b> (truth.md: windows are set per grade range when the calendar is defined; exams are scheduled inside them, teachers do not invent dates); can span sections; papers and grading link; publish results in one action.</li><li><b>Results &amp; report cards (A13)</b>: <code>report_cards (student_id, academic_year_id, term, generated_at, pdf_url)</code> compiled from results + attendance; visible in the student profile to teachers of that student (edge case 8: full card by default).</li><li><b>Leave &amp; substitution (A10)</b>: office view over T2 exchanges; unfilled periods list; suggested free teachers; cover assignment; exam-duty check (edge case 5). Depends on Timetable versions (05) and T2 (teacher pass).</li><li><b>Reports &amp; KPI (A14)</b>: read-only aggregates; needs period logs (T4) for the teacher-completion KPI — ships with marks and attendance first, adds KPI when T4 exists.</li></ol>
+<h4>Cross-cutting acceptance</h4>
+<ul><li>Every artefact carries its tag columns from the module map matrix.</li><li>No module sends its own messages; all go through the rail.</li><li>Every list is year-scoped by the header picker.</li></ul>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>Attendance: per period, by the period's teacher (including staff periods). Absence notifications go to the two primary guardian contacts.</li><li>Homework assignment triggers a push to parents (rail).</li></ul>
+<h4>From interview batch 3 (truth.md)</h4>
+<ul><li><b>Exam manager models term exams only.</b> Papers have <code>status draft → submitted → approved</code>; a committee prepares, the school approves, and the exam cannot be scheduled without an approved paper and an answer key. Class tests stay in the class module and never enter Exam manager.</li><li>Unit tests count toward results only when scheduled on the calendar (a flag on the exam).</li><li>Grading: every AI mark requires teacher verification; publication is blocked until all sheets are approved. Results to parents are the marked-up sheet as PDF with remarks, not a marks feed. <b>Report cards parked</b> — internal view only, Paperhint layout.</li><li>Notifications: no parent app; channel messages. Absence digest after the day's roll. Circulars admin-sent; class-level announcements route via class teacher.</li><li>Homework module is <b>preparation only</b>: draft, assign, notify. No submissions.</li><li>Copilot state changes: confirm, then execute (edge case 10 stands).</li></ul></div>
+</details>
+<details class="doc" id="doc-10-teacher-shell">
+  <summary><span class="no">10</span><span class="t">Teacher shell (later pass)</span><span class="src">10-teacher-shell.md</span></summary>
+  <div class="body"><p>Deferred by decision (admin-only build first). Recorded so the admin work is built with it in mind.</p>
+<h4>Shape</h4>
+<p>Teacher menu ordered by her day, from the handoff T1–T17: My Day / My schedule (T1) on top; Your classes with the five-step pipeline Knowledge → Exams → Grading → Results → Portion (T5); Library; My Department + Teachers (T17); Ask Hint everywhere. Coming-soon rows for T1, T2, T4, T5, T6, T7, T12 the same way as the admin menu.</p>
+<h4>What the admin pass must leave in place for it</h4>
+<ul><li>Nav definition per role already exists (<code>src/data/nav.ts</code>); this pass edits data.</li><li>Department with head (02) → My Department grouping and fill suggestions.</li><li>Stable slot identity and versions (05) → Period log and exchanges.</li><li><code>grade_subjects</code> (02) → Portion tracker per section reads one chapter list.</li><li>Students page scoped by roster (T16 → A6): same page, teacher scope.</li></ul>
+<h4>Out of scope for now</h4>
+<p>Everything above until the admin shell and modules 01–05 are merged.</p>
+<h4>From interview (truth.md, 2026-09-10)</h4>
+<ul><li>Teacher schedules (layer 3) are the teacher's home surface; borrow and substitute live there. Colleagues' schedules can be added to one's view. Upcoming duties (accepted fills) show on the dashboard with a countdown.</li><li>Non-teaching staff get the same shell scoped to their department periods and attendance.</li></ul>
+<h4>From interview batch 3 (truth.md)</h4>
+<ul><li>Period log: pre-filled from the plan, one-tap confirm, detail via Hint. Recap card is generated from the last log (absent, taught, homework) for the next period.</li><li>KPI visibility: the teacher and department heads only.</li></ul></div>
+</details>
+<!-- modules:end -->
+      </div>
+    </section>
+
+    <section id="decisions">
+      <div class="eyebrow">Record</div>
+      <h2>Decisions</h2>
+      <div class="log">
+        <div><span class="d">09 Sept</span><span>Never commit or push to <code>main</code> in the product repos. One branch per logical change, pull request when verified.</span></div>
+        <div><span class="d">10 Sept</span><span>Build as admin-only for now; teacher-facing screens untouched. Shell first, modules after.</span></div>
+        <div><span class="d">10 Sept</span><span>Setup is about the school (another admin sees the same value). Settings is about the app and the account. Settings stays in the user menu.</span></div>
+        <div><span class="d">10 Sept</span><span>Unbuilt modules stay in the nav as Soon rows landing on a placeholder with the module's own description.</span></div>
+        <div><span class="d">10 Sept</span><span>Timetable is two layers: period templates per grade (Setup, configuration) and the filled grid per section (Classes, data). Templates are rows, not code.</span></div>
+        <div><span class="d">10 Sept</span><span>Knowledge is two things: class knowledge at grade × subject inherited by sections, and the teacher-shared library. Separate pages, never confused.</span></div>
+        <div><span class="d">10 Sept</span><span>Home stays role-driven with an admin View-as switch. Teacher home kept, not scrapped.</span></div>
+        <div><span class="d">10 Sept</span><span>Subjects &amp; books becomes Departments &amp; subjects. Head of department is a marker with department-scoped permissions, not a third role. Books are materials on a subject per grade, managed in Class knowledge.</span></div>
+        <div><span class="d">10 Sept</span><span>The whole app should be seamless. Five testable rules above govern every module document.</span></div>
+        <div><span class="d">10 Sept</span><span>Opening a new academic year is the first step of rollover, not a separate action.</span></div>
+        <div><span class="d">10 Sept</span><span>Rooms are out. Paperhint stays at class and section; no room on slots, no room clash. (Interview, School &amp; year)</span></div>
+        <div><span class="d">10 Sept</span><span>One calendar per school with three layers: holidays, school events, exam windows per grade range. Exams are scheduled inside windows the office defined. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>Departments can have several heads, own subjects, and serve a grade range. The grade range is the "band", kept translucent. A default General department exists; subject-less departments (PT, Library) are valid and can hold periods. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>Templates assign to a multi-select of grades; no band object. Template periods carry a nullable day so a short-Saturday variant needs no later migration. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>Principal = admin + teacher. Roles become a set on the user. Non-teaching staff (library, PT, office) are users with a department; they hold periods and take attendance. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>A grade decides the subject; a section decides who teaches it. Class teacher owns the class; attendance is per period by that period's teacher. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>The calendar is three layers: school calendar (master), timetable (office), teacher schedules (derived, calendar-shaped). Teachers see schedules, not the grid; borrow and substitute happen on schedules. "Share", not "Publish". (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>Leaving teacher: deactivate, then "Replace teacher" per section moves allotment, slots and duties in one step. Guardians: two mandatory contacts, one optional. Fees and transport parked. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>Two kinds of exam: class tests (teacher's own, never in results) and term exams (school-level, committee paper, approved before use, answer key on every desk). Unit tests count only if on the calendar. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>AI marks are verified and approved by the teacher before anything publishes. Parents get the marked-up sheet with remarks, not a marks feed. Report cards parked as internal only. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>No parent app: channel messages, absence digest after the day's roll, circulars by admin. Homework is preparation only. Copilot confirms then executes. Onboarding imports from any table; Google calendar sync. (Interview)</span></div>
+        <div><span class="d">10 Sept</span><span>Chapters are board-defined school data, pre-loadable; ordering and pacing are the department's or teacher's plan. KPI visible to the teacher and heads only. Recap card is generated. (Interview)</span></div>
+      </div>
+    </section>
+
+    <section id="open" class="open">
+      <div class="eyebrow">Pending</div>
+      <h2>Open questions</h2>
+      <ul>
+        <li><b>Staging Supabase project</b> before the first migration, or additive-only discipline on the live database. Recommended: staging. Due at module 4 at the latest, sooner if module 1's migration goes first.</li>
+        <li><b>Teacher overview page</b> at <code>/teachers/:id/overview</code>: unreachable today and duplicates the drawer. Wire it as the full profile, or drop it.</li>
+        <li><b><code>users.custom_fields</code></b>: unused by the UI. Make it school-specific staff fields with an editor, or treat as dead schema. Decide before module 1 ships.</li>
+        <li><b>Year rollover page shape</b>: founder wants a mock before class creation moves out of Batches.</li>
+        <li><b>Unknown until pilot</b> (founder): whether any school runs different timings on different days; whether breaks and assembly ever differ by grade; how schools actually band their grades. Schema is ready for the first; the other two are recorded, not modelled.</li>
+      </ul>
+    </section>
+  </main>
+</div>

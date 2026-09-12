@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Outlet, useParams } from "react-router-dom"
 import { SparkleIcon } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
-import { useAuth } from "@/lib/auth"
+import { useViewRole } from "@/lib/view-role"
 import {
   useTeacherAssignments,
   classLabel,
@@ -34,7 +34,6 @@ import { HelpSupportDialog } from "@/components/help/help-support-dialog"
 
 function AppLayoutInner() {
   const { classSubjectId } = useParams()
-  const { user } = useAuth()
   const { assignments } = useTeacherAssignments()
   const { isMobile } = useSidebar()
   const [aiChatOpen, setAiChatOpen] = useState(false)
@@ -60,7 +59,8 @@ function AppLayoutInner() {
   // Lifted chat state — survives sheet close, resets on classSubjectId change.
   const classAiChat = useClassAiChat(classSubjectId ?? null)
 
-  const isClassScoped = Boolean(classSubjectId) && user?.role === "teacher"
+  const { role: viewRole } = useViewRole()
+  const isClassScoped = Boolean(classSubjectId) && viewRole === "teacher"
 
   // Only still needed to title the class-scoped AI chat sheet.
   const classTitle = (() => {

@@ -34,6 +34,7 @@ import { PlatformPage } from "@/modules/platform/pages/platform-page"
 import { PlatformSchoolPage } from "@/modules/platform/pages/platform-school-page"
 import { PlatformSchoolNewPage } from "@/modules/platform/pages/platform-school-new-page"
 import { FeatureRoute } from "@/components/shared/feature-route"
+import { ComingSoonPage } from "@/modules/coming-soon/pages/coming-soon-page"
 
 export const router = createBrowserRouter([
   { path: "login", element: <LoginPage /> },
@@ -73,11 +74,15 @@ export const router = createBrowserRouter([
           // PaperHint team only — the page itself redirects non-platform
           // roles home, and every /api/platform route re-checks the role.
           // School admin's configuration home (role-gated in the page)
+          { path: "soon/:slug", element: <ComingSoonPage /> },
           { path: "setup", element: <SetupPage /> },
           { path: "setup/:section", element: <SetupPage /> },
           { path: "platform", element: <PlatformPage /> },
           { path: "platform/schools/new", element: <PlatformSchoolNewPage /> },
-          { path: "platform/schools/:schoolId", element: <PlatformSchoolPage /> },
+          {
+            path: "platform/schools/:schoolId",
+            element: <PlatformSchoolPage />,
+          },
           { path: "library", element: <LibraryPage /> },
           { path: "library/bank", element: <BankPage /> },
 
@@ -125,7 +130,14 @@ export const router = createBrowserRouter([
             element: <ClassStudentsMarksPage />,
           },
 
-          { path: "ask", element: (<FeatureRoute feature="copilot"><CopilotPage /></FeatureRoute>) },
+          {
+            path: "ask",
+            element: (
+              <FeatureRoute feature="copilot">
+                <CopilotPage />
+              </FeatureRoute>
+            ),
+          },
           // A thread is its own page: navigating between it and /ask remounts
           // the panel, so no scroll/anchor state can leak between the two.
           {

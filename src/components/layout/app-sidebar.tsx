@@ -1,22 +1,14 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
-  BuildingsIcon,
-  ArchiveIcon,
   BookOpenIcon,
-  BooksIcon,
-  CalendarDotsIcon,
   ChalkboardIcon,
-  GearSixIcon,
   ExamIcon,
-  GraduationCapIcon,
-  HouseIcon,
-  IdentificationCardIcon,
   ListChecksIcon,
-  SparkleIcon,
-  TableIcon,
   UsersIcon,
 } from "@phosphor-icons/react"
+import { isNavItemActive, navForRole } from "@/data/nav"
+import { useViewRole } from "@/lib/view-role"
 import { useAuth } from "@/lib/auth"
 import { useFeatures } from "@/hooks/use-features"
 import {
@@ -28,6 +20,7 @@ import { PaperhintMark } from "@/components/shared/paperhint-mark"
 import { PaperhintWordmark } from "@/components/shared/paperhint-wordmark"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { NavViewRole } from "@/components/nav-view-role"
 import { NavWorkspaces } from "@/components/nav-workspaces"
 import {
   Sidebar,
@@ -61,7 +54,9 @@ export function AppSidebar() {
 
   const [hoveredNav, setHoveredNav] = useState<string | null>(null)
   const { assignments } = useTeacherAssignments()
-  const isTeacher = user?.role === "teacher"
+  const { role: viewRole } = useViewRole()
+  const isTeacher = viewRole === "teacher"
+  // PaperHint team accounts see only the console — they have no school.
   const isPlatform = user?.role === "platform"
   const { isEnabled } = useFeatures()
 
@@ -85,113 +80,25 @@ export function AppSidebar() {
     })
   }
 
-  const isActivePath = (path: string) => {
-    if (path === "/") return location.pathname === "/"
-    return location.pathname.startsWith(path)
-  }
-
-  // PaperHint team accounts see only the console — they have no school, so
-  // every school-scoped page would just error.
-  const platformItems = [
-    {
-      title: "Platform Console",
-      icon: BuildingsIcon,
-      isActive: isActivePath("/platform"),
-      onClick: () => handleNav("/platform"),
-    },
-  ]
-
-  const schoolItems = [
-    {
-      title: "Home",
-      icon: HouseIcon,
-      isActive: location.pathname === "/",
-      onClick: () => handleNav("/"),
-    },
-    ...(isEnabled("copilot")
-      ? [
-          {
-            title: "Ask Hint",
-            icon: SparkleIcon,
-            isActive: isActivePath("/ask"),
-            onClick: () => handleNav("/ask"),
-          },
-        ]
-      : []),
-    {
-      title: "Classes",
-      icon: ChalkboardIcon,
-      isActive: isActivePath("/classes"),
-      onClick: () => handleNav("/classes"),
-    },
-    {
-      title: "Teachers",
-      icon: IdentificationCardIcon,
-      isActive: isActivePath("/teachers"),
-      onClick: () => handleNav("/teachers"),
-    },
-    {
-      title: "Students",
-      icon: GraduationCapIcon,
-      isActive: isActivePath("/students"),
-      onClick: () => handleNav("/students"),
-    },
-    ...(isEnabled("calendar")
-      ? [
-          {
-            title: "Calendar",
-            icon: CalendarDotsIcon,
-            isActive: isActivePath("/calendar"),
-            onClick: () => handleNav("/calendar"),
-          },
-        ]
-      : []),
-    // Admins get the builder; teachers get their read-only My Schedule +
-    // class timetables on the same route. Hidden when not in the plan.
-    ...(isEnabled("timetable")
-      ? [
-          {
-            title: "Timetable",
-            icon: TableIcon,
-            isActive: isActivePath("/timetable"),
-            onClick: () => handleNav("/timetable"),
-          },
-        ]
-      : []),
-    // Batch management is an admin-only, structural operation
-    ...(!isTeacher
-      ? [
-          {
-            title: "Batches",
-            icon: ArchiveIcon,
-            isActive: isActivePath("/batches"),
-            onClick: () => handleNav("/batches"),
-          },
-        ]
-      : []),
-  ]
-
-  const mainItems = isPlatform ? platformItems : schoolItems
-
-  const libraryItems = isPlatform ? [] : [
-    {
-      title: "Knowledge Library",
-      icon: BookOpenIcon,
-      // Active only on /library itself (not /library/bank); the Bank has
-      // its own entry below and we don't want both highlighted at once.
-      isActive: location.pathname === "/library",
-      onClick: () => handleNav("/library"),
-    },
-    {
-      title: "Shared Library",
-      icon: BooksIcon,
-      isActive: isActivePath("/library/bank"),
-      onClick: () => handleNav("/library/bank"),
-    },
-  ]
+  // The menu is per role; the shell is shared. See src/data/nav.ts.
+  // Rows behind a plan feature disappear when the school's plan lacks it.
+  const navGroups = navForRole(isPlatform ? "platform" : viewRole)
+    .map((group) => ({
+      label: group.label,
+      items: group.items
+        .filter((item) => !item.feature || isEnabled(item.feature))
+        .map((item) => ({
+          title: item.title,
+          icon: item.icon,
+          soon: item.status === "soon",
+          isActive: isNavItemActive(item, location.pathname),
+          onClick: () => handleNav(item.path),
+        })),
+    }))
+    .filter((group) => group.items.length > 0)
 
   const workspaces =
-    isTeacher && assignments.length > 0
+    isTeacher && !isPlatform && assignments.length > 0
       ? [
           {
             name: "Your classes",
@@ -275,19 +182,15 @@ export function AppSidebar() {
           className="flex min-h-0 flex-1 flex-col"
           onMouseLeave={() => setHoveredNav(null)}
         >
-          <NavMain
-            items={mainItems}
-            hovered={hoveredNav}
-            onHover={setHoveredNav}
-          />
-          {libraryItems.length > 0 && (
+          {navGroups.map((group, i) => (
             <NavMain
-              items={libraryItems}
-              label="Library"
+              key={group.label ?? `group-${i}`}
+              items={group.items}
+              label={group.label}
               hovered={hoveredNav}
               onHover={setHoveredNav}
             />
-          )}
+          ))}
           {workspaces.length > 0 ? (
             <NavWorkspaces
               workspaces={workspaces}
@@ -295,28 +198,10 @@ export function AppSidebar() {
               onHover={setHoveredNav}
             />
           ) : null}
-
-          {/* Pinned to the bottom, just above the profile — configuration,
-              not a daily destination. Admin only. */}
-          {!isTeacher && !isPlatform && (
-            <div className="mt-auto pt-4">
-              <NavMain
-                items={[
-                  {
-                    title: "Setup",
-                    icon: GearSixIcon,
-                    isActive: isActivePath("/setup"),
-                    onClick: () => handleNav("/setup"),
-                  },
-                ]}
-                hovered={hoveredNav}
-                onHover={setHoveredNav}
-              />
-            </div>
-          )}
         </div>
       </SidebarContent>
       <SidebarFooter>
+        <NavViewRole />
         {user ? (
           <NavUser
             user={{
