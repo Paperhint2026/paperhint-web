@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
+  CalendarCheckIcon,
   CalendarDotsIcon,
   ChalkboardTeacherIcon,
   CircleNotchIcon,
@@ -32,6 +33,7 @@ import {
   type WeekSettings,
 } from "@/modules/timetable/pages/timetable-page"
 import { FormBuilder } from "@/modules/setup/components/form-builder"
+import { AcademicYearCard } from "@/modules/setup/components/academic-year-card"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /setup — the school admin's configuration home: working week, bell
@@ -41,6 +43,12 @@ import { FormBuilder } from "@/modules/setup/components/form-builder"
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SECTIONS = [
+  {
+    key: "year",
+    label: "Academic year",
+    icon: CalendarCheckIcon,
+    hint: "Open year & past years",
+  },
   {
     key: "week",
     label: "Working week",
@@ -76,7 +84,7 @@ export function SetupPage() {
   const { section } = useParams<{ section: string }>()
   const active: SectionKey = SECTIONS.some((s) => s.key === section)
     ? (section as SectionKey)
-    : "week"
+    : "year"
 
   if (!isAdmin) {
     return (
@@ -108,7 +116,7 @@ export function SetupPage() {
       <PageHeader
         icon={GearSixIcon}
         title="School setup"
-        description="The working week, bell schedule, and the fields on your forms."
+        description="The academic year, working week, bell schedule, and the fields on your forms."
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 md:flex-row">
@@ -148,6 +156,7 @@ export function SetupPage() {
               : "overflow-y-auto pb-12"
           )}
         >
+          {active === "year" && <AcademicYearCard />}
           {active === "week" && <WorkingWeekCard />}
           {active === "bell" && <BellScheduleCard />}
           {active === "student-form" && <FormBuilder entity="student" />}
@@ -234,7 +243,11 @@ function WorkingWeekCard() {
             </Select>
           </div>
           <Button onClick={save} disabled={isSaving}>
-            {isSaving ? <CircleNotchIcon className="size-4 animate-spin" /> : "Save"}
+            {isSaving ? (
+              <CircleNotchIcon className="size-4 animate-spin" />
+            ) : (
+              "Save"
+            )}
           </Button>
         </div>
       )}
