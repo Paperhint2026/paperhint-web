@@ -51,6 +51,7 @@ export function SubjectsPage() {
   const [error, setError] = useState("")
   const [newName, setNewName] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -119,6 +120,7 @@ export function SubjectsPage() {
           }
         )
         setNewName("")
+        setAdding(false)
         setSelectedId(r.subject.id)
       },
       "Subject added"
@@ -193,32 +195,58 @@ export function SubjectsPage() {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background md:flex-row">
           {/* Level 3 — the list */}
           <aside className="flex shrink-0 flex-col border-b border-border md:w-60 md:border-r md:border-b-0">
-            <form
-              className="flex shrink-0 gap-1 border-b border-border p-2"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (newName.trim()) create()
-              }}
-            >
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="New subject"
-                className="h-8 text-sm"
-              />
-              <Button
-                type="submit"
-                size="icon"
-                className="size-8 shrink-0"
-                disabled={!newName.trim() || busy === "new"}
-              >
-                {busy === "new" ? (
-                  <CircleNotchIcon className="size-4 animate-spin" />
-                ) : (
-                  <PlusIcon className="size-4" />
-                )}
-              </Button>
-            </form>
+            {/* An action, not a search box: the field lives behind the button */}
+            <div className="shrink-0 border-b border-border p-2">
+              <Popover open={adding} onOpenChange={setAdding}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start"
+                  >
+                    <PlusIcon className="size-4" />
+                    New subject
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-80">
+                  <form
+                    className="flex flex-col gap-3"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      if (newName.trim()) create()
+                    }}
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="new-subject" className="text-xs">
+                        Subject name
+                      </Label>
+                      <Input
+                        id="new-subject"
+                        autoFocus
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        placeholder="e.g. Business Studies"
+                        className="h-9"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        It finds its own department — you can change that after.
+                      </p>
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={!newName.trim() || busy === "new"}
+                    >
+                      {busy === "new" ? (
+                        <CircleNotchIcon className="size-4 animate-spin" />
+                      ) : (
+                        <PlusIcon className="size-4" />
+                      )}
+                      Add subject
+                    </Button>
+                  </form>
+                </PopoverContent>
+              </Popover>
+            </div>
             <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
               {subjects.map((s) => (
                 <button
