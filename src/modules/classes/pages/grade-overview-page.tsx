@@ -127,15 +127,12 @@ function BlockHeading({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-sidebar px-2.5 py-1 text-xs font-medium text-foreground ring-1 ring-border/60">
-        <HeadIcon className="size-3.5 text-muted-foreground" />
+      <h2 className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <HeadIcon className="size-3.5" />
         {label}
-        {count !== undefined && (
-          <span className="text-muted-foreground tabular-nums">{count}</span>
-        )}
-      </span>
-      <span className="h-px flex-1 bg-border" />
-      {trailing}
+        {count !== undefined && <span className="tabular-nums">{count}</span>}
+      </h2>
+      {trailing && <div className="ml-auto">{trailing}</div>}
     </div>
   )
 }
@@ -286,7 +283,6 @@ export function GradeOverviewPage() {
           return next
         })
       })
-     
   }, [tab, sectionId, ttBySection, ttPeriods])
 
   const fetchOverview = useCallback(async () => {
@@ -460,361 +456,346 @@ export function GradeOverviewPage() {
                             Current batch
                           </span>
                         </p>
+                        {/* The counts belong to the title, not to a band of
+                          their own halfway down the page. */}
+                        <div className="mt-1 flex flex-wrap items-center gap-x-5 gap-y-1">
+                          {stats.map((st) => (
+                            <span
+                              key={st.label}
+                              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                            >
+                              <st.icon className="size-3.5" />
+                              <span className="font-medium text-secondary-foreground tabular-nums">
+                                {st.value}
+                              </span>
+                              {st.label}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </header>
                 </motion.div>
 
-                {/* Counts on a hairline */}
+                {/* Sections on the left, what is inside them on the right.
+                  A row of chips stops working at six sections; a panel does
+                  not, and it keeps the choice in view while you read. */}
                 <motion.div
                   variants={ENTER}
-                  className="mx-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-border py-3.5"
+                  className="flex min-h-0 flex-1 flex-col gap-4 px-6 md:flex-row md:gap-6"
                 >
-                  {stats.map((s) => (
-                    <span
-                      key={s.label}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                    >
-                      <s.icon className="size-3.5" />
-                      <span className="font-semibold text-foreground tabular-nums">
-                        {s.value}
-                      </span>
-                      {s.label}
-                    </span>
-                  ))}
-                  {data.created_by && (
-                    <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Avatar className="size-5">
-                        <AvatarFallback className="text-[9px]">
-                          {getInitials(data.created_by)}
-                        </AvatarFallback>
-                      </Avatar>
-                      Set up by {data.created_by}
-                    </span>
-                  )}
-                </motion.div>
-
-                {/* Sections — doors along a corridor; pick one and the tabs
-                  below show who is inside */}
-                <motion.div
-                  variants={ENTER}
-                  className="flex flex-col gap-4 px-6"
-                >
-                  <BlockHeading
-                    icon={ChalkboardIcon}
-                    label="Sections"
-                    count={data.sections.length}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {data.sections.map((s) => {
-                      const on = s.id === sectionId
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => {
-                            setSectionId(s.id)
-                            setQuery("")
-                          }}
-                          className={cn(
-                            "flex items-center gap-2.5 rounded-xl border py-1.5 pr-4 pl-1.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            on
-                              ? "border-foreground/30 bg-sidebar"
-                              : "border-border bg-background hover:bg-muted/50"
-                          )}
-                        >
-                          <span
+                  <aside className="flex shrink-0 flex-col gap-1 md:w-56">
+                    <BlockHeading
+                      icon={ChalkboardIcon}
+                      label="Sections"
+                      count={data.sections.length}
+                    />
+                    <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:max-h-80 md:flex-col md:overflow-x-visible md:overflow-y-auto">
+                      {data.sections.map((s) => {
+                        const on = s.id === sectionId
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => {
+                              setSectionId(s.id)
+                              setQuery("")
+                            }}
                             className={cn(
-                              "flex size-8 items-center justify-center rounded-lg text-sm font-semibold text-foreground ring-1 ring-border/60",
-                              on ? "bg-background shadow-xs" : "bg-sidebar"
+                              "flex shrink-0 items-center gap-2.5 rounded-lg py-2 pr-3 pl-2 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-full",
+                              on ? "bg-muted" : "hover:bg-muted/60"
                             )}
                           >
-                            {s.section}
-                          </span>
-                          <span className="flex flex-col leading-tight">
                             <span
                               className={cn(
-                                "text-sm",
+                                "flex size-8 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ring-1 ring-border/60",
                                 on
-                                  ? "font-medium text-foreground"
-                                  : "text-secondary-foreground"
+                                  ? "bg-background text-foreground shadow-xs"
+                                  : "bg-sidebar text-secondary-foreground"
                               )}
                             >
-                              Section {s.section}
+                              {s.section}
                             </span>
-                            <span className="text-[11px] text-muted-foreground tabular-nums">
-                              {s.student_count}{" "}
-                              {s.student_count === 1 ? "student" : "students"}
+                            <span className="flex min-w-0 flex-col leading-tight">
+                              <span
+                                className={cn(
+                                  "truncate text-sm",
+                                  on
+                                    ? "font-medium text-foreground"
+                                    : "text-secondary-foreground"
+                                )}
+                              >
+                                Section {s.section}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground tabular-nums">
+                                {s.student_count}{" "}
+                                {s.student_count === 1 ? "student" : "students"}
+                              </span>
                             </span>
-                          </span>
-                          {(s.teachers ?? []).length > 0 && (
-                            <span className="ml-2">
-                              <TeacherAvatars teachers={s.teachers ?? []} />
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </motion.div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </aside>
 
-                {/* Tabs — what is taught, and who is in the picked section */}
-                <motion.div
-                  variants={ENTER}
-                  className="flex flex-col gap-5 px-6"
-                >
-                  <div className="flex items-center gap-1 border-b border-border">
-                    {(
-                      [
-                        {
-                          key: "subjects",
-                          label: "Subjects",
-                          icon: BookOpenIcon,
-                          count: data.total_subjects,
-                        },
-                        {
-                          key: "students",
-                          label: "Students",
-                          icon: UsersIcon,
-                          count: section?.students.length ?? 0,
-                        },
-                        {
-                          key: "teachers",
-                          label: "Teachers",
-                          icon: ChalkboardTeacherIcon,
-                          count: (section?.teachers ?? []).length,
-                        },
-                        {
-                          key: "timetable",
-                          label: "Timetable",
-                          icon: TableIcon,
-                          count:
-                            section &&
-                            typeof ttBySection[section.id] === "object"
-                              ? (ttBySection[section.id] as TtData).slots.length
-                              : 0,
-                        },
-                      ] as const
-                    ).map((t) => {
-                      const on = tab === t.key
-                      return (
-                        <button
-                          key={t.key}
-                          type="button"
-                          role="tab"
-                          aria-selected={on}
-                          onClick={() => {
-                            setTab(t.key)
-                            setQuery("")
-                          }}
-                          className={cn(
-                            "relative flex items-center gap-1.5 px-3 py-2.5 text-sm transition-colors outline-none focus-visible:text-foreground",
-                            on
-                              ? "font-medium text-foreground"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          <t.icon className="size-4" />
-                          {t.label}
-                          <span
+                  {/* What is taught, and who is in the picked section */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-5">
+                    <div className="flex items-center gap-1 border-b border-border">
+                      {(
+                        [
+                          {
+                            key: "subjects",
+                            label: "Subjects",
+                            icon: BookOpenIcon,
+                            count: data.total_subjects,
+                          },
+                          {
+                            key: "students",
+                            label: "Students",
+                            icon: UsersIcon,
+                            count: section?.students.length ?? 0,
+                          },
+                          {
+                            key: "teachers",
+                            label: "Teachers",
+                            icon: ChalkboardTeacherIcon,
+                            count: (section?.teachers ?? []).length,
+                          },
+                          {
+                            key: "timetable",
+                            label: "Timetable",
+                            icon: TableIcon,
+                            count:
+                              section &&
+                              typeof ttBySection[section.id] === "object"
+                                ? (ttBySection[section.id] as TtData).slots
+                                    .length
+                                : 0,
+                          },
+                        ] as const
+                      ).map((t) => {
+                        const on = tab === t.key
+                        return (
+                          <button
+                            key={t.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={on}
+                            onClick={() => {
+                              setTab(t.key)
+                              setQuery("")
+                            }}
                             className={cn(
-                              "text-xs tabular-nums",
+                              "relative flex items-center gap-1.5 px-3 py-2.5 text-sm transition-colors outline-none focus-visible:text-foreground",
                               on
-                                ? "text-foreground/70"
-                                : "text-muted-foreground"
+                                ? "font-medium text-foreground"
+                                : "text-muted-foreground hover:text-foreground"
                             )}
                           >
-                            {t.count}
-                          </span>
-                          {on && (
-                            <motion.span
-                              layoutId="grade-sheet-tab"
-                              transition={
-                                reduceMotion
-                                  ? { duration: 0 }
-                                  : {
-                                      type: "spring",
-                                      stiffness: 480,
-                                      damping: 40,
-                                      mass: 0.8,
-                                    }
-                              }
-                              className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-foreground"
-                            />
-                          )}
-                        </button>
-                      )
-                    })}
-                    {section && tab !== "subjects" && (
-                      <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">
-                        Section {section.section}
-                      </span>
-                    )}
-                  </div>
-
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      key={`${tab}-${section?.id ?? "none"}`}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: reduceMotion ? 0 : 0.18 }}
-                      className="flex flex-col gap-5"
-                    >
-                      {tab === "subjects" ? (
-                        <>
-                          <div className="flex flex-col gap-3">
-                            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                              Core
-                            </p>
-                            <div className="flex flex-wrap gap-2.5">
-                              {(data.core_subjects ?? data.subjects).map(
-                                (s) => (
-                                  <SubjectChip key={s.id} subject={s} />
-                                )
+                            <t.icon className="size-4" />
+                            {t.label}
+                            <span
+                              className={cn(
+                                "text-xs tabular-nums",
+                                on
+                                  ? "text-foreground/70"
+                                  : "text-muted-foreground"
                               )}
-                            </div>
-                          </div>
-                          {electiveGroups.map((group) => (
-                            <div
-                              key={group.elective_group_id}
-                              className="flex flex-col gap-3 rounded-xl border border-dashed border-border p-4"
                             >
-                              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                <ArrowsSplitIcon className="size-3.5" />
-                                <span className="font-medium tracking-wide uppercase">
-                                  {group.elective_group_name}
-                                </span>
-                                <span className="ml-auto">
-                                  students choose one
-                                </span>
-                              </div>
+                              {t.count}
+                            </span>
+                            {on && (
+                              <motion.span
+                                layoutId="grade-sheet-tab"
+                                transition={
+                                  reduceMotion
+                                    ? { duration: 0 }
+                                    : {
+                                        type: "spring",
+                                        stiffness: 480,
+                                        damping: 40,
+                                        mass: 0.8,
+                                      }
+                                }
+                                className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-foreground"
+                              />
+                            )}
+                          </button>
+                        )
+                      })}
+                      {section && tab !== "subjects" && (
+                        <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">
+                          Section {section.section}
+                        </span>
+                      )}
+                    </div>
+
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={`${tab}-${section?.id ?? "none"}`}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: reduceMotion ? 0 : 0.18 }}
+                        className="flex flex-col gap-5"
+                      >
+                        {tab === "subjects" ? (
+                          <>
+                            <div className="flex flex-col gap-3">
+                              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                Core
+                              </p>
                               <div className="flex flex-wrap gap-2.5">
-                                {group.subjects.map((s) => (
-                                  <SubjectChip key={s.id} subject={s} />
+                                {(data.core_subjects ?? data.subjects).map(
+                                  (s) => (
+                                    <SubjectChip key={s.id} subject={s} />
+                                  )
+                                )}
+                              </div>
+                            </div>
+                            {electiveGroups.map((group) => (
+                              <div
+                                key={group.elective_group_id}
+                                className="flex flex-col gap-3 rounded-xl bg-muted/40 p-4"
+                              >
+                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                  <ArrowsSplitIcon className="size-3.5" />
+                                  <span className="font-medium tracking-wide uppercase">
+                                    {group.elective_group_name}
+                                  </span>
+                                  <span className="ml-auto">
+                                    students choose one
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-2.5">
+                                  {group.subjects.map((s) => (
+                                    <SubjectChip key={s.id} subject={s} />
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : !section ? (
+                          <div className="flex flex-col items-center gap-3 py-10 text-center">
+                            <Sticker name="sleep" size={100} />
+                            <p className="text-sm text-muted-foreground">
+                              No sections in this grade yet.
+                            </p>
+                          </div>
+                        ) : tab === "timetable" ? (
+                          <SectionTimetableView
+                            sectionLabel={section.section}
+                            data={ttBySection[section.id]}
+                            periods={ttPeriods}
+                            isAdmin={isAdmin}
+                            onOpenBuilder={() => {
+                              navigate(`/timetable?class=${section.id}`)
+                            }}
+                          />
+                        ) : (
+                          <>
+                            <div className="relative">
+                              <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder={`Search ${tab} in Section ${section.section}…`}
+                                className="h-9 pl-9"
+                                aria-label={`Search ${tab}`}
+                              />
+                            </div>
+
+                            {people.length === 0 ? (
+                              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                                <Sticker
+                                  name={query ? "lost" : "friends"}
+                                  size={query ? 80 : 120}
+                                />
+                                <p className="text-sm text-muted-foreground">
+                                  {query
+                                    ? `Nobody called "${query.trim()}" here.`
+                                    : `No ${tab} in this section yet.`}
+                                </p>
+                              </div>
+                            ) : tab === "students" ? (
+                              <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                                {(people as Student[]).map((st) => (
+                                  <button
+                                    key={st.id}
+                                    type="button"
+                                    onClick={() =>
+                                      setPerson({ kind: "student", id: st.id })
+                                    }
+                                    className="group flex items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+                                  >
+                                    <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
+                                      {st.roll_number ?? "—"}
+                                    </span>
+                                    <Avatar size="sm">
+                                      <AvatarFallback>
+                                        {getInitials(st.full_name)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="min-w-0 flex-1 truncate text-sm text-secondary-foreground">
+                                      {st.full_name}
+                                    </span>
+                                    <CaretRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+                                  </button>
                                 ))}
                               </div>
-                            </div>
-                          ))}
-                        </>
-                      ) : !section ? (
-                        <div className="flex flex-col items-center gap-3 py-10 text-center">
-                          <Sticker name="sleep" size={100} />
-                          <p className="text-sm text-muted-foreground">
-                            No sections in this grade yet.
-                          </p>
-                        </div>
-                      ) : tab === "timetable" ? (
-                        <SectionTimetableView
-                          sectionLabel={section.section}
-                          data={ttBySection[section.id]}
-                          periods={ttPeriods}
-                          isAdmin={isAdmin}
-                          onOpenBuilder={() => {
-                            navigate(`/timetable?class=${section.id}`)
-                          }}
-                        />
-                      ) : (
-                        <>
-                          <div className="relative">
-                            <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              value={query}
-                              onChange={(e) => setQuery(e.target.value)}
-                              placeholder={`Search ${tab} in Section ${section.section}…`}
-                              className="h-9 pl-9"
-                              aria-label={`Search ${tab}`}
-                            />
-                          </div>
-
-                          {people.length === 0 ? (
-                            <div className="flex flex-col items-center gap-3 py-10 text-center">
-                              <Sticker
-                                name={query ? "lost" : "friends"}
-                                size={query ? 80 : 120}
-                              />
-                              <p className="text-sm text-muted-foreground">
-                                {query
-                                  ? `Nobody called "${query.trim()}" here.`
-                                  : `No ${tab} in this section yet.`}
-                              </p>
-                            </div>
-                          ) : tab === "students" ? (
-                            <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                              {(people as Student[]).map((st) => (
-                                <button
-                                  key={st.id}
-                                  type="button"
-                                  onClick={() =>
-                                    setPerson({ kind: "student", id: st.id })
-                                  }
-                                  className="group flex items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                  <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
-                                    {st.roll_number ?? "—"}
-                                  </span>
-                                  <Avatar size="sm">
-                                    <AvatarFallback>
-                                      {getInitials(st.full_name)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="min-w-0 flex-1 truncate text-sm text-secondary-foreground">
-                                    {st.full_name}
-                                  </span>
-                                  <CaretRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-1">
-                              {(people as Teacher[]).map((t) => (
-                                <button
-                                  key={t.id}
-                                  type="button"
-                                  onClick={() =>
-                                    setPerson({ kind: "teacher", id: t.id })
-                                  }
-                                  className="group flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                  <Avatar className="size-9">
-                                    {t.profile_url ? (
-                                      <AvatarImage
-                                        src={t.profile_url}
-                                        alt={t.full_name}
-                                      />
-                                    ) : null}
-                                    <AvatarFallback className="text-[10px]">
-                                      {getInitials(t.full_name)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                    <span className="truncate text-sm font-medium text-foreground">
-                                      {t.full_name}
-                                    </span>
-                                    <span className="truncate text-[11px] text-muted-foreground">
-                                      {t.designation ?? "Teacher"}
-                                    </span>
-                                  </div>
-                                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                                    {(t.subjects ?? []).slice(0, 3).map((s) => (
-                                      <span
-                                        key={s.id}
-                                        className="rounded-full bg-sidebar px-2 py-0.5 text-[11px] text-secondary-foreground ring-1 ring-border/60"
-                                      >
-                                        {tameCaps(s.subject_name)}
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                {(people as Teacher[]).map((t) => (
+                                  <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() =>
+                                      setPerson({ kind: "teacher", id: t.id })
+                                    }
+                                    className="group flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+                                  >
+                                    <Avatar className="size-9">
+                                      {t.profile_url ? (
+                                        <AvatarImage
+                                          src={t.profile_url}
+                                          alt={t.full_name}
+                                        />
+                                      ) : null}
+                                      <AvatarFallback className="text-[10px]">
+                                        {getInitials(t.full_name)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                      <span className="truncate text-sm font-medium text-foreground">
+                                        {t.full_name}
                                       </span>
-                                    ))}
-                                  </div>
-                                  <CaretRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
+                                      <span className="truncate text-[11px] text-muted-foreground">
+                                        {t.designation ?? "Teacher"}
+                                      </span>
+                                    </div>
+                                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                                      {(t.subjects ?? [])
+                                        .slice(0, 3)
+                                        .map((s) => (
+                                          <span
+                                            key={s.id}
+                                            className="rounded-full bg-sidebar px-2 py-0.5 text-[11px] text-secondary-foreground ring-1 ring-border/60"
+                                          >
+                                            {tameCaps(s.subject_name)}
+                                          </span>
+                                        ))}
+                                    </div>
+                                    <CaretRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
                 </motion.div>
               </motion.div>
             </div>
@@ -822,7 +803,7 @@ export function GradeOverviewPage() {
 
           {/* Footer — where to go to change things */}
           {data && (
-            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-6 py-3">
+            <div className="flex shrink-0 items-center justify-between gap-2 px-6 pt-2 pb-4">
               <span className="text-xs text-muted-foreground">
                 Enrolment and staffing live on their own pages.
               </span>
