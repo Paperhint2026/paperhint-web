@@ -38,7 +38,8 @@ export function ClassPlanStep({
         "/api/batches/context"
       )
       .then((r) => {
-        const active = r.classes.filter((c) => !c.is_pending_promotion)
+        // pending = still in the old year, waiting to move — the ones this step plans for
+        const active = r.classes.filter((c) => c.is_pending_promotion)
         setClasses(active)
         const saved = new Map(
           plan.plan.classes.map((c) => [c.source_class_id, c])
