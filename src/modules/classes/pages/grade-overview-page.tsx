@@ -870,7 +870,7 @@ function SectionTimetableView({
           No timetable for Section {sectionLabel} yet.
         </p>
         {isAdmin && (
-          <Button size="sm" className="rounded-full" onClick={onOpenBuilder}>
+          <Button size="sm" shape="pill" onClick={onOpenBuilder}>
             Create timetable
             <ArrowRightIcon className="size-3.5" />
           </Button>

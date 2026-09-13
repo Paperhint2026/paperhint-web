@@ -88,7 +88,7 @@ export function PlatformPage() {
         </p>
         <Button
           size="sm"
-          className="rounded-full"
+          shape="pill"
           onClick={() => navigate("/platform/schools/new")}
         >
           <PlusIcon className="size-3.5" />

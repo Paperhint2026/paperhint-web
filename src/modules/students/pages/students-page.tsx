@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
@@ -378,10 +379,10 @@ export function StudentsPage() {
       return
     }
     setHeaderActions(
-      <Button size="lg" onClick={() => setDrawerOpen(true)}>
+      <ModuleAction onClick={() => setDrawerOpen(true)}>
         <PlusIcon className="size-3.5" />
         <span className="hidden sm:inline">Add Students</span>
-      </Button>
+      </ModuleAction>
     )
     return () => setHeaderActions(null)
   }, [isAdmin, setHeaderActions])

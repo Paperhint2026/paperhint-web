@@ -53,6 +53,7 @@ import { useHeaderActions } from "@/components/layout/header-actions-context"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -355,14 +356,10 @@ export function CalendarPage() {
       return
     }
     setHeaderActions(
-      <Button
-        size="lg"
-        className="rounded-full"
-        onClick={() => setUploadOpen(true)}
-      >
+      <ModuleAction onClick={() => setUploadOpen(true)}>
         <UploadSimpleIcon className="size-3.5" />
         <span className="hidden sm:inline">Upload calendar</span>
-      </Button>
+      </ModuleAction>
     )
     return () => setHeaderActions(null)
   }, [isAdmin, setHeaderActions])

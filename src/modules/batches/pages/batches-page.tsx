@@ -28,6 +28,7 @@ import { useHeaderActions } from "@/components/layout/header-actions-context"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -361,15 +362,10 @@ function RolloverHome() {
 
   useEffect(() => {
     setHeaderActions(
-      <Button
-        size="lg"
-        variant="outline"
-        className="rounded-full"
-        onClick={() => setNewClassOpen(true)}
-      >
+      <ModuleAction variant="outline" onClick={() => setNewClassOpen(true)}>
         <PlusIcon className="size-3.5" />
         <span className="hidden sm:inline">New class</span>
-      </Button>
+      </ModuleAction>
     )
     return () => setHeaderActions(null)
   }, [setHeaderActions])

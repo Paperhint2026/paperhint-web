@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   CircleNotchIcon,
+  MagnifyingGlassIcon,
   PlusIcon,
   StackIcon,
   PencilSimpleIcon,
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -56,6 +58,7 @@ export function SubjectsPage() {
   const [newName, setNewName] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [query, setQuery] = useState("")
   const [renaming, setRenaming] = useState(false)
   const [renameTo, setRenameTo] = useState("")
 
@@ -85,10 +88,10 @@ export function SubjectsPage() {
         <BulkAddDialog onDone={load} />
         <Popover open={adding} onOpenChange={setAdding}>
           <PopoverTrigger asChild>
-            <Button size="lg">
+            <ModuleAction>
               <PlusIcon className="size-3.5" />
               <span className="hidden sm:inline">New subject</span>
-            </Button>
+            </ModuleAction>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-80">
             <form
@@ -138,6 +141,13 @@ export function SubjectsPage() {
     () => subjects?.find((s) => s.id === selectedId) ?? null,
     [subjects, selectedId]
   )
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!subjects) return []
+    return q
+      ? subjects.filter((s) => s.subject_name.toLowerCase().includes(q))
+      : subjects
+  }, [subjects, query])
 
   // Writes apply locally first and go out one at a time, so two quick clicks
   // never both compute a set from the same stale copy.
@@ -267,8 +277,25 @@ export function SubjectsPage() {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background md:flex-row">
           {/* Level 3 — the list */}
           <aside className="flex shrink-0 flex-col border-b border-border md:w-60 md:border-r md:border-b-0">
+            <div className="shrink-0 border-b border-border p-2">
+              <div className="relative">
+                <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Find a subject"
+                  aria-label="Find a subject"
+                  className="h-8 pl-8 text-sm"
+                />
+              </div>
+            </div>
             <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-              {subjects.map((s) => (
+              {shown.length === 0 && (
+                <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  Nothing matches &ldquo;{query.trim()}&rdquo;.
+                </p>
+              )}
+              {shown.map((s) => (
                 <button
                   key={s.id}
                   type="button"

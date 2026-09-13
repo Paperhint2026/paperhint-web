@@ -33,6 +33,7 @@ import { useHeaderActions } from "@/components/layout/header-actions-context"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -237,24 +238,17 @@ export function TimetablePage() {
     }
     setHeaderActions(
       <div className="flex items-center gap-2">
-        <Button
-          size="lg"
+        <ModuleAction
           variant="outline"
-          className="rounded-full"
           onClick={() => setTeacherLoadOpen(true)}
         >
           <ChalkboardTeacherIcon className="size-3.5" />
           <span className="hidden sm:inline">Teacher load</span>
-        </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          className="rounded-full"
-          onClick={() => setBellOpen(true)}
-        >
+        </ModuleAction>
+        <ModuleAction variant="outline" onClick={() => setBellOpen(true)}>
           <GearSixIcon className="size-3.5" />
           <span className="hidden sm:inline">Bell schedule</span>
-        </Button>
+        </ModuleAction>
       </div>
     )
     return () => setHeaderActions(null)
@@ -1366,7 +1360,7 @@ function SectionBuilder({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="rounded-full"
+              shape="pill"
               onClick={undo}
               disabled={history.length === 0}
               aria-label="Undo"
@@ -1377,7 +1371,7 @@ function SectionBuilder({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="rounded-full"
+              shape="pill"
               onClick={redo}
               disabled={future.length === 0}
               aria-label="Redo"

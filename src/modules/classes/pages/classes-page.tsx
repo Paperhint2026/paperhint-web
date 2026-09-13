@@ -17,6 +17,7 @@ import { countSummary } from "@/lib/format"
 import { useAppDispatch, useAppSelector } from "@/store"
 import { fetchSubjects } from "@/store/subjects-slice"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
 import {
@@ -165,10 +166,10 @@ export function ClassesPage() {
   useEffect(() => {
     if (!isAdmin) return
     setHeaderActions(
-      <Button size="lg" onClick={() => setDrawerOpen(true)}>
+      <ModuleAction onClick={() => setDrawerOpen(true)}>
         <PlusIcon className="size-3.5" />
         <span className="hidden sm:inline">Add Class Room</span>
-      </Button>
+      </ModuleAction>
     )
     return () => setHeaderActions(null)
   }, [isAdmin, setHeaderActions])

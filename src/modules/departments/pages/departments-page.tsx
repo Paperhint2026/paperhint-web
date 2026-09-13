@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -102,10 +103,10 @@ export function DepartmentsPage() {
     setHeaderActions(
       <Popover open={adding} onOpenChange={setAdding}>
         <PopoverTrigger asChild>
-          <Button size="lg">
+          <ModuleAction>
             <PlusIcon className="size-3.5" />
             <span className="hidden sm:inline">New department</span>
-          </Button>
+          </ModuleAction>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-80">
           <form

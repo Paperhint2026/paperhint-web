@@ -26,6 +26,7 @@ import {
 } from "@/components/shared/page-toolbar"
 import { countSummary } from "@/lib/format"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
@@ -257,8 +258,7 @@ export function TeachersPage() {
   useEffect(() => {
     if (!isAdmin) return
     setHeaderActions(
-      <Button
-        size="lg"
+      <ModuleAction
         disabled={!isFormDataReady}
         onClick={() => {
           setEditData(null)
@@ -268,7 +268,7 @@ export function TeachersPage() {
       >
         <PlusIcon className="size-3.5" />
         <span className="hidden sm:inline">Add Teacher</span>
-      </Button>
+      </ModuleAction>
     )
     return () => setHeaderActions(null)
   }, [isAdmin, isFormDataReady, setHeaderActions])
