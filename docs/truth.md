@@ -255,3 +255,11 @@ subjects paste-list flow. One shared import component, not one per module.
 - **Every step is a tool.** The founder will put an AI on this. So the plan is a
   server-side record that a person and an assistant edit through the same
   endpoints, each with preview before apply, and execution is one atomic call.
+
+## Rollover details (2026-09-13, founder)
+
+- **Detained students stay where they are**: same grade, same section, by default.
+  Changing a detained student's section is an optional per-student override.
+- **Reshuffle is a list, not a rule.** Class teachers work it out offline and hand
+  the admin "student → section"; the admin applies it. No rule-based sorting.
+- **Admin executes.** They hold the lists.
