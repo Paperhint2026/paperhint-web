@@ -362,28 +362,25 @@ export function DepartmentDetailPage() {
               ))}
             </div>
           )}
-          {isAdmin && (
+          {isAdmin && members.length > 0 && (
             <div className="flex">
               <Picker
                 label="Add head"
                 empty={
-                  teachers.length === 0
-                    ? "Add teachers first."
-                    : "No one matches."
+                  members.length === 0
+                    ? "Nobody is in this department yet."
+                    : "Everyone here is already a head."
                 }
-                options={[
-                  ...members,
-                  ...teachers.filter((t) => t.department_id !== id),
-                ]
+                /* A head leads the department, so they have to be in it. */
+                options={members
                   .filter((t) => !dept.heads.some((h) => h.id === t.id))
                   .map((t) => ({
                     id: t.id,
                     label: t.full_name,
-                    note:
-                      t.department_id === id ? "in this department" : undefined,
+                    note: t.designation ?? undefined,
                   }))}
                 onPick={(pid) => {
-                  const t = teachers.find((x) => x.id === pid)
+                  const t = members.find((x) => x.id === pid)
                   if (t) toggleHead(t)
                 }}
               />

@@ -51,6 +51,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -90,6 +91,8 @@ export interface TeacherFormData {
   phone: string
   profileUrl: string
   departmentId: string
+  /** Mark this person as a head of the department they are joining. */
+  isDepartmentHead?: boolean
   designation: string
   dateOfJoining: Date | undefined
   classSubjects: ClassSubjectEntry[]
@@ -117,6 +120,7 @@ const emptyForm: TeacherFormData = {
   phone: "",
   profileUrl: "",
   departmentId: "",
+  isDepartmentHead: false,
   designation: "",
   dateOfJoining: undefined,
   classSubjects: [{ classId: "", classSubjectId: "" }],
@@ -611,6 +615,17 @@ export function AddTeacherDrawer({
                   >
                     Cancel
                   </Button>
+                  {form.departmentId && !creatingDept && (
+                    <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs text-muted-foreground">
+                      <Checkbox
+                        checked={!!form.isDepartmentHead}
+                        onCheckedChange={(v) =>
+                          updateField("isDepartmentHead", v === true)
+                        }
+                      />
+                      Head of this department
+                    </label>
+                  )}
                 </div>
               )}
             </div>

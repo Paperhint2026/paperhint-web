@@ -359,6 +359,26 @@ export function TeachersPage() {
     }
   }
 
+  /**
+   * A head is a marker on the department, not a field on the user, so it is a
+   * second call. It never blocks saving the teacher: if it fails the teacher
+   * still exists and the marker can be set on the department's own page.
+   */
+  const markAsHead = async (departmentId: string, teacherId: string) => {
+    try {
+      const r = await apiClient.get<{
+        departments: { id: string; heads: { id: string }[] }[]
+      }>("/api/departments")
+      const dep = r.departments.find((d) => d.id === departmentId)
+      if (!dep || dep.heads.some((h) => h.id === teacherId)) return
+      await apiClient.put(`/api/departments/${departmentId}/heads`, {
+        user_ids: [...dep.heads.map((h) => h.id), teacherId],
+      })
+    } catch (e) {
+      showError(e, "Saved, but could not mark them as head")
+    }
+  }
+
   const handleSaveTeacher = async (data: TeacherFormData) => {
     setIsSaving(true)
     try {
@@ -377,6 +397,10 @@ export function TeachersPage() {
           phone_number: data.phone || undefined,
           custom_fields: data.customFields ?? {},
         })
+
+        if (data.isDepartmentHead && data.departmentId && teacherId) {
+          await markAsHead(data.departmentId, teacherId)
+        }
       } else {
         const res = await apiClient.post<{
           message: string
@@ -393,6 +417,10 @@ export function TeachersPage() {
           custom_fields: data.customFields ?? {},
         })
         teacherId = res.teacher.id
+
+        if (data.isDepartmentHead && data.departmentId) {
+          await markAsHead(data.departmentId, teacherId)
+        }
 
         if (data.pendingProfileFile) {
           try {
