@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   ArchiveIcon,
   ArrowRightIcon,
@@ -1361,6 +1362,7 @@ function SwitchYearDialog({
   existingYears: string[]
   onSwitched: () => void
 }) {
+  const navigate = useNavigate()
   // A school moves forward one year, and never back (truth.md): the next year
   // is not a choice, it is a fact derived from the current one.
   const nextYear = useMemo(
@@ -1385,6 +1387,7 @@ function SwitchYearDialog({
       toast.success(`${year} is now the open year`)
       onOpenChange(false)
       onSwitched()
+      navigate("/rollover")
     } catch (err) {
       showError(err)
     } finally {
