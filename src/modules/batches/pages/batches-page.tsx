@@ -217,25 +217,28 @@ function ViewSwitch({
     { id: "past" as const, label: "Past Batches", icon: ArchiveIcon },
   ]
   return (
-    <div className="flex items-center gap-1.5">
+    <nav
+      aria-label="Batches views"
+      className="-mb-px flex shrink-0 gap-1 overflow-x-auto border-b border-border"
+    >
       {options.map((o) => (
         <button
           key={o.id}
           type="button"
           onClick={() => onChange(o.id)}
-          aria-pressed={view === o.id}
+          aria-current={view === o.id ? "page" : undefined}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-150",
+            "flex shrink-0 items-center gap-2 border-b-2 px-3 pb-2.5 text-sm whitespace-nowrap transition-colors",
             view === o.id
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : "border-border bg-background text-secondary-foreground hover:bg-muted"
+              ? "border-primary font-medium text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
-          <o.icon className="size-3.5" />
+          <o.icon className="size-4 shrink-0" />
           {o.label}
         </button>
       ))}
-    </div>
+    </nav>
   )
 }
 
@@ -319,7 +322,6 @@ function RolloverHome() {
   const [error, setError] = useState("")
 
   const [switchOpen, setSwitchOpen] = useState(false)
-  const [newClassOpen, setNewClassOpen] = useState(false)
 
   // pending-class selection (before drafting)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -362,9 +364,9 @@ function RolloverHome() {
 
   useEffect(() => {
     setHeaderActions(
-      <ModuleAction variant="outline" onClick={() => setNewClassOpen(true)}>
-        <PlusIcon className="size-3.5" />
-        <span className="hidden sm:inline">New class</span>
+      <ModuleAction onClick={() => setSwitchOpen(true)}>
+        <ArrowsClockwiseIcon className="size-3.5" />
+        <span className="hidden sm:inline">Start new academic year</span>
       </ModuleAction>
     )
     return () => setHeaderActions(null)
@@ -578,23 +580,14 @@ function RolloverHome() {
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          {/* School year pill + switch */}
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full bg-sidebar px-3 py-1.5 text-xs font-medium text-secondary-foreground ring-1 ring-border/60">
-              <CalendarDotsIcon className="size-3.5 text-muted-foreground" />
-              School year:{" "}
-              <span className="text-foreground">{activeYear ?? "not set"}</span>
+          {/* The open year is a fact about the school, so it reads as one */}
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <CalendarDotsIcon className="size-4" />
+            School year{" "}
+            <span className="font-medium text-foreground">
+              {activeYear ?? "not set"}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full text-xs"
-              onClick={() => setSwitchOpen(true)}
-            >
-              <ArrowsClockwiseIcon className="size-3.5" />
-              Start new academic year…
-            </Button>
-          </div>
+          </p>
 
           {done && (
             <div className="flex flex-col gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3.5">
@@ -756,14 +749,6 @@ function RolloverHome() {
           setDrafts(null)
           fetchContext()
         }}
-      />
-
-      <NewClassDialog
-        open={newClassOpen}
-        onOpenChange={setNewClassOpen}
-        onCreated={fetchContext}
-        existingYears={classes.map((c) => c.academic_year)}
-        activeClasses={classes}
       />
 
       {drafts && editDraftId && drafts[editDraftId] && (
@@ -1480,405 +1465,6 @@ function SwitchYearDialog({
     </Dialog>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// New class dialog — manual escape hatch (splits, extra sections)
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface ClassTemplateResponse {
-  source_class: {
-    id: string
-    grade: number
-    section: string
-    academic_year: string
-  } | null
-  subjects: TemplateSubject[]
-  teachers: DraftTeacher[]
-}
-
-const NEW_SECTION = "__new__"
-
-function NewClassDialog({
-  open,
-  onOpenChange,
-  onCreated,
-  existingYears,
-  activeClasses,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onCreated: () => void
-  existingYears: string[]
-  activeClasses: ContextClass[]
-}) {
-  const yearOptions = useMemo(
-    () => deriveYearOptions(existingYears),
-    [existingYears]
-  )
-
-  const [grade, setGrade] = useState("")
-  const [sectionChoice, setSectionChoice] = useState("")
-  const [customSection, setCustomSection] = useState("")
-  const [year, setYear] = useState<string>(yearOptions[0] ?? "")
-  const [isSaving, setIsSaving] = useState(false)
-
-  const [template, setTemplate] = useState<ClassTemplateResponse | null>(null)
-  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false)
-  const [keptSubjects, setKeptSubjects] = useState<TemplateSubject[]>([])
-  const [keptTeachers, setKeptTeachers] = useState<DraftTeacher[]>([])
-
-  const section =
-    sectionChoice === NEW_SECTION
-      ? customSection.trim().toUpperCase()
-      : sectionChoice
-
-  const sectionOptions = useMemo(() => {
-    if (!grade) return []
-    return [
-      ...new Set(
-        activeClasses
-          .filter((c) => String(c.grade) === grade)
-          .map((c) => c.section)
-      ),
-    ].sort()
-  }, [activeClasses, grade])
-
-  useEffect(() => {
-    if (open) {
-      setYear(yearOptions[0] ?? "")
-      setGrade("")
-      setSectionChoice("")
-      setCustomSection("")
-      setTemplate(null)
-      setKeptSubjects([])
-      setKeptTeachers([])
-    }
-  }, [open, yearOptions])
-
-  useEffect(() => {
-    setSectionChoice("")
-    setCustomSection("")
-    setTemplate(null)
-  }, [grade])
-
-  useEffect(() => {
-    if (!open || !grade || !section) {
-      setTemplate(null)
-      setKeptSubjects([])
-      setKeptTeachers([])
-      setIsLoadingTemplate(false)
-      return
-    }
-    let cancelled = false
-    setIsLoadingTemplate(true)
-    apiClient
-      .get<ClassTemplateResponse>(
-        `/api/batches/class-template?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`
-      )
-      .then((res) => {
-        if (cancelled) return
-        setTemplate(res)
-        setKeptSubjects(res.subjects)
-        setKeptTeachers(res.teachers)
-      })
-      .catch(() => {
-        if (!cancelled)
-          setTemplate({ source_class: null, subjects: [], teachers: [] })
-      })
-      .finally(() => {
-        setIsLoadingTemplate(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [open, grade, section])
-
-  const removeSubject = (subjectId: string) => {
-    setKeptSubjects((prev) => prev.filter((s) => s.subject_id !== subjectId))
-    setKeptTeachers((prev) => prev.filter((t) => t.subject_id !== subjectId))
-  }
-
-  const removeTeacher = (teacherId: string, subjectId: string | null) => {
-    setKeptTeachers((prev) =>
-      prev.filter(
-        (t) => !(t.teacher_id === teacherId && t.subject_id === subjectId)
-      )
-    )
-  }
-
-  const create = async (withCarryOver: boolean) => {
-    if (!grade || !section || !year) {
-      showError(new Error("Grade, section, and academic year are required"))
-      return
-    }
-    setIsSaving(true)
-    try {
-      const res = await apiClient.post<{
-        subjects_created: number
-        teachers_assigned: number
-      }>("/api/batches/prepare-class", {
-        grade: Number(grade),
-        section,
-        academic_year: year.trim(),
-        subjects: withCarryOver ? keptSubjects : [],
-        teacher_assignments: withCarryOver
-          ? keptTeachers
-              .filter((t) => t.subject_id)
-              .map((t) => ({
-                teacher_id: t.teacher_id,
-                subject_id: t.subject_id,
-              }))
-          : [],
-      })
-      const parts = [`Grade ${grade} - ${section} created`]
-      if (res.subjects_created > 0)
-        parts.push(`${res.subjects_created} subjects`)
-      if (res.teachers_assigned > 0)
-        parts.push(`${res.teachers_assigned} teachers assigned`)
-      toast.success(parts.join(" · "))
-      onOpenChange(false)
-      onCreated()
-    } catch (err) {
-      showError(err)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const hasTemplate = !!template?.source_class
-  const carryCount = keptSubjects.length + keptTeachers.length
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>New class</DialogTitle>
-          <DialogDescription>
-            For extra sections or splits the automatic plan can't cover.
-            Subjects and teachers from the current year's class are carried over
-            unless you remove them.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-4 overflow-y-auto px-6 py-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs">Grade</Label>
-              <Select value={grade || undefined} onValueChange={setGrade}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(
-                    (g) => (
-                      <SelectItem key={g} value={g}>
-                        Grade {g}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs">Section</Label>
-              <Select
-                value={sectionChoice || undefined}
-                onValueChange={setSectionChoice}
-                disabled={!grade}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={grade ? "Select…" : "Pick grade first"}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {sectionOptions.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      Section {s}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value={NEW_SECTION}>
-                    <span className="inline-flex items-center gap-1">
-                      <PlusIcon className="size-3" />
-                      New section…
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {sectionChoice === NEW_SECTION && (
-                <Input
-                  autoFocus
-                  value={customSection}
-                  onChange={(e) => setCustomSection(e.target.value)}
-                  placeholder="e.g. C"
-                  maxLength={3}
-                  className="mt-1"
-                />
-              )}
-            </div>
-            <div className="col-span-2 flex flex-col gap-1.5">
-              <Label className="text-xs">Academic year</Label>
-              <Select value={year || undefined} onValueChange={setYear}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((y, i) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                      {i === 0 ? " (next year)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {isLoadingTemplate && (
-            <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-xs text-muted-foreground">
-              <CircleNotchIcon className="size-3.5 animate-spin" />
-              Looking up the current Grade {grade} - {section} class…
-            </div>
-          )}
-
-          {!isLoadingTemplate && template && hasTemplate && (
-            <div className="flex flex-col gap-3 rounded-lg border border-border bg-sidebar/50 px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">
-                Carried over from{" "}
-                <span className="font-medium text-foreground">
-                  Grade {template.source_class!.grade} -{" "}
-                  {template.source_class!.section} (
-                  {template.source_class!.academic_year})
-                </span>
-                . Remove anything that changes next year.
-              </p>
-
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">
-                  Subjects ({keptSubjects.length})
-                </Label>
-                {keptSubjects.length === 0 ? (
-                  <p className="text-xs text-muted-foreground/70">
-                    No subjects — the class will be created empty; add subjects
-                    later from the class editor.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {keptSubjects.map((s) => (
-                      <span
-                        key={s.subject_id}
-                        className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-secondary-foreground"
-                      >
-                        {s.subject_name}
-                        {s.subject_type === "elective" && (
-                          <span className="text-[10px] text-muted-foreground">
-                            · {s.elective_group_name || "elective"}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeSubject(s.subject_id)}
-                          className="ml-0.5 text-muted-foreground transition-colors hover:text-destructive"
-                          aria-label={`Remove ${s.subject_name}`}
-                        >
-                          <XIcon className="size-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">
-                  Teachers ({keptTeachers.length})
-                </Label>
-                {keptTeachers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground/70">
-                    No teachers carried over — assign them later from the
-                    Teachers page.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {keptTeachers.map((t) => (
-                      <span
-                        key={`${t.teacher_id}-${t.subject_id}`}
-                        className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-secondary-foreground"
-                      >
-                        {t.full_name}
-                        {t.subject_name && (
-                          <span className="text-[10px] text-muted-foreground">
-                            · {t.subject_name}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            removeTeacher(t.teacher_id, t.subject_id)
-                          }
-                          className="ml-0.5 text-muted-foreground transition-colors hover:text-destructive"
-                          aria-label={`Remove ${t.full_name}`}
-                        >
-                          <XIcon className="size-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {!isLoadingTemplate && template && !hasTemplate && section && (
-            <div className="rounded-lg border border-border px-3 py-2.5 text-xs text-muted-foreground">
-              No current Grade {grade} - {section} class to copy from. The class
-              will be created empty — add subjects from the class editor
-              afterwards.
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          {hasTemplate && (
-            <Button
-              variant="outline"
-              onClick={() => create(false)}
-              disabled={isSaving || !grade || !section || !year}
-            >
-              Create empty class
-            </Button>
-          )}
-          <Button
-            onClick={() => create(true)}
-            disabled={isSaving || !grade || !section || !year}
-          >
-            {isSaving ? (
-              <>
-                <CircleNotchIcon className="size-3.5 animate-spin" />
-                Creating…
-              </>
-            ) : hasTemplate && carryCount > 0 ? (
-              "Create with carry-over"
-            ) : (
-              "Create class"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Past batches
-// ─────────────────────────────────────────────────────────────────────────────
 
 function PastBatchesSkeleton() {
   return (
