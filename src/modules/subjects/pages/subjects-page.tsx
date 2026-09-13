@@ -4,7 +4,6 @@ import {
   PlusIcon,
   StackIcon,
   TrashIcon,
-  XIcon,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
@@ -16,11 +15,6 @@ import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
 import { describeGrades, GRADES, gradeLabel } from "@/lib/grades"
@@ -31,12 +25,10 @@ import { describeGrades, GRADES, gradeLabel } from "@/lib/grades"
  * equally from the departments page: the same junction from the other end.
  */
 
-type DeptLite = { id: string; name: string }
 type Subject = {
   id: string
   subject_name: string
   grades: number[]
-  departments: DeptLite[]
   section_count: number
 }
 
@@ -44,7 +36,6 @@ export function SubjectsPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
   const [subjects, setSubjects] = useState<Subject[] | null>(null)
-  const [departments, setDepartments] = useState<DeptLite[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [newName, setNewName] = useState("")
@@ -52,12 +43,10 @@ export function SubjectsPage() {
 
   const load = useCallback(async () => {
     try {
-      const [s, d] = await Promise.all([
-        apiClient.get<{ subjects: Subject[] }>("/api/subjects/detail"),
-        apiClient.get<{ departments: DeptLite[] }>("/api/departments"),
-      ])
+      const s = await apiClient.get<{ subjects: Subject[] }>(
+        "/api/subjects/detail"
+      )
       setSubjects(s.subjects ?? [])
-      setDepartments(d.departments ?? [])
       setSelectedId((cur) => cur ?? s.subjects?.[0]?.id ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load subjects")
@@ -138,18 +127,6 @@ export function SubjectsPage() {
     ).sort((a, b) => a - b)
     patch(s.id, (x) => ({ ...x, grades }))
     send(() => apiClient.put(`/api/subjects/${s.id}/grades`, { grades }))
-  }
-
-  const toggleDepartment = (s: Subject, d: DeptLite) => {
-    const next = s.departments.some((x) => x.id === d.id)
-      ? s.departments.filter((x) => x.id !== d.id)
-      : [...s.departments, d].sort((a, b) => a.name.localeCompare(b.name))
-    patch(s.id, (x) => ({ ...x, departments: next }))
-    send(() =>
-      apiClient.put(`/api/subjects/${s.id}/departments`, {
-        department_ids: next.map((x) => x.id),
-      })
-    )
   }
 
   if (!isAdmin) {
@@ -298,40 +275,6 @@ export function SubjectsPage() {
                   })}
                 </div>
               </div>
-
-              {/* Departments — the same tag the departments page writes */}
-              <div className="flex flex-col gap-2 border-t border-dashed border-border px-5 py-4">
-                <Label className="text-xs">Departments that own it</Label>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {selected.departments.map((d) => (
-                    <span
-                      key={d.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground"
-                    >
-                      {d.name}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${d.name}`}
-                        onClick={() => toggleDepartment(selected, d)}
-                        className="grid size-3.5 place-items-center rounded-full text-muted-foreground hover:bg-background hover:text-destructive"
-                      >
-                        <XIcon className="size-2.5" />
-                      </button>
-                    </span>
-                  ))}
-                  <DepartmentPicker
-                    options={departments.filter(
-                      (d) => !selected.departments.some((x) => x.id === d.id)
-                    )}
-                    onPick={(d) => toggleDepartment(selected, d)}
-                  />
-                </div>
-                {selected.departments.length === 0 && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Not in a department yet. Departments group who teaches it.
-                  </p>
-                )}
-              </div>
             </div>
           ) : (
             <p className="flex-1 p-8 text-center text-sm text-muted-foreground">
@@ -341,73 +284,5 @@ export function SubjectsPage() {
         </div>
       )}
     </div>
-  )
-}
-
-function DepartmentPicker({
-  options,
-  onPick,
-}: {
-  options: DeptLite[]
-  onPick: (d: DeptLite) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState("")
-  const q = query.trim().toLowerCase()
-  const shown = q
-    ? options.filter((o) => o.name.toLowerCase().includes(q))
-    : options
-
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v)
-        if (!v) setQuery("")
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <PlusIcon className="size-3" />
-          Add department
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-0">
-        <div className="border-b border-border p-2">
-          <Input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search"
-            className="h-8 text-sm"
-          />
-        </div>
-        <div className="max-h-64 overflow-y-auto p-1">
-          {shown.length === 0 ? (
-            <p className="px-2 py-3 text-xs text-muted-foreground">
-              No department matches.
-            </p>
-          ) : (
-            shown.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => {
-                  onPick(d)
-                  setOpen(false)
-                  setQuery("")
-                }}
-                className="w-full truncate rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-              >
-                {d.name}
-              </button>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
   )
 }
