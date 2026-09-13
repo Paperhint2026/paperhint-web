@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
+  BookmarkSimpleIcon,
   CaretRightIcon,
   PlusIcon,
+  StackIcon,
   TrashIcon,
+  UsersThreeIcon,
   XIcon,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -24,6 +27,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyNote } from "@/components/shared/empty-note"
 import { Sticker } from "@/components/shared/sticker"
 import { lookFor } from "@/modules/departments/lib/department-look"
 import type {
@@ -288,9 +292,16 @@ export function DepartmentDetailPage() {
             </Link>
           </div>
           {members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nobody yet. A teacher joins a department from their own profile.
-            </p>
+            <EmptyNote
+              icon={UsersThreeIcon}
+              title="No teachers here yet"
+              hint="A teacher joins a department from their own profile."
+              action={
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/teachers">Open Teachers</Link>
+                </Button>
+              }
+            />
           ) : (
             <ul className="-mr-2 flex max-h-72 flex-col divide-y divide-border overflow-y-auto pr-2">
               {members.map((t) => {
@@ -327,28 +338,32 @@ export function DepartmentDetailPage() {
           <h2 className="text-sm font-semibold text-foreground">
             Heads of department
           </h2>
-          <div className="-mr-2 flex max-h-40 flex-wrap items-start gap-1.5 overflow-y-auto pr-2">
-            {dept.heads.map((h) => (
-              <span
-                key={h.id}
-                className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground"
-              >
-                {h.full_name}
-                {isAdmin && (
-                  <button
-                    type="button"
-                    aria-label={`Remove ${h.full_name} as head`}
-                    onClick={() =>
-                      toggleHead({ id: h.id, full_name: h.full_name })
-                    }
-                    className="grid size-3.5 place-items-center rounded-full text-muted-foreground hover:bg-background hover:text-destructive"
-                  >
-                    <XIcon className="size-2.5" />
-                  </button>
-                )}
-              </span>
-            ))}
-            {isAdmin && (
+          {dept.heads.length > 0 && (
+            <div className="-mr-2 flex max-h-40 flex-wrap items-start gap-1.5 overflow-y-auto pr-2">
+              {dept.heads.map((h) => (
+                <span
+                  key={h.id}
+                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground"
+                >
+                  {h.full_name}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      aria-label={`Remove ${h.full_name} as head`}
+                      onClick={() =>
+                        toggleHead({ id: h.id, full_name: h.full_name })
+                      }
+                      className="grid size-3.5 place-items-center rounded-full text-muted-foreground hover:bg-background hover:text-destructive"
+                    >
+                      <XIcon className="size-2.5" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+          {isAdmin && (
+            <div className="flex">
               <Picker
                 label="Add head"
                 empty={
@@ -372,12 +387,18 @@ export function DepartmentDetailPage() {
                   if (t) toggleHead(t)
                 }}
               />
-            )}
-          </div>
+            </div>
+          )}
           {dept.heads.length === 0 && (
-            <p className="text-[11px] text-muted-foreground">
-              No head yet. A head sees their department&apos;s work.
-            </p>
+            <EmptyNote
+              icon={BookmarkSimpleIcon}
+              title="No head yet"
+              hint={
+                members.length === 0
+                  ? "Add a teacher to this department first."
+                  : "A head sees their department's work and approves inside it."
+              }
+            />
           )}
         </section>
 
@@ -395,9 +416,11 @@ export function DepartmentDetailPage() {
             </Link>
           </div>
           {dept.subjects.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              None. Fine for a Library or Physical Education department.
-            </p>
+            <EmptyNote
+              icon={StackIcon}
+              title="No subjects yet"
+              hint="Fine for a Library or Physical Education department; otherwise add one below."
+            />
           ) : (
             <ul className="-mr-2 flex max-h-72 flex-col divide-y divide-border overflow-y-auto pr-2">
               {dept.subjects.map((s) => (
