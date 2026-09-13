@@ -3,6 +3,7 @@ import {
   CircleNotchIcon,
   PlusIcon,
   StackIcon,
+  PencilSimpleIcon,
   TrashIcon,
   XIcon,
 } from "@phosphor-icons/react"
@@ -12,6 +13,7 @@ import { showError } from "@/lib/show-error"
 
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
+import { useHeaderActions } from "@/components/layout/header-actions-context"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
@@ -25,6 +27,7 @@ import {
 } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
+import { BulkAddDialog } from "@/modules/subjects/components/bulk-add-dialog"
 import { describeGrades, GRADES, gradeLabel } from "@/lib/grades"
 
 /**
@@ -45,6 +48,7 @@ type Subject = {
 export function SubjectsPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
+  const { setHeaderActions } = useHeaderActions()
   const [subjects, setSubjects] = useState<Subject[] | null>(null)
   const [departments, setDepartments] = useState<DeptLite[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -52,6 +56,8 @@ export function SubjectsPage() {
   const [newName, setNewName] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [renameTo, setRenameTo] = useState("")
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +75,64 @@ export function SubjectsPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  // The module's primary action belongs in the shell header, far right, beside
+  // every other module's (founder, 2026-09-13).
+  useEffect(() => {
+    if (!isAdmin) return
+    setHeaderActions(
+      <div className="flex items-center gap-2">
+        <BulkAddDialog onDone={load} />
+        <Popover open={adding} onOpenChange={setAdding}>
+          <PopoverTrigger asChild>
+            <Button size="lg">
+              <PlusIcon className="size-3.5" />
+              <span className="hidden sm:inline">New subject</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80">
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (newName.trim()) create()
+              }}
+            >
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="new-subject" className="text-xs">
+                  Subject name
+                </Label>
+                <Input
+                  id="new-subject"
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="e.g. Business Studies"
+                  className="h-9"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  It finds its own department — you can change that after.
+                </p>
+              </div>
+              <Button
+                type="submit"
+                disabled={!newName.trim() || busy === "new"}
+              >
+                {busy === "new" ? (
+                  <CircleNotchIcon className="size-4 animate-spin" />
+                ) : (
+                  <PlusIcon className="size-4" />
+                )}
+                Add subject
+              </Button>
+            </form>
+          </PopoverContent>
+        </Popover>
+      </div>
+    )
+    return () => setHeaderActions(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, adding, newName, busy, load, setHeaderActions])
 
   const selected = useMemo(
     () => subjects?.find((s) => s.id === selectedId) ?? null,
@@ -125,6 +189,14 @@ export function SubjectsPage() {
       },
       "Subject added"
     )
+
+  const rename = (s: Subject) => {
+    const name = renameTo.trim()
+    setRenaming(false)
+    if (!name || name === s.subject_name) return
+    patch(s.id, (x) => ({ ...x, subject_name: name }))
+    send(() => apiClient.patch(`/api/subjects/${s.id}`, { subject_name: name }))
+  }
 
   const remove = (s: Subject) =>
     structural(
@@ -195,58 +267,6 @@ export function SubjectsPage() {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background md:flex-row">
           {/* Level 3 — the list */}
           <aside className="flex shrink-0 flex-col border-b border-border md:w-60 md:border-r md:border-b-0">
-            {/* An action, not a search box: the field lives behind the button */}
-            <div className="shrink-0 border-b border-border p-2">
-              <Popover open={adding} onOpenChange={setAdding}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-start"
-                  >
-                    <PlusIcon className="size-4" />
-                    New subject
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-80">
-                  <form
-                    className="flex flex-col gap-3"
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      if (newName.trim()) create()
-                    }}
-                  >
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="new-subject" className="text-xs">
-                        Subject name
-                      </Label>
-                      <Input
-                        id="new-subject"
-                        autoFocus
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        placeholder="e.g. Business Studies"
-                        className="h-9"
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        It finds its own department — you can change that after.
-                      </p>
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={!newName.trim() || busy === "new"}
-                    >
-                      {busy === "new" ? (
-                        <CircleNotchIcon className="size-4 animate-spin" />
-                      ) : (
-                        <PlusIcon className="size-4" />
-                      )}
-                      Add subject
-                    </Button>
-                  </form>
-                </PopoverContent>
-              </Popover>
-            </div>
             <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
               {subjects.map((s) => (
                 <button
@@ -277,9 +297,44 @@ export function SubjectsPage() {
             <div className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-4">
               <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-4">
                 <div>
-                  <h3 className="text-base font-medium text-foreground">
-                    {selected.subject_name}
-                  </h3>
+                  {renaming ? (
+                    <form
+                      className="flex items-center gap-2"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        rename(selected)
+                      }}
+                    >
+                      <Input
+                        autoFocus
+                        value={renameTo}
+                        onChange={(e) => setRenameTo(e.target.value)}
+                        onBlur={() => rename(selected)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") setRenaming(false)
+                        }}
+                        className="h-8 w-56 text-base font-medium"
+                      />
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isAdmin) return
+                        setRenameTo(selected.subject_name)
+                        setRenaming(true)
+                      }}
+                      className="group/name -mx-1 flex items-center gap-1.5 rounded px-1 text-left text-base font-medium text-foreground"
+                    >
+                      {selected.subject_name}
+                      {isAdmin && (
+                        <PencilSimpleIcon
+                          aria-hidden
+                          className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/name:opacity-100"
+                        />
+                      )}
+                    </button>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {selected.section_count === 0
                       ? "No section teaches it yet"

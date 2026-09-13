@@ -9,6 +9,7 @@ import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
+import { useHeaderActions } from "@/components/layout/header-actions-context"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
@@ -37,6 +38,7 @@ import type { Department } from "@/modules/departments/lib/types"
 export function DepartmentsPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
+  const { setHeaderActions } = useHeaderActions()
   const navigate = useNavigate()
   const [departments, setDepartments] = useState<Department[] | null>(null)
   const [error, setError] = useState("")
@@ -92,6 +94,81 @@ export function DepartmentsPage() {
     }
   }
 
+  // Module CTAs live in the shell header, far right (founder, 2026-09-13) —
+  // the same slot Teachers and Students already use, so every module's primary
+  // action sits in one place and looks the same.
+  useEffect(() => {
+    if (!isAdmin || departments === null) return
+    setHeaderActions(
+      <Popover open={adding} onOpenChange={setAdding}>
+        <PopoverTrigger asChild>
+          <Button size="lg">
+            <PlusIcon className="size-3.5" />
+            <span className="hidden sm:inline">New department</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-80">
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (newName.trim()) create()
+            }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="new-department" className="text-xs">
+                Department name
+              </Label>
+              <Input
+                id="new-department"
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g. Commerce"
+                className="h-9"
+              />
+            </div>
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
+              <Checkbox
+                className="mt-0.5"
+                checked={suggestSubject}
+                onCheckedChange={(v) => setWithSubject(v === true)}
+              />
+              <span>
+                Also create a subject called{" "}
+                <span className="text-foreground">
+                  {newName.trim() || "the same name"}
+                </span>
+                <span className="block text-[11px]">
+                  A department that teaches several subjects, or none, leaves
+                  this off.
+                </span>
+              </span>
+            </label>
+            <Button type="submit" disabled={!newName.trim() || busy}>
+              {busy ? (
+                <CircleNotchIcon className="size-4 animate-spin" />
+              ) : (
+                <PlusIcon className="size-4" />
+              )}
+              Add department
+            </Button>
+          </form>
+        </PopoverContent>
+      </Popover>
+    )
+    return () => setHeaderActions(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isAdmin,
+    departments,
+    adding,
+    newName,
+    suggestSubject,
+    busy,
+    setHeaderActions,
+  ])
+
   return (
     <div
       className={cn(
@@ -104,68 +181,7 @@ export function DepartmentsPage() {
         icon={UsersThreeIcon}
         title="Departments"
         description="How the school groups its teachers, and which subjects each group owns."
-      >
-        {isAdmin && departments !== null && (
-          /* A bare input under the page title reads as a search box. This is an
-             action, so it looks like one and asks for the name once opened. */
-          <Popover open={adding} onOpenChange={setAdding}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-fit">
-                <PlusIcon className="size-4" />
-                New department
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-80">
-              <form
-                className="flex flex-col gap-3"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  if (newName.trim()) create()
-                }}
-              >
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="new-department" className="text-xs">
-                    Department name
-                  </Label>
-                  <Input
-                    id="new-department"
-                    autoFocus
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="e.g. Commerce"
-                    className="h-9"
-                  />
-                </div>
-                <label className="flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
-                  <Checkbox
-                    className="mt-0.5"
-                    checked={suggestSubject}
-                    onCheckedChange={(v) => setWithSubject(v === true)}
-                  />
-                  <span>
-                    Also create a subject called{" "}
-                    <span className="text-foreground">
-                      {newName.trim() || "the same name"}
-                    </span>
-                    <span className="block text-[11px]">
-                      A department that teaches several subjects, or none,
-                      leaves this off.
-                    </span>
-                  </span>
-                </label>
-                <Button type="submit" disabled={!newName.trim() || busy}>
-                  {busy ? (
-                    <CircleNotchIcon className="size-4 animate-spin" />
-                  ) : (
-                    <PlusIcon className="size-4" />
-                  )}
-                  Add department
-                </Button>
-              </form>
-            </PopoverContent>
-          </Popover>
-        )}
-      </PageHeader>
+      />
 
       {error ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
