@@ -626,11 +626,6 @@ export function GradeOverviewPage() {
                           </button>
                         )
                       })}
-                      {section && tab !== "subjects" && (
-                        <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">
-                          Section {section.section}
-                        </span>
-                      )}
                     </div>
 
                     <AnimatePresence mode="wait" initial={false}>
