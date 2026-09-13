@@ -46,7 +46,6 @@ export function DepartmentDetailPage() {
   const [subjects, setSubjects] = useState<SubjectLite[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [error, setError] = useState("")
-  const [narrowing, setNarrowing] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -99,7 +98,6 @@ export function DepartmentDetailPage() {
 
   const setGrades = (grades: number[]) => {
     patch((x) => ({ ...x, grades }))
-    setNarrowing(false)
     send(() => apiClient.put(`/api/departments/${id}/grades`, { grades }))
   }
   const toggleGrade = (g: number) => {
@@ -270,11 +268,18 @@ export function DepartmentDetailPage() {
         )}
       </div>
 
-      <div className="grid gap-4 @3xl:grid-cols-2">
+      <div className="grid content-start gap-4 @3xl:grid-cols-2">
         {/* Teachers */}
         <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-foreground">Teachers</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              Teachers
+              {members.length > 0 && (
+                <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">
+                  {members.length}
+                </span>
+              )}
+            </h2>
             <Link
               to="/teachers"
               className="text-xs text-muted-foreground hover:text-foreground"
@@ -287,7 +292,7 @@ export function DepartmentDetailPage() {
               Nobody yet. A teacher joins a department from their own profile.
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-border">
+            <ul className="-mr-2 flex max-h-72 flex-col divide-y divide-border overflow-y-auto pr-2">
               {members.map((t) => {
                 const isHead = dept.heads.some((h) => h.id === t.id)
                 return (
@@ -322,7 +327,7 @@ export function DepartmentDetailPage() {
           <h2 className="text-sm font-semibold text-foreground">
             Heads of department
           </h2>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="-mr-2 flex max-h-40 flex-wrap items-start gap-1.5 overflow-y-auto pr-2">
             {dept.heads.map((h) => (
               <span
                 key={h.id}
@@ -394,7 +399,7 @@ export function DepartmentDetailPage() {
               None. Fine for a Library or Physical Education department.
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-border">
+            <ul className="-mr-2 flex max-h-72 flex-col divide-y divide-border overflow-y-auto pr-2">
               {dept.subjects.map((s) => (
                 <li
                   key={s.id}
@@ -452,22 +457,11 @@ export function DepartmentDetailPage() {
           <p className="text-sm text-foreground">
             {describeGrades(dept.grades)}
           </p>
-          {isAdmin && dept.grades.length === 0 && !narrowing && (
-            <div className="flex">
-              <button
-                type="button"
-                onClick={() => setNarrowing(true)}
-                className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                Narrow to specific grades
-              </button>
-            </div>
-          )}
-          {isAdmin && (dept.grades.length > 0 || narrowing) && (
+          {isAdmin && (
             <>
               <Label className="text-xs text-muted-foreground">
-                Ticking 1 to 5 already says primary — the band is read back,
-                never typed.
+                Nothing ticked means every grade. Ticking 1 to 5 already says
+                primary — the band is read back, never typed.
               </Label>
               <div className="flex flex-wrap gap-1">
                 {GRADES.map((g) => {
