@@ -245,3 +245,13 @@ teachers, students — offer two ways in besides typing:
 
 Either way: preview before write, every row accounted for, same shape as the
 subjects paste-list flow. One shared import component, not one per module.
+
+## Year rollover is a wizard (2026-09-13, founder)
+
+- Opening the next year is the easy part. The work is the **configuration
+  between**: per class promote / graduate / hold; per student detain, move
+  section, withdraw, add a transfer-in; reshuffle sections from a list. All of it
+  must be possible inside the flow — no dead end that sends the admin elsewhere.
+- **Every step is a tool.** The founder will put an AI on this. So the plan is a
+  server-side record that a person and an assistant edit through the same
+  endpoints, each with preview before apply, and execution is one atomic call.

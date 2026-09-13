@@ -49,3 +49,26 @@ Report card generation itself (A13); allotment re-staffing UI (03 does it agains
   hold back, remove, add transfer-in. The copilot proposes hold-backs from results.
 - **Reshuffle** step: section → student remapping by uploading a list or typing names,
   reviewed, then applied. Optional; off by default.
+
+## The wizard (founder, 2026-09-13)
+
+Five steps, each a screen and each a tool. The plan lives on the server
+(`rollover_plans`, one draft per school per target year) so it survives
+navigation and so an assistant can edit the same plan through the same calls.
+
+| Step | Screen | Tool |
+|---|---|---|
+| 1 Open the year | The dialog: the one next year, closing is final | `POST /academic-years` (exists) |
+| 2 Class plan | Every current class → promote to grade+1 / graduate / hold; target section defaults to the same letter | `PUT /rollover/plan/classes` |
+| 3 Students | Per student: detain (stays in old grade, pick section), move section, withdraw, add transfer-in; bulk by paste or upload; search within a class | `PUT /rollover/plan/students`, `POST /students/:id/transfer` (exists), `POST /students/:id/withdraw` (exists), `PATCH /annual-result` (exists) |
+| 4 Review | Counts (moved, detained, graduated, withdrawn, classes created), warnings (a target section with no teacher, a class over strength), every exception listed | `POST /rollover/preview` (exists; reads the saved plan) |
+| 5 Execute | One atomic call; result summary; closed year read-only | `POST /rollover/execute` → `rollover_batch()` (exists) |
+
+Tool design rules: every write has a `preview: true` twin; the plan is idempotent
+(PUT the whole set); every response says what changed and why; nothing in the
+wizard needs a page outside it. `switch-year` is retired — it moved the school's
+active year without the years table and allowed going backwards.
+
+Schema (additive): `rollover_plans (id, school_id, from_year_id, to_year_id, status
+draft|executed, plan jsonb, created_by, updated_at)`. The jsonb is the class plan
+plus per-student exceptions; the preview and execute read it, never the client.
