@@ -36,3 +36,14 @@ Never a fourth. Anything deeper opens as a drawer or dialog over the content.
 sections swaps levels 2 and 3: the sections become a side panel (level 2) and the
 tabs move inside it (level 3). Below seven, a section list is never a vertical rail. Pickers show what is selected and offer an Add button with search — never
 every candidate as a chip.
+
+**Cards are pages, not panels.** A collection rendered as cards — classrooms, class
+subjects, templates, anything a person thinks of as a *thing they open* — and which
+carries create actions of its own, is always a **page with a breadcrumb trail**, never
+a drawer or a fourth panel. Clicking a card navigates (its own URL); the breadcrumb in
+the header is the way back. This is what keeps the depth rule honest: going deeper
+changes the page instead of stacking another rail over the last one.
+
+Corollary: a drawer is for *editing one record in place* (a form over the list you came
+from). A page is for *a thing with its own contents and actions*. If you find yourself
+putting a create button inside a drawer, it should have been a page.

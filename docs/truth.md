@@ -216,3 +216,8 @@ changes. Dated. "Unknown until pilot" is a valid answer and is recorded as such.
   Tabs hold up to seven sections; past seven, levels 2 and 3 swap (side panel of
   sections, tabs inside). Recorded in `docs/modules/00-principles.md`. Trigger: the Setup page stacked three
   vertical rails and the content had half the width left.
+
+- **Cards are pages** (2026-09-13): any card-shaped collection that carries create
+  actions inside it is a page with a breadcrumb trail, not a drawer or panel. Clicking
+  a card navigates; the breadcrumb is the way back. Drawers are only for editing a
+  single record in place.
