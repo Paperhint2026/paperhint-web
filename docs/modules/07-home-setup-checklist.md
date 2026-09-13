@@ -43,3 +43,11 @@ Teacher home changes; Ask Hint panel changes.
 - Post-setup Home leads with today's gaps: unfilled periods and registers not taken.
 - Setup checklist gains **Import**: from a table (CSV/XLSX) for students and teachers;
   Google Workspace calendar sync as an option on the Calendar step.
+
+## Import, generalised (truth.md, 2026-09-13)
+
+The Import step is one component used by every list module: download our template
+(prefilled where possible) or upload theirs with column mapping; a preview table of
+every row and what will happen to it; then apply. Subjects' paste-a-list is the first
+instance and the shape to copy. Order: Students and Teachers (the big lists an office
+already has in Excel), then Classes, Departments, Subjects.

@@ -231,3 +231,17 @@ changes. Dated. "Unknown until pilot" is a valid answer and is recorded as such.
   grade selection says.
 - Department grades default to **all grades**: a school with no bands never
   touches them.
+
+## Importing lists (2026-09-13, founder)
+
+Wherever the app holds a quantifiable list — departments, classes, subjects,
+teachers, students — offer two ways in besides typing:
+
+1. **Our template.** Download a CSV/XLSX shaped for our table, prefilled where we
+   already know rows (the subjects a department implies, the grades a school runs),
+   fill it in, upload it back.
+2. **Their list.** Upload whatever sheet the school already has; we read its columns,
+   map them onto ours (confirmed, never guessed silently), and update.
+
+Either way: preview before write, every row accounted for, same shape as the
+subjects paste-list flow. One shared import component, not one per module.
