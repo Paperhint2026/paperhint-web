@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   BookmarkSimpleIcon,
+  GraduationCapIcon,
   CaretRightIcon,
   PlusIcon,
   StackIcon,
@@ -14,13 +15,12 @@ import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
-import { describeGrades, GRADES, gradeLabel } from "@/lib/grades"
+import { describeGrades, gradeLabel } from "@/lib/grades"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Popover,
   PopoverContent,
@@ -100,19 +100,6 @@ export function DepartmentDetailPage() {
       (prev) => prev?.map((d) => (d.id === id ? fn(d) : d)) ?? prev
     )
 
-  const setGrades = (grades: number[]) => {
-    patch((x) => ({ ...x, grades }))
-    send(() => apiClient.put(`/api/departments/${id}/grades`, { grades }))
-  }
-  const toggleGrade = (g: number) => {
-    if (!dept) return
-    setGrades(
-      (dept.grades.includes(g)
-        ? dept.grades.filter((x) => x !== g)
-        : [...dept.grades, g]
-      ).sort((a, b) => a - b)
-    )
-  }
   const toggleHead = (t: Teacher) => {
     if (!dept) return
     const heads = dept.heads.some((h) => h.id === t.id)
@@ -458,52 +445,44 @@ export function DepartmentDetailPage() {
           )}
         </section>
 
-        {/* Grades */}
+        {/* Grades — read back from the subjects it owns, never set here */}
         <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-foreground">
-              Grades it serves
-            </h2>
-            {isAdmin && dept.grades.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setGrades([])}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Serve all grades
-              </button>
-            )}
-          </div>
-          <p className="text-sm text-foreground">
-            {describeGrades(dept.grades)}
-          </p>
-          {isAdmin && (
+          <h2 className="text-sm font-semibold text-foreground">
+            Grades it serves
+          </h2>
+          {dept.subjects.length === 0 ? (
+            <EmptyNote
+              icon={GraduationCapIcon}
+              title="No grades yet"
+              hint="Grades follow the subjects a department owns. Add a subject and the grades it runs in."
+            />
+          ) : (
             <>
-              <Label className="text-xs text-muted-foreground">
-                Nothing ticked means every grade. Ticking 1 to 5 already says
-                primary — the band is read back, never typed.
-              </Label>
+              <p className="text-sm text-foreground">
+                {dept.grades.length === 0
+                  ? "Its subjects are not placed in any grade yet"
+                  : describeGrades(dept.grades, "")}
+              </p>
               <div className="flex flex-wrap gap-1">
-                {GRADES.map((g) => {
-                  const on = dept.grades.includes(g)
-                  return (
-                    <button
-                      key={g}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => toggleGrade(g)}
-                      className={cn(
-                        "min-w-8 rounded-md border px-2 py-1 text-xs tabular-nums transition-colors",
-                        on
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {gradeLabel(g)}
-                    </button>
-                  )
-                })}
+                {dept.grades.map((g) => (
+                  <span
+                    key={g}
+                    className="min-w-8 rounded-md border border-border bg-muted/50 px-2 py-1 text-center text-xs text-foreground tabular-nums"
+                  >
+                    {gradeLabel(g)}
+                  </span>
+                ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Read from the subjects it owns.{" "}
+                <Link
+                  to="/subjects"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Change a subject&apos;s grades
+                </Link>
+                .
+              </p>
             </>
           )}
         </section>
