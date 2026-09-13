@@ -65,3 +65,9 @@ to the new teacher, pending exchanges invalidated).
   (student_id, name, relation, phone, email, is_primary, position 1..3)`.
 - Roles as a set: `user_roles (user_id, role)` with `admin | teacher | staff`; the
   principal holds admin + teacher. `users.role` kept as the primary for compatibility.
+
+## Bands belong here (truth.md, 2026-09-13)
+
+A school defines its bands at grade / class creation — which grades are primary,
+middle, secondary, higher secondary. Everywhere else a band is read back from a
+grade selection, never entered. The department page already does this.

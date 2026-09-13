@@ -221,3 +221,13 @@ changes. Dated. "Unknown until pilot" is a valid answer and is recorded as such.
   actions inside it is a page with a breadcrumb trail, not a drawer or panel. Clicking
   a card navigates; the breadcrumb is the way back. Drawers are only for editing a
   single record in place.
+
+## Bands (2026-09-13, founder)
+
+- A **band is a tag, never a field.** Nobody fills in "primary" on a department.
+  Ticking grades 1–4 already says primary; the app reads that back.
+- Where a school actually **defines** its bands is **grade / class creation**
+  (module 03), not the department page. The department page only names what the
+  grade selection says.
+- Department grades default to **all grades**: a school with no bands never
+  touches them.
