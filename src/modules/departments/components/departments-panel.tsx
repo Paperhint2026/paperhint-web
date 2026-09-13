@@ -285,7 +285,7 @@ export function DepartmentsPanel() {
 
           {/* Detail */}
           {selected ? (
-            <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+            <div className="flex min-w-0 flex-1 flex-col overflow-y-auto pb-4">
               <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-4">
                 <div>
                   <h3 className="text-base font-medium text-foreground">
@@ -399,7 +399,7 @@ export function DepartmentsPanel() {
               </div>
 
               {/* Subjects owned, with the grades each runs in */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 border-t border-dashed border-border px-5 py-4">
                 <Label className="text-xs">Subjects this department owns</Label>
                 <ul className="divide-y divide-border rounded-lg border border-border">
                   {selected.subjects.length === 0 && (
@@ -449,21 +449,23 @@ export function DepartmentsPanel() {
                     </li>
                   ))}
                 </ul>
-                <AddPicker
-                  label="Add subject"
-                  empty="Every subject is already here. Type a name to create one."
-                  options={subjects
-                    .filter(
-                      (x) => !selected.subjects.some((y) => y.id === x.id)
-                    )
-                    .map((x) => ({ id: x.id, label: x.subject_name }))}
-                  onPick={(id) => {
-                    const sub = subjects.find((x) => x.id === id)
-                    if (sub) toggleSubject(selected, sub)
-                  }}
-                  onCreate={(name) => createSubject(selected, name)}
-                  createLabel="Create subject"
-                />
+                <div className="flex">
+                  <AddPicker
+                    label="Add subject"
+                    empty="Every subject is already here. Type a name to create one."
+                    options={subjects
+                      .filter(
+                        (x) => !selected.subjects.some((y) => y.id === x.id)
+                      )
+                      .map((x) => ({ id: x.id, label: x.subject_name }))}
+                    onPick={(id) => {
+                      const sub = subjects.find((x) => x.id === id)
+                      if (sub) toggleSubject(selected, sub)
+                    }}
+                    onCreate={(name) => createSubject(selected, name)}
+                    createLabel="Create subject"
+                  />
+                </div>
               </div>
             </div>
           ) : (
