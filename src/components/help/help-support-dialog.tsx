@@ -16,6 +16,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
@@ -261,9 +263,7 @@ function ContactTab({ onSent }: { onSent: () => void }) {
       setMessage("")
       onSent()
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Couldn't send. Please try again."
-      )
+      showError(err, "Couldn't send. Please try again.")
     } finally {
       setIsSending(false)
     }

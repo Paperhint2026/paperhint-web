@@ -13,7 +13,7 @@ export type { User }
 export function useAuth() {
   const dispatch = useAppDispatch()
   const { user, token, isLoading, error } = useAppSelector(
-    (state) => state.auth,
+    (state) => state.auth
   )
 
   const login = useCallback(
@@ -24,7 +24,7 @@ export function useAuth() {
       }
       dispatch(fetchSchool())
     },
-    [dispatch],
+    [dispatch]
   )
 
   const logout = useCallback(() => {

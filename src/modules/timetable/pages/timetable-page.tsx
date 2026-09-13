@@ -22,6 +22,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -139,7 +141,15 @@ interface TimetableResponse {
   grade_teacher_ids: string[]
 }
 
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+const DAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+]
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 const cellKey = (day: number, periodId: string) => `${day}|${periodId}`
@@ -200,9 +210,10 @@ export function TimetablePage() {
     try {
       const [p, r, cal] = await Promise.all([
         apiClient.get<{ periods: Period[] }>("/api/timetable/periods"),
-        apiClient.get<{ bell_schedule_ready: boolean; sections: ReadinessSection[] }>(
-          "/api/timetable/readiness"
-        ),
+        apiClient.get<{
+          bell_schedule_ready: boolean
+          sections: ReadinessSection[]
+        }>("/api/timetable/readiness"),
         apiClient.get<{ week_settings?: WeekSettings }>("/api/calendar"),
       ])
       setPeriods(p.periods ?? [])
@@ -282,7 +293,11 @@ export function TimetablePage() {
         description="The bell schedule and each section's weekly periods."
       />
 
-      <LoadingSwap loading={isLoading} skeleton={<PageSkeleton />} className="flex-1">
+      <LoadingSwap
+        loading={isLoading}
+        skeleton={<PageSkeleton />}
+        className="flex-1"
+      >
         {error ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-5">
             <Sticker name="worried" size={88} />
@@ -339,8 +354,8 @@ export function TimetablePage() {
             <DialogHeader>
               <DialogTitle>Bell schedule</DialogTitle>
               <DialogDescription>
-                Changing period times updates every timetable. Removing a
-                period is blocked while any timetable still uses it.
+                Changing period times updates every timetable. Removing a period
+                is blocked while any timetable still uses it.
               </DialogDescription>
             </DialogHeader>
             <div className="overflow-y-auto px-6 py-4">
@@ -396,7 +411,9 @@ export function BellScheduleSetup({
     { name: "Lunch", after_period: 5, minutes: 40 },
   ])
 
-  const [rows, setRows] = useState<(Omit<Period, "id" | "period_number"> & { id?: string })[]>(
+  const [rows, setRows] = useState<
+    (Omit<Period, "id" | "period_number"> & { id?: string })[]
+  >(
     initial.map(({ id, name, start_time, end_time, is_break }) => ({
       id,
       name,
@@ -410,43 +427,62 @@ export function BellScheduleSetup({
   const generate = () => {
     const mins = Number(periodMinutes)
     if (!startTime || !endTime || !mins || endTime <= startTime) {
-      toast.error("Check the school start/end times and period length")
+      showError(new Error("Check the school start/end times and period length"))
       return
     }
     const out: typeof rows = []
     let cursor = startTime
     let periodNo = 0
-    const sortedBreaks = [...breaks].sort((a, b) => a.after_period - b.after_period)
+    const sortedBreaks = [...breaks].sort(
+      (a, b) => a.after_period - b.after_period
+    )
     while (addMinutes(cursor, mins) <= endTime && out.length < 20) {
       periodNo += 1
       const pEnd = addMinutes(cursor, mins)
-      out.push({ name: `Period ${periodNo}`, start_time: cursor, end_time: pEnd, is_break: false })
+      out.push({
+        name: `Period ${periodNo}`,
+        start_time: cursor,
+        end_time: pEnd,
+        is_break: false,
+      })
       cursor = pEnd
       const brk = sortedBreaks.find((b) => b.after_period === periodNo)
       if (brk && brk.minutes > 0) {
         const bEnd = addMinutes(cursor, brk.minutes)
         if (bEnd > endTime) break
-        out.push({ name: brk.name || "Break", start_time: cursor, end_time: bEnd, is_break: true })
+        out.push({
+          name: brk.name || "Break",
+          start_time: cursor,
+          end_time: bEnd,
+          is_break: true,
+        })
         cursor = bEnd
       }
     }
     if (out.length === 0) {
-      toast.error("That day shape produces no periods")
+      showError(new Error("That day shape produces no periods"))
       return
     }
     setRows(out)
   }
 
   const updateRow = (i: number, patch: Partial<(typeof rows)[number]>) =>
-    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+    setRows((prev) =>
+      prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r))
+    )
 
   const saveBell = async () => {
     if (rows.length === 0) {
-      toast.error("Generate or add the day's periods first")
+      showError(new Error("Generate or add the day's periods first"))
       return
     }
     for (const r of rows) {
-      if (!r.name.trim() || !r.start_time || !r.end_time || r.end_time <= r.start_time) {
+      if (
+        !r.name.trim() ||
+        !r.start_time ||
+        !r.end_time ||
+        r.end_time <= r.start_time
+      ) {
         toast.error(`Check the row "${r.name || "?"}" — times must be valid`)
         return
       }
@@ -457,7 +493,7 @@ export function BellScheduleSetup({
       toast.success("Bell schedule saved")
       onSaved()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
@@ -469,11 +505,14 @@ export function BellScheduleSetup({
     <div className={cn("flex flex-col gap-5", !embedded && "max-w-3xl")}>
       {!embedded && (
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-semibold text-foreground">Set up the school day</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Set up the school day
+          </h3>
           <p className="text-xs text-muted-foreground">
             Describe the day's shape and the periods are drawn for you — then
-            tweak any row. The week runs {days.map((d) => DAY_SHORT[d]).join(", ")}{" "}
-            (change in Calendar → Week settings).
+            tweak any row. The week runs{" "}
+            {days.map((d) => DAY_SHORT[d]).join(", ")} (change in Calendar →
+            Week settings).
           </p>
         </div>
       )}
@@ -522,12 +561,18 @@ export function BellScheduleSetup({
               <Input
                 value={b.name}
                 onChange={(e) =>
-                  setBreaks((prev) => prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                  setBreaks((prev) =>
+                    prev.map((x, j) =>
+                      j === i ? { ...x, name: e.target.value } : x
+                    )
+                  )
                 }
                 placeholder="Name"
                 className="h-8 w-32 text-xs"
               />
-              <span className="text-xs text-muted-foreground">after period</span>
+              <span className="text-xs text-muted-foreground">
+                after period
+              </span>
               <Input
                 type="number"
                 min={1}
@@ -535,7 +580,11 @@ export function BellScheduleSetup({
                 value={b.after_period}
                 onChange={(e) =>
                   setBreaks((prev) =>
-                    prev.map((x, j) => (j === i ? { ...x, after_period: Number(e.target.value) } : x))
+                    prev.map((x, j) =>
+                      j === i
+                        ? { ...x, after_period: Number(e.target.value) }
+                        : x
+                    )
                   )
                 }
                 className="h-8 w-16 text-xs"
@@ -549,7 +598,9 @@ export function BellScheduleSetup({
                 value={b.minutes}
                 onChange={(e) =>
                   setBreaks((prev) =>
-                    prev.map((x, j) => (j === i ? { ...x, minutes: Number(e.target.value) } : x))
+                    prev.map((x, j) =>
+                      j === i ? { ...x, minutes: Number(e.target.value) } : x
+                    )
                   )
                 }
                 className="h-8 w-16 text-xs"
@@ -559,7 +610,9 @@ export function BellScheduleSetup({
                 variant="ghost"
                 size="icon-sm"
                 className="text-muted-foreground hover:text-destructive"
-                onClick={() => setBreaks((prev) => prev.filter((_, j) => j !== i))}
+                onClick={() =>
+                  setBreaks((prev) => prev.filter((_, j) => j !== i))
+                }
                 aria-label="Remove break"
               >
                 <XIcon className="size-3.5" />
@@ -571,7 +624,10 @@ export function BellScheduleSetup({
             size="sm"
             className="h-7 w-fit text-xs"
             onClick={() =>
-              setBreaks((prev) => [...prev, { name: "Break", after_period: prev.length + 2, minutes: 15 }])
+              setBreaks((prev) => [
+                ...prev,
+                { name: "Break", after_period: prev.length + 2, minutes: 15 },
+              ])
             }
           >
             <PlusIcon className="size-3" />
@@ -588,13 +644,17 @@ export function BellScheduleSetup({
       {rows.length > 0 && (
         <div className="flex flex-col gap-2">
           <Label className="text-xs">
-            The day ({rows.filter((r) => !r.is_break).length} periods) — edit any row before saving
+            The day ({rows.filter((r) => !r.is_break).length} periods) — edit
+            any row before saving
           </Label>
           <div className="flex flex-col divide-y divide-border rounded-xl border border-border bg-background">
             {rows.map((r, i) => (
               <div
                 key={i}
-                className={cn("flex flex-wrap items-center gap-2 px-3 py-2", r.is_break && "bg-sidebar/60")}
+                className={cn(
+                  "flex flex-wrap items-center gap-2 px-3 py-2",
+                  r.is_break && "bg-sidebar/60"
+                )}
               >
                 <Input
                   value={r.name}
@@ -617,14 +677,19 @@ export function BellScheduleSetup({
                   className="h-8 w-32 text-xs"
                 />
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Checkbox checked={r.is_break} onCheckedChange={(v) => updateRow(i, { is_break: !!v })} />
+                  <Checkbox
+                    checked={r.is_break}
+                    onCheckedChange={(v) => updateRow(i, { is_break: !!v })}
+                  />
                   Break
                 </label>
                 <Button
                   variant="ghost"
                   size="icon-sm"
                   className="ml-auto text-muted-foreground hover:text-destructive"
-                  onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
+                  onClick={() =>
+                    setRows((prev) => prev.filter((_, j) => j !== i))
+                  }
                   aria-label="Remove row"
                 >
                   <TrashIcon className="size-3.5" />
@@ -694,7 +759,10 @@ function ReadinessStrip({
             >
               {s.ready ? (
                 s.slot_count > 0 ? (
-                  <CheckCircleIcon weight="fill" className="size-3.5 text-primary" />
+                  <CheckCircleIcon
+                    weight="fill"
+                    className="size-3.5 text-primary"
+                  />
                 ) : null
               ) : (
                 <WarningIcon className="size-3.5 text-amber-600" />
@@ -747,7 +815,10 @@ function SectionBuilder({
   const [warnings, setWarnings] = useState<
     { day_of_week: number; period_id: string; message: string }[]
   >([])
-  const [editorCell, setEditorCell] = useState<{ day: number; periodId: string } | null>(null)
+  const [editorCell, setEditorCell] = useState<{
+    day: number
+    periodId: string
+  } | null>(null)
   const [copyDayOpen, setCopyDayOpen] = useState(false)
   const [genOpen, setGenOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
@@ -768,7 +839,9 @@ function SectionBuilder({
     electiveQuotas: Record<string, number>
     customRows: { label: string; quota: number }[]
   } | null>(null)
-  const [orientation, setOrientation] = useState<"periods-rows" | "days-rows">("days-rows")
+  const [orientation, setOrientation] = useState<"periods-rows" | "days-rows">(
+    "days-rows"
+  )
 
   const days = workingDayNumbers(weekSettings)
   const teachable = useMemo(() => periods.filter((p) => !p.is_break), [periods])
@@ -799,7 +872,9 @@ function SectionBuilder({
       customRows: [...customs].map(([label, quota]) => ({ label, quota })),
     }
   }, [draft])
-  const effectiveSession = isDraftInProgress ? (draftSession ?? genSession) : genSession
+  const effectiveSession = isDraftInProgress
+    ? (draftSession ?? genSession)
+    : genSession
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -807,9 +882,12 @@ function SectionBuilder({
       const [res, draftRes] = await Promise.all([
         apiClient.get<TimetableResponse>(`/api/timetable/${classId}`),
         apiClient
-          .get<{ draft: { slots: ({ key: string } & SlotDraft)[]; quality: unknown } | null }>(
-            `/api/timetable/${classId}/draft`
-          )
+          .get<{
+            draft: {
+              slots: ({ key: string } & SlotDraft)[]
+              quality: unknown
+            } | null
+          }>(`/api/timetable/${classId}/draft`)
           .catch(() => ({ draft: null })),
       ])
       setData(res)
@@ -823,9 +901,7 @@ function SectionBuilder({
         for (const { key, ...slot } of draftSlots) map.set(key, slot)
         setDraft(map)
         setDirty(true)
-        setGenQuality(
-          (draftRes.draft?.quality as typeof genQuality) ?? null
-        )
+        setGenQuality((draftRes.draft?.quality as typeof genQuality) ?? null)
         toast.info("Restored your unsaved draft — save to publish, or discard")
       } else {
         const map = new Map<string, SlotDraft>()
@@ -835,7 +911,9 @@ function SectionBuilder({
             class_subject_id: s.class_subject_id ?? undefined,
             subject_name:
               s.kind === "subject"
-                ? res.subjects.find((x) => x.class_subject_id === s.class_subject_id)?.subject_name
+                ? res.subjects.find(
+                    (x) => x.class_subject_id === s.class_subject_id
+                  )?.subject_name
                 : undefined,
             custom_label: s.custom_label ?? undefined,
             elective_group_id: s.elective_group_id ?? undefined,
@@ -856,7 +934,7 @@ function SectionBuilder({
       setHistory([])
       setFuture([])
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsLoading(false)
     }
@@ -872,7 +950,10 @@ function SectionBuilder({
   useEffect(() => {
     if (!dirty || isLoading || isSaving) return
     const t = setTimeout(() => {
-      const slots = [...draft.entries()].map(([key, slot]) => ({ key, ...slot }))
+      const slots = [...draft.entries()].map(([key, slot]) => ({
+        key,
+        ...slot,
+      }))
       apiClient
         .put(`/api/timetable/${classId}/draft`, { slots, quality: genQuality })
         .catch(() => {}) // a failed autosave must never interrupt editing
@@ -967,11 +1048,17 @@ function SectionBuilder({
           map.set(cellKey(c.day_of_week, c.period_id), c.message)
         }
         setConflicts(map)
-        const shown = body.conflicts.slice(0, 3).map((c: { message: string }) => c.message)
+        const shown = body.conflicts
+          .slice(0, 3)
+          .map((c: { message: string }) => c.message)
         const more = body.conflicts.length - shown.length
         toast.error(
           `${body.conflicts.length} teacher clash${body.conflicts.length > 1 ? "es" : ""} — nothing was saved`,
-          { description: shown.join(" · ") + (more > 0 ? ` · +${more} more (see red cells)` : "") }
+          {
+            description:
+              shown.join(" · ") +
+              (more > 0 ? ` · +${more} more (see red cells)` : ""),
+          }
         )
         return
       }
@@ -984,7 +1071,7 @@ function SectionBuilder({
       toast.success("Timetable saved")
       onSaved()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
@@ -1049,7 +1136,11 @@ function SectionBuilder({
     const b = draft.get(toKey)
     if (!a && !b) return
     if (a?.block_id || b?.block_id) {
-      toast.error("Double periods can't be swapped by drag — edit the cell instead")
+      showError(
+        new Error(
+          "Double periods can't be swapped by drag — edit the cell instead"
+        )
+      )
       return
     }
     pushHistory()
@@ -1084,15 +1175,27 @@ function SectionBuilder({
 
   // Save a custom cell AND stamp its teacher onto every other cell with the
   // same label — one history entry, so a single undo reverts the lot.
-  const applyCustomAcrossLabel = (day: number, periodId: string, slot: SlotDraft) => {
+  const applyCustomAcrossLabel = (
+    day: number,
+    periodId: string,
+    slot: SlotDraft
+  ) => {
     pushHistory()
     setDraft((prev) => {
       const next = new Map(prev)
       next.set(cellKey(day, periodId), slot)
       for (const [key, s] of prev) {
         if (key === cellKey(day, periodId)) continue
-        if (s.kind === "custom" && s.custom_label === slot.custom_label && !s.block_id) {
-          next.set(key, { ...s, teacher_id: slot.teacher_id, teacher_name: slot.teacher_name })
+        if (
+          s.kind === "custom" &&
+          s.custom_label === slot.custom_label &&
+          !s.block_id
+        ) {
+          next.set(key, {
+            ...s,
+            teacher_id: slot.teacher_id,
+            teacher_name: slot.teacher_name,
+          })
         }
       }
       return next
@@ -1160,10 +1263,12 @@ function SectionBuilder({
       setWarnings(res.warnings ?? [])
       if (res.ok) {
         setConflicts(new Map())
-        if (!opts?.silent) toast.success("All good — no teacher clashes with any other section")
+        if (!opts?.silent)
+          toast.success("All good — no teacher clashes with any other section")
       } else {
         const map = new Map<string, string>()
-        for (const c of res.conflicts) map.set(cellKey(c.day_of_week, c.period_id), c.message)
+        for (const c of res.conflicts)
+          map.set(cellKey(c.day_of_week, c.period_id), c.message)
         setConflicts(map)
         if (opts?.silent) {
           // brief nudge only — the admin may be mid-swap; details are on the
@@ -1174,12 +1279,16 @@ function SectionBuilder({
           const more = res.conflicts.length - shown.length
           toast.error(
             `${res.conflicts.length} clash${res.conflicts.length > 1 ? "es" : ""} found`,
-            { description: shown.join(" · ") + (more > 0 ? ` · +${more} more (see red cells)` : "") }
+            {
+              description:
+                shown.join(" · ") +
+                (more > 0 ? ` · +${more} more (see red cells)` : ""),
+            }
           )
         }
       }
     } catch (err) {
-      if (!opts?.silent && err instanceof Error) toast.error(err.message)
+      if (!opts?.silent && err instanceof Error) showError(err)
     } finally {
       if (!opts?.silent) setIsChecking(false)
     }
@@ -1229,7 +1338,9 @@ function SectionBuilder({
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold text-foreground">
           Grade {cls?.grade} - {cls?.section}{" "}
-          <span className="font-normal text-muted-foreground">({cls?.academic_year})</span>
+          <span className="font-normal text-muted-foreground">
+            ({cls?.academic_year})
+          </span>
         </h3>
         {readinessRow && (
           <Badge variant="secondary" className="rounded-full text-[10px]">
@@ -1361,7 +1472,8 @@ function SectionBuilder({
                       const prevPeriod = teachable[idx - 1]
                       if (
                         prevPeriod &&
-                        draft.get(cellKey(d, prevPeriod.id))?.block_id === slot.block_id
+                        draft.get(cellKey(d, prevPeriod.id))?.block_id ===
+                          slot.block_id
                       ) {
                         return null // covered by the colSpan before it
                       }
@@ -1372,7 +1484,8 @@ function SectionBuilder({
                       const nextPeriod = teachable[idx + 1]
                       return (
                         !!nextPeriod &&
-                        draft.get(cellKey(d, nextPeriod.id))?.block_id === slot.block_id
+                        draft.get(cellKey(d, nextPeriod.id))?.block_id ===
+                          slot.block_id
                       )
                     })()
 
@@ -1380,13 +1493,17 @@ function SectionBuilder({
                       <td
                         key={key}
                         colSpan={isDoubleStart ? 2 : 1}
-                        onClick={() => setEditorCell({ day: d, periodId: p.id })}
+                        onClick={() =>
+                          setEditorCell({ day: d, periodId: p.id })
+                        }
                         {...dragProps(key, slot)}
                         className={cn(
                           "cursor-pointer border-b border-l border-border px-1.5 py-1.5 align-middle transition-colors hover:bg-primary/[0.04]",
-                          conflict && "bg-destructive/10 ring-1 ring-destructive/50 ring-inset",
+                          conflict &&
+                            "bg-destructive/10 ring-1 ring-destructive/50 ring-inset",
                           dragKey === key && "opacity-40",
-                          dropKey === key && "bg-primary/10 ring-1 ring-primary/50 ring-inset"
+                          dropKey === key &&
+                            "bg-primary/10 ring-1 ring-primary/50 ring-inset"
                         )}
                         title={conflict}
                       >
@@ -1409,11 +1526,15 @@ function SectionBuilder({
                               </span>
                             ) : null}
                             {isDoubleStart && (
-                              <span className="text-[9px] text-muted-foreground/60">double</span>
+                              <span className="text-[9px] text-muted-foreground/60">
+                                double
+                              </span>
                             )}
                           </div>
                         ) : (
-                          <span className="block text-center text-muted-foreground/30">+</span>
+                          <span className="block text-center text-muted-foreground/30">
+                            +
+                          </span>
                         )}
                       </td>
                     )
@@ -1423,119 +1544,132 @@ function SectionBuilder({
             </tbody>
           </table>
         ) : (
-        <table className="w-full border-collapse bg-background text-xs">
-          <thead>
-            <tr className="bg-sidebar">
-              <th className="w-32 border-b border-border px-2 py-2 text-left font-medium text-muted-foreground">
-                Period
-              </th>
-              {days.map((d) => (
-                <th
-                  key={d}
-                  className="min-w-28 border-b border-l border-border px-2 py-2 text-center font-medium text-muted-foreground"
-                >
-                  {DAY_NAMES[d]}
+          <table className="w-full border-collapse bg-background text-xs">
+            <thead>
+              <tr className="bg-sidebar">
+                <th className="w-32 border-b border-border px-2 py-2 text-left font-medium text-muted-foreground">
+                  Period
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {periods.map((p) => {
-              if (p.is_break) {
+                {days.map((d) => (
+                  <th
+                    key={d}
+                    className="min-w-28 border-b border-l border-border px-2 py-2 text-center font-medium text-muted-foreground"
+                  >
+                    {DAY_NAMES[d]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {periods.map((p) => {
+                if (p.is_break) {
+                  return (
+                    <tr key={p.id} className="bg-sidebar/60">
+                      <td className="border-b border-border px-2 py-1 text-[10px] text-muted-foreground">
+                        {p.name} · {fmtTime(p.start_time.slice(0, 5))}
+                      </td>
+                      <td
+                        colSpan={days.length}
+                        className="border-b border-l border-border px-2 py-1 text-center text-[10px] tracking-wide text-muted-foreground/60 uppercase"
+                      >
+                        {p.name}
+                      </td>
+                    </tr>
+                  )
+                }
                 return (
-                  <tr key={p.id} className="bg-sidebar/60">
-                    <td className="border-b border-border px-2 py-1 text-[10px] text-muted-foreground">
-                      {p.name} · {fmtTime(p.start_time.slice(0, 5))}
+                  <tr key={p.id}>
+                    <td className="border-b border-border px-2 py-1.5 align-middle">
+                      <span className="font-medium text-secondary-foreground">
+                        {p.name}
+                      </span>
+                      <span className="block text-[10px] text-muted-foreground">
+                        {fmtTime(p.start_time.slice(0, 5))} –{" "}
+                        {fmtTime(p.end_time.slice(0, 5))}
+                      </span>
                     </td>
-                    <td
-                      colSpan={days.length}
-                      className="border-b border-l border-border px-2 py-1 text-center text-[10px] tracking-wide text-muted-foreground/60 uppercase"
-                    >
-                      {p.name}
-                    </td>
+                    {days.map((d) => {
+                      const key = cellKey(d, p.id)
+                      const slot = draft.get(key)
+                      const conflict = conflicts.get(key)
+
+                      if (slot?.block_id) {
+                        const idx = teachable.findIndex((x) => x.id === p.id)
+                        const prevPeriod = teachable[idx - 1]
+                        if (
+                          prevPeriod &&
+                          draft.get(cellKey(d, prevPeriod.id))?.block_id ===
+                            slot.block_id
+                        ) {
+                          return null // covered by the rowSpan above
+                        }
+                      }
+                      const isDoubleStart = (() => {
+                        if (!slot?.block_id) return false
+                        const idx = teachable.findIndex((x) => x.id === p.id)
+                        const nextPeriod = teachable[idx + 1]
+                        return (
+                          !!nextPeriod &&
+                          draft.get(cellKey(d, nextPeriod.id))?.block_id ===
+                            slot.block_id
+                        )
+                      })()
+
+                      return (
+                        <td
+                          key={key}
+                          rowSpan={isDoubleStart ? 2 : 1}
+                          onClick={() =>
+                            setEditorCell({ day: d, periodId: p.id })
+                          }
+                          {...dragProps(key, slot)}
+                          className={cn(
+                            "cursor-pointer border-b border-l border-border px-1.5 py-1 align-middle transition-colors hover:bg-primary/[0.04]",
+                            conflict &&
+                              "bg-destructive/10 ring-1 ring-destructive/50 ring-inset",
+                            dragKey === key && "opacity-40",
+                            dropKey === key &&
+                              "bg-primary/10 ring-1 ring-primary/50 ring-inset"
+                          )}
+                          title={conflict}
+                        >
+                          {slot ? (
+                            <div className="flex flex-col items-center gap-0.5 text-center">
+                              <span className="font-medium text-secondary-foreground">
+                                {slot.kind === "subject"
+                                  ? slot.subject_name
+                                  : slot.kind === "custom"
+                                    ? slot.custom_label
+                                    : slot.elective_label}
+                              </span>
+                              {slot.kind === "elective" ? (
+                                <span className="text-[10px] text-violet-600 dark:text-violet-400">
+                                  elective
+                                </span>
+                              ) : slot.teacher_name ? (
+                                <span className="truncate text-[10px] text-muted-foreground">
+                                  {slot.teacher_name}
+                                </span>
+                              ) : null}
+                              {isDoubleStart && (
+                                <span className="text-[9px] text-muted-foreground/60">
+                                  double
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="block text-center text-muted-foreground/30">
+                              +
+                            </span>
+                          )}
+                        </td>
+                      )
+                    })}
                   </tr>
                 )
-              }
-              return (
-                <tr key={p.id}>
-                  <td className="border-b border-border px-2 py-1.5 align-middle">
-                    <span className="font-medium text-secondary-foreground">{p.name}</span>
-                    <span className="block text-[10px] text-muted-foreground">
-                      {fmtTime(p.start_time.slice(0, 5))} – {fmtTime(p.end_time.slice(0, 5))}
-                    </span>
-                  </td>
-                  {days.map((d) => {
-                    const key = cellKey(d, p.id)
-                    const slot = draft.get(key)
-                    const conflict = conflicts.get(key)
-
-                    if (slot?.block_id) {
-                      const idx = teachable.findIndex((x) => x.id === p.id)
-                      const prevPeriod = teachable[idx - 1]
-                      if (
-                        prevPeriod &&
-                        draft.get(cellKey(d, prevPeriod.id))?.block_id === slot.block_id
-                      ) {
-                        return null // covered by the rowSpan above
-                      }
-                    }
-                    const isDoubleStart = (() => {
-                      if (!slot?.block_id) return false
-                      const idx = teachable.findIndex((x) => x.id === p.id)
-                      const nextPeriod = teachable[idx + 1]
-                      return (
-                        !!nextPeriod &&
-                        draft.get(cellKey(d, nextPeriod.id))?.block_id === slot.block_id
-                      )
-                    })()
-
-                    return (
-                      <td
-                        key={key}
-                        rowSpan={isDoubleStart ? 2 : 1}
-                        onClick={() => setEditorCell({ day: d, periodId: p.id })}
-                        {...dragProps(key, slot)}
-                        className={cn(
-                          "cursor-pointer border-b border-l border-border px-1.5 py-1 align-middle transition-colors hover:bg-primary/[0.04]",
-                          conflict && "bg-destructive/10 ring-1 ring-destructive/50 ring-inset",
-                          dragKey === key && "opacity-40",
-                          dropKey === key && "bg-primary/10 ring-1 ring-primary/50 ring-inset"
-                        )}
-                        title={conflict}
-                      >
-                        {slot ? (
-                          <div className="flex flex-col items-center gap-0.5 text-center">
-                            <span className="font-medium text-secondary-foreground">
-                              {slot.kind === "subject"
-                                ? slot.subject_name
-                                : slot.kind === "custom"
-                                  ? slot.custom_label
-                                  : slot.elective_label}
-                            </span>
-                            {slot.kind === "elective" ? (
-                              <span className="text-[10px] text-violet-600 dark:text-violet-400">
-                                elective
-                              </span>
-                            ) : slot.teacher_name ? (
-                              <span className="truncate text-[10px] text-muted-foreground">
-                                {slot.teacher_name}
-                              </span>
-                            ) : null}
-                            {isDoubleStart && (
-                              <span className="text-[9px] text-muted-foreground/60">double</span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="block text-center text-muted-foreground/30">+</span>
-                        )}
-                      </td>
-                    )
-                  })}
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -1545,7 +1679,10 @@ function SectionBuilder({
             AI generation didn't produce a timetable:
           </p>
           {genIssues.map((issue, i) => (
-            <p key={i} className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+            <p
+              key={i}
+              className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300"
+            >
               <WarningIcon className="mt-0.5 size-3 shrink-0" />
               {issue}
             </p>
@@ -1592,19 +1729,23 @@ function SectionBuilder({
               · similar day pairs: {genQuality.similarDays!.length}
             </span>
           )}
-          {genQuality.candidatesTried === 1 && genQuality.variationScore < 75 && (
-            <span className="text-muted-foreground">
-              · refine keeps your layout, so the score carries over — Discard and AI
-              fill fresh for more variety
-            </span>
-          )}
+          {genQuality.candidatesTried === 1 &&
+            genQuality.variationScore < 75 && (
+              <span className="text-muted-foreground">
+                · refine keeps your layout, so the score carries over — Discard
+                and AI fill fresh for more variety
+              </span>
+            )}
         </div>
       )}
 
       {warnings.length > 0 && (
         <div className="flex flex-col gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/40">
           {warnings.map((w, i) => (
-            <p key={i} className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+            <p
+              key={i}
+              className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300"
+            >
               <WarningIcon className="mt-0.5 size-3 shrink-0" />
               {w.message}
             </p>
@@ -1615,11 +1756,16 @@ function SectionBuilder({
       {dirty && (
         <div className="sticky bottom-4 z-10 flex items-center justify-between gap-3 rounded-xl border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
           <p className="text-xs text-muted-foreground">
-            Unsaved changes — drag a class onto another cell to swap; clashes are
-            checked on save.
+            Unsaved changes — drag a class onto another cell to swap; clashes
+            are checked on save.
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={discardDraft} disabled={isSaving}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={discardDraft}
+              disabled={isSaving}
+            >
               Discard
             </Button>
             <Button
@@ -1661,7 +1807,9 @@ function SectionBuilder({
             const next = teachable[idx + 1]
             return !!next && !draft.get(cellKey(editorCell.day, next.id))
           })()}
-          current={draft.get(cellKey(editorCell.day, editorCell.periodId)) ?? null}
+          current={
+            draft.get(cellKey(editorCell.day, editorCell.periodId)) ?? null
+          }
           subjects={data.subjects}
           electiveGroups={data.elective_groups}
           teachers={data.teachers}
@@ -1675,7 +1823,11 @@ function SectionBuilder({
           existingCustomLabels={[...customLabelStats.keys()]}
           customLabelCount={(label) => customLabelStats.get(label) ?? 0}
           onSave={(slot, asDouble, applyToAllLabel) => {
-            if (applyToAllLabel && slot.kind === "custom" && slot.custom_label) {
+            if (
+              applyToAllLabel &&
+              slot.kind === "custom" &&
+              slot.custom_label
+            ) {
               applyCustomAcrossLabel(editorCell.day, editorCell.periodId, slot)
             } else if (asDouble) {
               setDouble(editorCell.day, editorCell.periodId, slot)
@@ -1688,7 +1840,11 @@ function SectionBuilder({
       )}
 
       {copyDayOpen && (
-        <CopyDayDialog days={days} onClose={() => setCopyDayOpen(false)} onCopy={copyDay} />
+        <CopyDayDialog
+          days={days}
+          onClose={() => setCopyDayOpen(false)}
+          onCopy={copyDay}
+        />
       )}
 
       {summaryOpen && (
@@ -1745,7 +1901,9 @@ function SectionBuilder({
             if (slots.length === 0 && issues.length > 0) {
               setGenIssues(issues)
               setGenOpen(false)
-              toast.error("Generation failed — see the notes below the grid")
+              showError(
+                new Error("Generation failed — see the notes below the grid")
+              )
               return
             }
             const map = new Map<string, SlotDraft>()
@@ -1755,14 +1913,17 @@ function SectionBuilder({
                 class_subject_id: sl.class_subject_id ?? undefined,
                 subject_name:
                   sl.kind === "subject"
-                    ? data.subjects.find((x) => x.class_subject_id === sl.class_subject_id)?.subject_name
+                    ? data.subjects.find(
+                        (x) => x.class_subject_id === sl.class_subject_id
+                      )?.subject_name
                     : undefined,
                 custom_label: sl.custom_label ?? undefined,
                 elective_group_id: sl.elective_group_id ?? undefined,
                 elective_label: sl.elective_label ?? undefined,
                 teacher_id: sl.teacher_id,
                 teacher_name: sl.teacher_id
-                  ? data.teachers.find((t) => t.id === sl.teacher_id)?.full_name ?? null
+                  ? (data.teachers.find((t) => t.id === sl.teacher_id)
+                      ?.full_name ?? null)
                   : null,
                 block_id: sl.block_id,
               })
@@ -1835,25 +1996,38 @@ function AIGenerateDialog({
     | null
   onClose: () => void
   onSession: (s: GenSession) => void
-  onGenerated: (slots: GeneratedSlot[], issues: string[], quality: unknown) => void
+  onGenerated: (
+    slots: GeneratedSlot[],
+    issues: string[],
+    quality: unknown
+  ) => void
 }) {
   const isRefine = !!session
   // even split as the starting point, leaving a little room
   const slotsPerEntity = Math.max(
     1,
-    Math.floor((capacity * 0.9) / Math.max(1, subjects.length + electiveGroups.length))
+    Math.floor(
+      (capacity * 0.9) / Math.max(1, subjects.length + electiveGroups.length)
+    )
   )
   const [quotas, setQuotas] = useState<Record<string, number>>(
     session?.quotas ??
-      Object.fromEntries(subjects.map((s) => [s.class_subject_id, slotsPerEntity]))
+      Object.fromEntries(
+        subjects.map((s) => [s.class_subject_id, slotsPerEntity])
+      )
   )
   const [electiveQuotas, setElectiveQuotas] = useState<Record<string, number>>(
     session?.electiveQuotas ??
-      Object.fromEntries(electiveGroups.map((g) => [g.elective_group_id, Math.min(slotsPerEntity, 6)]))
+      Object.fromEntries(
+        electiveGroups.map((g) => [
+          g.elective_group_id,
+          Math.min(slotsPerEntity, 6),
+        ])
+      )
   )
-  const [customRows, setCustomRows] = useState<{ label: string; quota: number }[]>(
-    session?.customRows ?? [{ label: "PT", quota: 2 }]
-  )
+  const [customRows, setCustomRows] = useState<
+    { label: string; quota: number }[]
+  >(session?.customRows ?? [{ label: "PT", quota: 2 }])
   const [requirements, setRequirements] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
 
@@ -1863,32 +2037,40 @@ function AIGenerateDialog({
     customRows.reduce((a, r) => a + (r.quota || 0), 0)
 
   const generate = async () => {
-    if (total === 0) return toast.error("Set at least one quota")
-    if (total > capacity) return toast.error(`Quotas total ${total} but the week has ${capacity} cells`)
+    if (total === 0) return showError(new Error("Set at least one quota"))
+    if (total > capacity)
+      return toast.error(
+        `Quotas total ${total} but the week has ${capacity} cells`
+      )
     setIsGenerating(true)
     try {
-      const res = await apiClient.post<{ slots: GeneratedSlot[]; issues: string[]; quality: unknown }>(
-        `/api/timetable/${classId}/generate`,
-        {
-          quotas: subjects.map((s) => ({
-            class_subject_id: s.class_subject_id,
-            periods_per_week: quotas[s.class_subject_id] || 0,
-          })),
-          elective_quotas: electiveGroups.map((g) => ({
-            elective_group_id: g.elective_group_id,
-            periods_per_week: electiveQuotas[g.elective_group_id] || 0,
-          })),
-          custom_quotas: customRows
-            .filter((r) => r.label.trim() && r.quota > 0)
-            .map((r) => ({ label: r.label.trim(), periods_per_week: r.quota })),
-          requirements,
-          current_slots: isRefine ? currentSlots : null,
-        }
-      )
+      const res = await apiClient.post<{
+        slots: GeneratedSlot[]
+        issues: string[]
+        quality: unknown
+      }>(`/api/timetable/${classId}/generate`, {
+        quotas: subjects.map((s) => ({
+          class_subject_id: s.class_subject_id,
+          periods_per_week: quotas[s.class_subject_id] || 0,
+        })),
+        elective_quotas: electiveGroups.map((g) => ({
+          elective_group_id: g.elective_group_id,
+          periods_per_week: electiveQuotas[g.elective_group_id] || 0,
+        })),
+        custom_quotas: customRows
+          .filter((r) => r.label.trim() && r.quota > 0)
+          .map((r) => ({ label: r.label.trim(), periods_per_week: r.quota })),
+        requirements,
+        current_slots: isRefine ? currentSlots : null,
+      })
       onSession({ quotas, electiveQuotas, customRows })
-      onGenerated(res.slots ?? [], res.issues ?? [], (res as { quality?: unknown }).quality as never)
+      onGenerated(
+        res.slots ?? [],
+        res.issues ?? [],
+        (res as { quality?: unknown }).quality as never
+      )
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsGenerating(false)
     }
@@ -1898,7 +2080,9 @@ function AIGenerateDialog({
     <Dialog open onOpenChange={(o) => !o && !isGenerating && onClose()}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isRefine ? "Refine with AI" : "Fill the grid with AI"}</DialogTitle>
+          <DialogTitle>
+            {isRefine ? "Refine with AI" : "Fill the grid with AI"}
+          </DialogTitle>
           <DialogDescription>
             {isRefine
               ? "Describe what to change — the AI edits the current grid, keeping the rest in place. The configs below reflect the grid; adjust them if the split itself should change."
@@ -1913,7 +2097,9 @@ function AIGenerateDialog({
               <span
                 className={cn(
                   "text-[11px] tabular-nums",
-                  total > capacity ? "text-destructive" : "text-muted-foreground"
+                  total > capacity
+                    ? "text-destructive"
+                    : "text-muted-foreground"
                 )}
               >
                 {total} / {capacity} cells
@@ -1921,11 +2107,17 @@ function AIGenerateDialog({
             </div>
             <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
               {subjects.map((s) => (
-                <div key={s.class_subject_id} className="flex items-center gap-2 px-3 py-1.5">
+                <div
+                  key={s.class_subject_id}
+                  className="flex items-center gap-2 px-3 py-1.5"
+                >
                   <span className="min-w-0 flex-1 truncate text-xs text-secondary-foreground">
                     {s.subject_name}
                     {s.default_teacher_name && (
-                      <span className="text-muted-foreground"> · {s.default_teacher_name}</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {s.default_teacher_name}
+                      </span>
                     )}
                   </span>
                   <Input
@@ -1936,7 +2128,10 @@ function AIGenerateDialog({
                     onChange={(e) =>
                       setQuotas((prev) => ({
                         ...prev,
-                        [s.class_subject_id]: Math.max(0, Number(e.target.value)),
+                        [s.class_subject_id]: Math.max(
+                          0,
+                          Number(e.target.value)
+                        ),
                       }))
                     }
                     className="h-7 w-16 text-xs"
@@ -1944,10 +2139,16 @@ function AIGenerateDialog({
                 </div>
               ))}
               {electiveGroups.map((g) => (
-                <div key={g.elective_group_id} className="flex items-center gap-2 px-3 py-1.5">
+                <div
+                  key={g.elective_group_id}
+                  className="flex items-center gap-2 px-3 py-1.5"
+                >
                   <span className="min-w-0 flex-1 truncate text-xs text-secondary-foreground">
                     {g.elective_group_name}
-                    <span className="text-[10px] text-violet-600 dark:text-violet-400"> · elective</span>
+                    <span className="text-[10px] text-violet-600 dark:text-violet-400">
+                      {" "}
+                      · elective
+                    </span>
                   </span>
                   <Input
                     type="number"
@@ -1957,7 +2158,10 @@ function AIGenerateDialog({
                     onChange={(e) =>
                       setElectiveQuotas((prev) => ({
                         ...prev,
-                        [g.elective_group_id]: Math.max(0, Number(e.target.value)),
+                        [g.elective_group_id]: Math.max(
+                          0,
+                          Number(e.target.value)
+                        ),
                       }))
                     }
                     className="h-7 w-16 text-xs"
@@ -1970,7 +2174,9 @@ function AIGenerateDialog({
                     value={r.label}
                     onChange={(e) =>
                       setCustomRows((prev) =>
-                        prev.map((x, j) => (j === i ? { ...x, label: e.target.value } : x))
+                        prev.map((x, j) =>
+                          j === i ? { ...x, label: e.target.value } : x
+                        )
                       )
                     }
                     placeholder="PT, Library…"
@@ -1984,7 +2190,12 @@ function AIGenerateDialog({
                     onChange={(e) =>
                       setCustomRows((prev) =>
                         prev.map((x, j) =>
-                          j === i ? { ...x, quota: Math.max(0, Number(e.target.value)) } : x
+                          j === i
+                            ? {
+                                ...x,
+                                quota: Math.max(0, Number(e.target.value)),
+                              }
+                            : x
                         )
                       )
                     }
@@ -1994,7 +2205,9 @@ function AIGenerateDialog({
                     variant="ghost"
                     size="icon-sm"
                     className="text-muted-foreground hover:text-destructive"
-                    onClick={() => setCustomRows((prev) => prev.filter((_, j) => j !== i))}
+                    onClick={() =>
+                      setCustomRows((prev) => prev.filter((_, j) => j !== i))
+                    }
                     aria-label="Remove"
                   >
                     <XIcon className="size-3" />
@@ -2006,7 +2219,9 @@ function AIGenerateDialog({
               variant="outline"
               size="sm"
               className="h-7 w-fit text-xs"
-              onClick={() => setCustomRows((prev) => [...prev, { label: "", quota: 1 }])}
+              onClick={() =>
+                setCustomRows((prev) => [...prev, { label: "", quota: 1 }])
+              }
             >
               <PlusIcon className="size-3" />
               Add custom period
@@ -2099,7 +2314,10 @@ function LayoutTile({
             <span className="flex gap-0.5">
               <span className="h-1 w-2.5 shrink-0 rounded-[1px] bg-muted-foreground/50" />
               {Array.from({ length: 4 }).map((_, i) => (
-                <span key={i} className="h-1 flex-1 rounded-[1px] bg-muted-foreground/30" />
+                <span
+                  key={i}
+                  className="h-1 flex-1 rounded-[1px] bg-muted-foreground/30"
+                />
               ))}
             </span>
             {/* period rows with a horizontal break band */}
@@ -2107,7 +2325,10 @@ function LayoutTile({
               <span key={r} className="flex flex-1 gap-0.5">
                 <span className="w-2.5 shrink-0 rounded-[1px] bg-muted-foreground/25" />
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <span key={i} className="flex-1 rounded-[1px] bg-muted-foreground/15" />
+                  <span
+                    key={i}
+                    className="flex-1 rounded-[1px] bg-muted-foreground/15"
+                  />
                 ))}
               </span>
             ))}
@@ -2115,7 +2336,10 @@ function LayoutTile({
             <span className="flex flex-1 gap-0.5">
               <span className="w-2.5 shrink-0 rounded-[1px] bg-muted-foreground/25" />
               {Array.from({ length: 4 }).map((_, i) => (
-                <span key={i} className="flex-1 rounded-[1px] bg-muted-foreground/15" />
+                <span
+                  key={i}
+                  className="flex-1 rounded-[1px] bg-muted-foreground/15"
+                />
               ))}
             </span>
           </>
@@ -2125,7 +2349,10 @@ function LayoutTile({
             <span className="flex w-2.5 shrink-0 flex-col gap-0.5">
               <span className="h-1 rounded-[1px] bg-muted-foreground/50" />
               {Array.from({ length: 3 }).map((_, i) => (
-                <span key={i} className="flex-1 rounded-[1px] bg-muted-foreground/25" />
+                <span
+                  key={i}
+                  className="flex-1 rounded-[1px] bg-muted-foreground/25"
+                />
               ))}
             </span>
             {/* period columns with a vertical break band */}
@@ -2192,14 +2419,24 @@ function CellEditor({
   customLabelCount: (label: string) => number
   onClose: () => void
   onClear: () => void
-  onSave: (slot: SlotDraft, asDouble: boolean, applyToAllLabel?: boolean) => void
+  onSave: (
+    slot: SlotDraft,
+    asDouble: boolean,
+    applyToAllLabel?: boolean
+  ) => void
 }) {
-  const [kind, setKind] = useState<SlotDraft["kind"]>(current?.kind ?? "subject")
-  const [classSubjectId, setClassSubjectId] = useState(current?.class_subject_id ?? "")
+  const [kind, setKind] = useState<SlotDraft["kind"]>(
+    current?.kind ?? "subject"
+  )
+  const [classSubjectId, setClassSubjectId] = useState(
+    current?.class_subject_id ?? ""
+  )
   const [teacherId, setTeacherId] = useState<string>(current?.teacher_id ?? "")
   const [customLabel, setCustomLabel] = useState(current?.custom_label ?? "PT")
   const [applyAll, setApplyAll] = useState(true)
-  const [electiveGroupId, setElectiveGroupId] = useState(current?.elective_group_id ?? "")
+  const [electiveGroupId, setElectiveGroupId] = useState(
+    current?.elective_group_id ?? ""
+  )
   const [asDouble, setAsDouble] = useState(false)
   const [busy, setBusy] = useState<Record<string, string>>({})
   const [alignAfter, setAlignAfter] = useState(true)
@@ -2225,27 +2462,31 @@ function CellEditor({
   const save = async () => {
     if (kind === "subject") {
       const s = subjects.find((x) => x.class_subject_id === classSubjectId)
-      if (!s) return toast.error("Pick a subject")
+      if (!s) return showError(new Error("Pick a subject"))
       onSave(
         {
           kind,
           class_subject_id: s.class_subject_id,
           subject_name: s.subject_name,
           teacher_id: teacherId || null,
-          teacher_name: teachers.find((t) => t.id === teacherId)?.full_name ?? null,
+          teacher_name:
+            teachers.find((t) => t.id === teacherId)?.full_name ?? null,
         },
         asDouble && nextPeriodFree
       )
     } else if (kind === "custom") {
-      if (!customLabel.trim()) return toast.error("Give the period a label")
+      if (!customLabel.trim())
+        return showError(new Error("Give the period a label"))
       const label = customLabel.trim()
-      const others = customLabelCount(label) - (current?.custom_label === label ? 1 : 0)
+      const others =
+        customLabelCount(label) - (current?.custom_label === label ? 1 : 0)
       onSave(
         {
           kind,
           custom_label: label,
           teacher_id: teacherId || null,
-          teacher_name: teachers.find((t) => t.id === teacherId)?.full_name ?? null,
+          teacher_name:
+            teachers.find((t) => t.id === teacherId)?.full_name ?? null,
         },
         asDouble && nextPeriodFree,
         applyAll && others > 0
@@ -2256,8 +2497,10 @@ function CellEditor({
         )
       }
     } else {
-      const g = electiveGroups.find((x) => x.elective_group_id === electiveGroupId)
-      if (!g) return toast.error("Pick the elective group")
+      const g = electiveGroups.find(
+        (x) => x.elective_group_id === electiveGroupId
+      )
+      if (!g) return showError(new Error("Pick the elective group"))
       onSave(
         {
           kind,
@@ -2270,24 +2513,32 @@ function CellEditor({
       )
       if (alignAfter) {
         try {
-          const res = await apiClient.post<{ results: { class: string; status: string }[] }>(
-            "/api/timetable/align-elective",
-            {
-              grade,
-              day_of_week: day,
-              period_id: period.id,
-              elective_group_id: g.elective_group_id,
-              elective_label: g.elective_group_name,
-              source_class_id: classId,
-            }
+          const res = await apiClient.post<{
+            results: { class: string; status: string }[]
+          }>("/api/timetable/align-elective", {
+            grade,
+            day_of_week: day,
+            period_id: period.id,
+            elective_group_id: g.elective_group_id,
+            elective_label: g.elective_group_name,
+            source_class_id: classId,
+          })
+          const aligned = res.results.filter(
+            (r) => r.status === "aligned"
+          ).length
+          const blocked = res.results.filter(
+            (r) => r.status === "cell_occupied"
           )
-          const aligned = res.results.filter((r) => r.status === "aligned").length
-          const blocked = res.results.filter((r) => r.status === "cell_occupied")
-          if (aligned > 0) toast.success(`Elective aligned in ${aligned} sibling section${aligned > 1 ? "s" : ""}`)
+          if (aligned > 0)
+            toast.success(
+              `Elective aligned in ${aligned} sibling section${aligned > 1 ? "s" : ""}`
+            )
           if (blocked.length > 0)
-            toast.warning(`Cell occupied in ${blocked.map((b) => b.class).join(", ")} — align manually`)
+            toast.warning(
+              `Cell occupied in ${blocked.map((b) => b.class).join(", ")} — align manually`
+            )
         } catch (err) {
-          if (err instanceof Error) toast.error(err.message)
+          showError(err)
         }
       }
     }
@@ -2337,15 +2588,23 @@ function CellEditor({
             <>
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs">Subject</Label>
-                <Select value={classSubjectId || undefined} onValueChange={setClassSubjectId}>
+                <Select
+                  value={classSubjectId || undefined}
+                  onValueChange={setClassSubjectId}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Pick a subject…" />
                   </SelectTrigger>
                   <SelectContent>
                     {subjects.map((s) => (
-                      <SelectItem key={s.class_subject_id} value={s.class_subject_id}>
+                      <SelectItem
+                        key={s.class_subject_id}
+                        value={s.class_subject_id}
+                      >
                         {s.subject_name}
-                        {s.default_teacher_name ? ` · ${s.default_teacher_name}` : ""}
+                        {s.default_teacher_name
+                          ? ` · ${s.default_teacher_name}`
+                          : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -2392,7 +2651,9 @@ function CellEditor({
                     Also set this teacher for every "{customLabel.trim()}"
                     period on this section's week (
                     {customLabelCount(customLabel.trim()) -
-                      (current?.custom_label === customLabel.trim() ? 1 : 0)}{" "}
+                      (current?.custom_label === customLabel.trim()
+                        ? 1
+                        : 0)}{" "}
                     more).
                   </span>
                 </label>
@@ -2420,7 +2681,10 @@ function CellEditor({
                       </SelectTrigger>
                       <SelectContent>
                         {electiveGroups.map((g) => (
-                          <SelectItem key={g.elective_group_id} value={g.elective_group_id}>
+                          <SelectItem
+                            key={g.elective_group_id}
+                            value={g.elective_group_id}
+                          >
                             {g.elective_group_name} ({g.options.join(" / ")})
                           </SelectItem>
                         ))}
@@ -2446,7 +2710,10 @@ function CellEditor({
 
           {kind !== "elective" && nextPeriodFree && (
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Checkbox checked={asDouble} onCheckedChange={(v) => setAsDouble(!!v)} />
+              <Checkbox
+                checked={asDouble}
+                onCheckedChange={(v) => setAsDouble(!!v)}
+              />
               Double period — also fill the next period (continuous lab/class)
             </label>
           )}
@@ -2498,15 +2765,15 @@ function TeacherPicker({
 
   const gradeSet = new Set(gradeTeacherIds)
   // this grade's teachers first; a picked outsider stays visible in the list
-  const primary = teachers.filter(
-    (t) => gradeSet.has(t.id) || t.id === value
-  )
+  const primary = teachers.filter((t) => gradeSet.has(t.id) || t.id === value)
 
   const filteredAll = teachers.filter(
     (t) =>
       !search.trim() ||
       t.full_name.toLowerCase().includes(search.trim().toLowerCase()) ||
-      (t.department_name ?? "").toLowerCase().includes(search.trim().toLowerCase())
+      (t.department_name ?? "")
+        .toLowerCase()
+        .includes(search.trim().toLowerCase())
   )
 
   return (
@@ -2551,8 +2818,7 @@ function TeacherPicker({
             <DialogHeader>
               <DialogTitle>Pick any teacher</DialogTitle>
               <DialogDescription>
-                The whole staff room — busy teachers are marked for this
-                period.
+                The whole staff room — busy teachers are marked for this period.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-3 px-6 py-4">
@@ -2665,15 +2931,19 @@ function TeacherLoadDialog({
 
   useEffect(() => {
     apiClient
-      .get<{ teachers: TeacherLoadRow[]; clashes: TeacherClash[]; draft_classes?: string[] }>(
-        "/api/timetable/teacher-load"
-      )
+      .get<{
+        teachers: TeacherLoadRow[]
+        clashes: TeacherClash[]
+        draft_classes?: string[]
+      }>("/api/timetable/teacher-load")
       .then((res) => {
         setRows(res.teachers ?? [])
         setClashes(res.clashes ?? [])
         setDraftClasses(res.draft_classes ?? [])
       })
-      .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load"))
+      .catch((err) =>
+        setLoadError(err instanceof Error ? err.message : "Failed to load")
+      )
   }, [])
 
   // A day at 100% of teachable periods is back-to-back all day; ≥75% is heavy.
@@ -2686,8 +2956,8 @@ function TeacherLoadDialog({
           <DialogTitle>Teacher load</DialogTitle>
           <DialogDescription>
             Periods per teacher across every section — saved timetables plus
-            unsaved drafts (a draft replaces its section's saved grid here,
-            just as saving it would).
+            unsaved drafts (a draft replaces its section's saved grid here, just
+            as saving it would).
           </DialogDescription>
         </DialogHeader>
 
@@ -2705,14 +2975,17 @@ function TeacherLoadDialog({
               {clashes.length > 0 ? (
                 <div className="flex flex-col gap-1.5 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
                   <p className="text-xs font-medium text-destructive">
-                    {clashes.length} overlap{clashes.length > 1 ? "s" : ""} found — the
-                    same teacher is in two sections at once:
+                    {clashes.length} overlap{clashes.length > 1 ? "s" : ""}{" "}
+                    found — the same teacher is in two sections at once:
                   </p>
                   {clashes.map((c, i) => (
-                    <p key={i} className="flex items-start gap-1.5 text-xs text-destructive">
+                    <p
+                      key={i}
+                      className="flex items-start gap-1.5 text-xs text-destructive"
+                    >
                       <WarningIcon className="mt-0.5 size-3 shrink-0" />
-                      {c.teacher_name} — {DAY_NAMES[c.day_of_week]} {c.period_name}:{" "}
-                      {c.classes.join(", ")}
+                      {c.teacher_name} — {DAY_NAMES[c.day_of_week]}{" "}
+                      {c.period_name}: {c.classes.join(", ")}
                     </p>
                   ))}
                 </div>
@@ -2723,8 +2996,8 @@ function TeacherLoadDialog({
                     className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
                   />
                   <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                    No overlaps — every teacher is in at most one class per period,
-                    drafts included.
+                    No overlaps — every teacher is in at most one class per
+                    period, drafts included.
                   </p>
                 </div>
               )}
@@ -2767,7 +3040,9 @@ function TeacherLoadDialog({
                         <Fragment key={t.id}>
                           <tr
                             className="cursor-pointer hover:bg-muted/40"
-                            onClick={() => setExpandedId(expanded ? null : t.id)}
+                            onClick={() =>
+                              setExpandedId(expanded ? null : t.id)
+                            }
                           >
                             <td className="border-b border-border px-3 py-2 font-medium text-foreground">
                               <span className="flex items-center gap-1">
@@ -2800,7 +3075,7 @@ function TeacherLoadDialog({
                                 </td>
                               )
                             })}
-                            <td className="border-b border-l border-border px-2 py-2 text-center font-semibold tabular-nums text-foreground">
+                            <td className="border-b border-l border-border px-2 py-2 text-center font-semibold text-foreground tabular-nums">
                               {t.total}
                             </td>
                             <td className="border-b border-l border-border px-3 py-2 text-muted-foreground">
@@ -2837,7 +3112,8 @@ function TeacherLoadDialog({
                                             {DAY_SHORT[d]}
                                           </td>
                                           {teachable.map((p) => {
-                                            const here = cellMap.get(`${d}|${p.id}`) ?? []
+                                            const here =
+                                              cellMap.get(`${d}|${p.id}`) ?? []
                                             const isClash = here.length > 1
                                             return (
                                               <td
@@ -2860,7 +3136,10 @@ function TeacherLoadDialog({
                                                 {here.length === 0
                                                   ? "·"
                                                   : here
-                                                      .map((c) => `${c.class}${c.is_draft ? "*" : ""}`)
+                                                      .map(
+                                                        (c) =>
+                                                          `${c.class}${c.is_draft ? "*" : ""}`
+                                                      )
                                                       .join(" / ")}
                                               </td>
                                             )
@@ -2881,12 +3160,13 @@ function TeacherLoadDialog({
               </div>
 
               <p className="text-[11px] text-muted-foreground">
-                A day highlighted amber has {heavy}+ of {periodsPerDay} periods; red is
-                every period of the day back-to-back.
+                A day highlighted amber has {heavy}+ of {periodsPerDay} periods;
+                red is every period of the day back-to-back.
                 {draftClasses.length > 0 && (
                   <>
-                    {" "}* counts an unsaved draft ({draftClasses.join(", ")}) — numbers
-                    change if the draft is edited or discarded.
+                    {" "}
+                    * counts an unsaved draft ({draftClasses.join(", ")}) —
+                    numbers change if the draft is edited or discarded.
                   </>
                 )}
               </p>
@@ -2928,7 +3208,13 @@ function TimetableSummaryDialog({
     // custom by label. A double period is two cells → counts as 2.
     const byKey = new Map<
       string,
-      { name: string; teacher: string | null; kind: SlotDraft["kind"]; perDay: Map<number, number>; total: number }
+      {
+        name: string
+        teacher: string | null
+        kind: SlotDraft["kind"]
+        perDay: Map<number, number>
+        total: number
+      }
     >()
     for (const [key, sl] of draft) {
       const day = Number(key.split("|")[0])
@@ -2940,10 +3226,10 @@ function TimetableSummaryDialog({
             : `c:${sl.custom_label}`
       const name =
         sl.kind === "subject"
-          ? sl.subject_name ?? "Subject"
+          ? (sl.subject_name ?? "Subject")
           : sl.kind === "elective"
-            ? sl.elective_label ?? "Elective"
-            : sl.custom_label ?? "Activity"
+            ? (sl.elective_label ?? "Elective")
+            : (sl.custom_label ?? "Activity")
       if (!byKey.has(groupKey)) {
         byKey.set(groupKey, {
           name,
@@ -3023,9 +3309,14 @@ function TimetableSummaryDialog({
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={`${row.kind}:${row.name}`} className="hover:bg-muted/40">
+                  <tr
+                    key={`${row.kind}:${row.name}`}
+                    className="hover:bg-muted/40"
+                  >
                     <td className="border-b border-border px-3 py-2">
-                      <span className="font-medium text-foreground">{row.name}</span>
+                      <span className="font-medium text-foreground">
+                        {row.name}
+                      </span>
                       {row.teacher && (
                         <span className="block text-[10px] text-muted-foreground">
                           {row.teacher}
@@ -3039,7 +3330,9 @@ function TimetableSummaryDialog({
                           key={d}
                           className={cn(
                             "border-b border-l border-border px-1 py-2 text-center tabular-nums",
-                            n === 0 ? "text-muted-foreground/40" : "text-foreground",
+                            n === 0
+                              ? "text-muted-foreground/40"
+                              : "text-foreground",
                             n > 1 && "font-semibold"
                           )}
                         >
@@ -3047,7 +3340,7 @@ function TimetableSummaryDialog({
                         </td>
                       )
                     })}
-                    <td className="border-b border-l border-border px-2 py-2 text-center font-semibold tabular-nums text-foreground">
+                    <td className="border-b border-l border-border px-2 py-2 text-center font-semibold text-foreground tabular-nums">
                       {row.total}
                     </td>
                   </tr>
@@ -3055,16 +3348,18 @@ function TimetableSummaryDialog({
               </tbody>
               <tfoot>
                 <tr className="bg-sidebar/60">
-                  <td className="px-3 py-2 font-medium text-muted-foreground">Per day</td>
+                  <td className="px-3 py-2 font-medium text-muted-foreground">
+                    Per day
+                  </td>
                   {days.map((d) => (
                     <td
                       key={d}
-                      className="border-l border-border px-1 py-2 text-center font-medium tabular-nums text-secondary-foreground"
+                      className="border-l border-border px-1 py-2 text-center font-medium text-secondary-foreground tabular-nums"
                     >
                       {perDayTotals.get(d) ?? 0}
                     </td>
                   ))}
-                  <td className="border-l border-border px-2 py-2 text-center font-semibold tabular-nums text-foreground">
+                  <td className="border-l border-border px-2 py-2 text-center font-semibold text-foreground tabular-nums">
                     {filled}
                   </td>
                 </tr>
@@ -3105,14 +3400,17 @@ function CopyDayDialog({
         <DialogHeader>
           <DialogTitle>Copy a day</DialogTitle>
           <DialogDescription>
-            Copies every slot of one day onto other days (replacing them) —
-            in this draft only, nothing saves yet.
+            Copies every slot of one day onto other days (replacing them) — in
+            this draft only, nothing saves yet.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4 px-6 py-4">
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs">Copy from</Label>
-            <Select value={String(from)} onValueChange={(v) => setFrom(Number(v))}>
+            <Select
+              value={String(from)}
+              onValueChange={(v) => setFrom(Number(v))}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -3136,7 +3434,9 @@ function CopyDayDialog({
                     type="button"
                     onClick={() =>
                       setTo((prev) =>
-                        prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+                        prev.includes(d)
+                          ? prev.filter((x) => x !== d)
+                          : [...prev, d]
                       )
                     }
                     aria-pressed={to.includes(d)}
@@ -3167,14 +3467,21 @@ function CopyDayDialog({
   )
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom-class label picker — a select over the labels this grid already
 // uses plus the common defaults. Typing filters; typing something new offers
 // "Add" so one-off classes stay possible without polluting the quick list.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEFAULT_CUSTOM_LABELS = ["PT", "Library", "Music", "Art", "Science Lab", "Assembly", "CCA"]
+const DEFAULT_CUSTOM_LABELS = [
+  "PT",
+  "Library",
+  "Music",
+  "Art",
+  "Science Lab",
+  "Assembly",
+  "CCA",
+]
 
 function CustomLabelCombobox({
   value,
@@ -3201,7 +3508,9 @@ function CustomLabelCombobox({
   }, [existingLabels])
 
   const q = query.trim().toLowerCase()
-  const filtered = q ? options.filter((o) => o.toLowerCase().includes(q)) : options
+  const filtered = q
+    ? options.filter((o) => o.toLowerCase().includes(q))
+    : options
   const exactMatch = options.some((o) => o.toLowerCase() === q)
 
   const pick = (label: string) => {
@@ -3228,7 +3537,10 @@ function CustomLabelCombobox({
           {value || "Pick a class…"}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+      <PopoverContent
+        className="w-(--radix-popover-trigger-width) p-0"
+        align="start"
+      >
         <div className="border-b border-border p-2">
           <Input
             autoFocus
@@ -3271,7 +3583,9 @@ function CustomLabelCombobox({
             </button>
           )}
           {filtered.length === 0 && !q && (
-            <p className="px-2.5 py-2 text-xs text-muted-foreground">No classes yet — type to add one.</p>
+            <p className="px-2.5 py-2 text-xs text-muted-foreground">
+              No classes yet — type to add one.
+            </p>
           )}
         </div>
       </PopoverContent>
@@ -3325,9 +3639,9 @@ function TeacherTimetableView() {
     Promise.all([
       apiClient.get<{ periods: Period[] }>("/api/timetable/periods"),
       apiClient.get<{ slots: MyScheduleSlot[] }>("/api/timetable/my-schedule"),
-      apiClient.get<{ classes: { id: string; grade: number; section: string }[] }>(
-        "/api/classes"
-      ),
+      apiClient.get<{
+        classes: { id: string; grade: number; section: string }[]
+      }>("/api/classes"),
       apiClient
         .get<{ week_settings?: WeekSettings }>("/api/calendar")
         .catch(() => ({ week_settings: undefined })),
@@ -3492,7 +3806,10 @@ function TeacherTimetableView() {
               </thead>
               <tbody>
                 {days.map((d) => (
-                  <tr key={d} className={cn(d === today && "bg-primary/[0.04]")}>
+                  <tr
+                    key={d}
+                    className={cn(d === today && "bg-primary/[0.04]")}
+                  >
                     <td className="sticky left-0 z-10 border-b border-border bg-background px-2 py-2 font-medium text-secondary-foreground after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border">
                       {DAY_SHORT[d]}
                       {d === today && (
@@ -3513,7 +3830,10 @@ function TeacherTimetableView() {
                       const slot = myByCell.get(`${d}|${p.id}`)
                       if (!slot) {
                         return (
-                          <td key={p.id} className={cn(cellBase, "text-muted-foreground/30")}>
+                          <td
+                            key={p.id}
+                            className={cn(cellBase, "text-muted-foreground/30")}
+                          >
                             ·
                           </td>
                         )
@@ -3560,7 +3880,10 @@ function TeacherTimetableView() {
             selected.teachers.map((t) => [t.id, t.full_name])
           )
           const byCell = new Map(
-            selected.slots.map((sl) => [`${sl.day_of_week}|${sl.period_id}`, sl])
+            selected.slots.map((sl) => [
+              `${sl.day_of_week}|${sl.period_id}`,
+              sl,
+            ])
           )
           return (
             <div className="overflow-x-auto rounded-xl border border-border">
@@ -3596,7 +3919,10 @@ function TeacherTimetableView() {
                 </thead>
                 <tbody>
                   {days.map((d) => (
-                    <tr key={d} className={cn(d === today && "bg-primary/[0.04]")}>
+                    <tr
+                      key={d}
+                      className={cn(d === today && "bg-primary/[0.04]")}
+                    >
                       <td className="sticky left-0 z-10 border-b border-border bg-background px-2 py-2 font-medium text-secondary-foreground after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border">
                         {DAY_SHORT[d]}
                       </td>
@@ -3614,7 +3940,10 @@ function TeacherTimetableView() {
                           return (
                             <td
                               key={p.id}
-                              className={cn(cellBase, "text-muted-foreground/30")}
+                              className={cn(
+                                cellBase,
+                                "text-muted-foreground/30"
+                              )}
                             >
                               ·
                             </td>
@@ -3622,7 +3951,8 @@ function TeacherTimetableView() {
                         }
                         const label =
                           sl.kind === "subject"
-                            ? subjectName.get(sl.class_subject_id ?? "") ?? "Subject"
+                            ? (subjectName.get(sl.class_subject_id ?? "") ??
+                              "Subject")
                             : sl.kind === "custom"
                               ? sl.custom_label
                               : sl.elective_label

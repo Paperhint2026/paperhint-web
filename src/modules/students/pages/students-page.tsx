@@ -20,6 +20,8 @@ import {
   TrashIcon,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
+
+import { showError } from "@/lib/show-error"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -197,9 +199,8 @@ export function StudentsPage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [saveFieldError, setSaveFieldError] = useState<StudentFieldError | null>(
-    null
-  )
+  const [saveFieldError, setSaveFieldError] =
+    useState<StudentFieldError | null>(null)
 
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
@@ -450,7 +451,7 @@ export function StudentsPage() {
         if (field) {
           setSaveFieldError({ field, message: err.message })
         } else {
-          toast.error(err.message)
+          showError(err)
         }
       }
     } finally {
@@ -563,7 +564,7 @@ export function StudentsPage() {
         if (field) {
           setSaveFieldError({ field, message: err.message })
         } else {
-          toast.error(err.message)
+          showError(err)
         }
       }
     } finally {
@@ -584,7 +585,7 @@ export function StudentsPage() {
       setTransferTargetId("")
       await fetchAll()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsTransferring(false)
     }
@@ -601,7 +602,7 @@ export function StudentsPage() {
       setStudentToWithdraw(null)
       await fetchAll()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsWithdrawing(false)
     }

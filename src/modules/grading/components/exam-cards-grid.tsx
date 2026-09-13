@@ -15,7 +15,7 @@ import {
 } from "@phosphor-icons/react"
 import { useNavigate } from "react-router-dom"
 import dayjs from "dayjs"
-import { toast } from "sonner"
+import { showError } from "@/lib/show-error"
 
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
@@ -134,7 +134,7 @@ export function ExamCardsGrid({ classSubjectId, onSelectExam }: Props) {
       })
       .catch((err) => {
         console.error("Failed to fetch exam cards:", err)
-        toast.error("Couldn't load exams")
+        showError(new Error("Couldn't load exams"))
         if (!cancelled) setFetched({ csId: classSubjectId, data: null })
       })
     return () => {

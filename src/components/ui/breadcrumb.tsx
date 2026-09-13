@@ -81,9 +81,7 @@ function BreadcrumbSeparator({
       className={cn("[&>svg]:size-3.5", className)}
       {...props}
     >
-      {children ?? (
-        <CaretRightIcon />
-      )}
+      {children ?? <CaretRightIcon />}
     </li>
   )
 }
@@ -103,8 +101,7 @@ function BreadcrumbEllipsis({
       )}
       {...props}
     >
-      <DotsThreeIcon
-      />
+      <DotsThreeIcon />
       <span className="sr-only">More</span>
     </span>
   )

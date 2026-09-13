@@ -745,7 +745,11 @@ function AnswerMarkdown({ content }: { content: string }) {
     <div className="prose prose-sm dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted prose-pre:text-foreground max-w-none [&_svg]:h-auto [&_svg]:max-w-full">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, remarkMath]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
+        rehypePlugins={[
+          rehypeRaw,
+          [rehypeSanitize, sanitizeSchema],
+          rehypeKatex,
+        ]}
         components={{
           table: ({ children, ...props }) => (
             <div className="my-3 overflow-x-auto rounded-lg border border-border">

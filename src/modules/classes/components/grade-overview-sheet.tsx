@@ -1002,7 +1002,8 @@ function SectionTimetableView({
                   }
                   const label =
                     sl.kind === "subject"
-                      ? subjectName.get(sl.class_subject_id ?? "") ?? "Subject"
+                      ? (subjectName.get(sl.class_subject_id ?? "") ??
+                        "Subject")
                       : sl.kind === "custom"
                         ? sl.custom_label
                         : sl.elective_label
@@ -1013,7 +1014,7 @@ function SectionTimetableView({
                     <td
                       key={p.id}
                       className="border-b border-l border-border px-1 py-1.5 text-center align-middle"
-                      title={teacher ? `${label} — ${teacher}` : label ?? ""}
+                      title={teacher ? `${label} — ${teacher}` : (label ?? "")}
                     >
                       <span className="block truncate font-medium text-secondary-foreground">
                         {label}

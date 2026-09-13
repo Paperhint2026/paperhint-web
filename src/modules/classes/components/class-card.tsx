@@ -37,7 +37,11 @@ interface ClassCardProps {
   activeAcademicYear?: string | null
 }
 
-export function ClassCard({ data, onClick, activeAcademicYear }: ClassCardProps) {
+export function ClassCard({
+  data,
+  onClick,
+  activeAcademicYear,
+}: ClassCardProps) {
   const isCurrent =
     activeAcademicYear != null && data.academicYear === activeAcademicYear
   const subjects = data.subjects ?? []

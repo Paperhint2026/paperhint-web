@@ -10,6 +10,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
@@ -154,9 +156,7 @@ export function SecuritySection() {
       setNext("")
       setConfirm("")
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to change password"
-      )
+      showError(err, "Failed to change password")
     } finally {
       setIsSaving(false)
     }

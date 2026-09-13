@@ -7,6 +7,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -283,9 +285,7 @@ function Cell({
         `/api/teacher-assignments/candidates?class_subject_id=${subject.class_subject_id}`
       )
       .then((r) => setCandidates(r.candidates))
-      .catch((e) =>
-        toast.error(e instanceof Error ? e.message : "Could not load teachers")
-      )
+      .catch((e) => showError(e, "Could not load teachers"))
   }, [open, subject.class_subject_id])
 
   const assign = async (t: Candidate) => {
@@ -299,7 +299,7 @@ function Cell({
       setOpen(false)
       onChanged()
     } catch (e) {
-      if (e instanceof Error) toast.error(e.message)
+      showError(e)
     } finally {
       setBusy(null)
     }
@@ -314,7 +314,7 @@ function Cell({
       toast.success(`${t.full_name} released from ${subject.subject_name}`)
       onChanged()
     } catch (e) {
-      if (e instanceof Error) toast.error(e.message)
+      showError(e)
     } finally {
       setBusy(null)
     }

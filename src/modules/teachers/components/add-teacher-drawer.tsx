@@ -15,6 +15,8 @@ import {
 import { format } from "date-fns"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import {
   CustomFieldsInputs,
@@ -189,7 +191,7 @@ export function AddTeacherDrawer({
           : `Department "${res.department.name}" created`
       )
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSavingDept(false)
     }
@@ -364,9 +366,14 @@ export function AddTeacherDrawer({
   // success it closes the drawer; on failure it toasts and leaves the drawer
   // open with every field intact so the admin can correct and retry.
   const handleSave = () => {
-    const missing = missingRequiredCustomFields(customDefs, form.customFields ?? {})
+    const missing = missingRequiredCustomFields(
+      customDefs,
+      form.customFields ?? {}
+    )
     if (missing.length > 0) {
-      toast.error(`Fill the required field${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`)
+      toast.error(
+        `Fill the required field${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`
+      )
       return
     }
     onSave(form)

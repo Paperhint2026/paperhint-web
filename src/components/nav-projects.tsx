@@ -16,7 +16,12 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { DotsThreeIcon, FolderIcon, ArrowRightIcon, TrashIcon } from "@phosphor-icons/react"
+import {
+  DotsThreeIcon,
+  FolderIcon,
+  ArrowRightIcon,
+  TrashIcon,
+} from "@phosphor-icons/react"
 export function NavProjects({
   projects,
 }: {
@@ -46,8 +51,7 @@ export function NavProjects({
                   showOnHover
                   className="aria-expanded:bg-muted"
                 >
-                  <DotsThreeIcon
-                  />
+                  <DotsThreeIcon />
                   <span className="sr-only">More</span>
                 </SidebarMenuAction>
               </DropdownMenuTrigger>

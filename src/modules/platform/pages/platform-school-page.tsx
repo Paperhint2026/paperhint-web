@@ -8,6 +8,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -98,7 +100,7 @@ export function PlatformSchoolPage() {
       })
       toast.success("License updated")
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
@@ -106,7 +108,7 @@ export function PlatformSchoolPage() {
 
   const inviteAdmin = async () => {
     if (!adminName.trim() || !adminEmail.trim()) {
-      return toast.error("Admin name and email are required")
+      return showError(new Error("Admin name and email are required"))
     }
     setIsInviting(true)
     try {
@@ -119,14 +121,16 @@ export function PlatformSchoolPage() {
       setAdminEmail("")
       load()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsInviting(false)
     }
   }
 
   return (
-    <div className={cn(PAGE_GUTTER, PAGE_TOP, "flex min-h-full flex-col pb-12")}>
+    <div
+      className={cn(PAGE_GUTTER, PAGE_TOP, "flex min-h-full flex-col pb-12")}
+    >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         {/* Header */}
         <div className="flex flex-col gap-3">
@@ -220,7 +224,11 @@ export function PlatformSchoolPage() {
                   placeholder="Billing contact, agreed price, anything the team should know."
                 />
               </div>
-              <Button onClick={saveLicense} disabled={isSaving} className="self-end">
+              <Button
+                onClick={saveLicense}
+                disabled={isSaving}
+                className="self-end"
+              >
                 {isSaving ? (
                   <CircleNotchIcon className="size-4 animate-spin" />
                 ) : (
@@ -241,7 +249,10 @@ export function PlatformSchoolPage() {
               ) : (
                 <div className="flex flex-col divide-y divide-border rounded-xl border border-border">
                   {detail.admins.map((a) => (
-                    <div key={a.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <div
+                      key={a.id}
+                      className="flex items-center gap-3 px-4 py-2.5"
+                    >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">
                           {a.full_name}
@@ -250,7 +261,10 @@ export function PlatformSchoolPage() {
                           {a.email}
                         </p>
                       </div>
-                      <Badge variant="secondary" className="rounded-full text-[10px]">
+                      <Badge
+                        variant="secondary"
+                        className="rounded-full text-[10px]"
+                      >
                         {a.status}
                       </Badge>
                     </div>

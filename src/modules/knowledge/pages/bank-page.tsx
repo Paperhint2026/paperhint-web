@@ -10,6 +10,8 @@ import {
 import dayjs from "dayjs"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { countSummary } from "@/lib/format"
@@ -125,7 +127,7 @@ export function BankPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        toast.error(err instanceof Error ? err.message : "Failed to load bank")
+        showError(err, "Failed to load bank")
         setMaterials([])
       })
       .finally(() => {
@@ -185,7 +187,7 @@ export function BankPage() {
       if (res?.coverage_warning) toast.warning(res.coverage_warning)
       else toast.success("Added to your class")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to add material")
+      showError(err, "Failed to add material")
     } finally {
       setPickingId(null)
     }

@@ -296,9 +296,14 @@ export function AddStudentDrawer({
 
   const handleSave = () => {
     if (!isFormValid) return
-    const missing = missingRequiredCustomFields(customDefs, entry.custom_fields ?? {})
+    const missing = missingRequiredCustomFields(
+      customDefs,
+      entry.custom_fields ?? {}
+    )
     if (missing.length > 0) {
-      toast.error(`Fill the required field${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`)
+      toast.error(
+        `Fill the required field${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`
+      )
       return
     }
     onSave(entry)

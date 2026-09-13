@@ -7,6 +7,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -67,9 +69,11 @@ export function PlatformSchoolNewPage() {
   if (user && user.role !== "platform") return <Navigate to="/" replace />
 
   const create = async () => {
-    if (!name.trim()) return toast.error("Give the school a name")
+    if (!name.trim()) return showError(new Error("Give the school a name"))
     if ((adminName.trim() === "") !== (adminEmail.trim() === "")) {
-      return toast.error("Admin needs both a name and an email — or leave both empty")
+      return showError(
+        new Error("Admin needs both a name and an email — or leave both empty")
+      )
     }
     setIsSaving(true)
     try {
@@ -101,14 +105,16 @@ export function PlatformSchoolNewPage() {
       }
       navigate(`/platform/schools/${res.school.id}`, { replace: true })
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
   }
 
   return (
-    <div className={cn(PAGE_GUTTER, PAGE_TOP, "flex min-h-full flex-col pb-12")}>
+    <div
+      className={cn(PAGE_GUTTER, PAGE_TOP, "flex min-h-full flex-col pb-12")}
+    >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <div className="flex flex-col gap-3">
           <Link
@@ -123,7 +129,9 @@ export function PlatformSchoolNewPage() {
               <BuildingsIcon className="size-5 text-muted-foreground" />
             </span>
             <div>
-              <h1 className="text-lg font-semibold text-foreground">New school</h1>
+              <h1 className="text-lg font-semibold text-foreground">
+                New school
+              </h1>
               <p className="text-sm text-muted-foreground">
                 Identity, license, and the first admin — provisioned in one go.
               </p>
@@ -174,7 +182,10 @@ export function PlatformSchoolNewPage() {
           </p>
           <div className="flex flex-col divide-y divide-border rounded-xl border border-border">
             {GATEABLE.map((m) => (
-              <label key={m} className="flex cursor-pointer items-center gap-3 px-4 py-3">
+              <label
+                key={m}
+                className="flex cursor-pointer items-center gap-3 px-4 py-3"
+              >
                 <Checkbox
                   checked={features[m] !== false}
                   onCheckedChange={(v) =>
@@ -231,8 +242,8 @@ export function PlatformSchoolNewPage() {
               First admin
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Optional — they get an invite email to set a password. You can also
-              invite admins later from the school page.
+              Optional — they get an invite email to set a password. You can
+              also invite admins later from the school page.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

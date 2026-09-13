@@ -28,6 +28,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { tameCaps } from "@/lib/format"
@@ -99,7 +101,11 @@ interface SubmissionData {
 }
 
 const MD_REMARK = [remarkGfm, remarkMath]
-const MD_REHYPE: import("unified").PluggableList = [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]
+const MD_REHYPE: import("unified").PluggableList = [
+  rehypeRaw,
+  [rehypeSanitize, sanitizeSchema],
+  rehypeKatex,
+]
 
 function initialsOf(name: string) {
   return name
@@ -259,7 +265,7 @@ export function GradingReviewPage() {
       setMarks(res.marks ?? [])
     } catch (err) {
       console.error(err)
-      toast.error("Failed to load submission")
+      showError(new Error("Failed to load submission"))
     } finally {
       setIsLoading(false)
     }
@@ -316,7 +322,7 @@ export function GradingReviewPage() {
       toast.success("Marks updated")
     } catch (err) {
       console.error(err)
-      toast.error("Failed to update marks")
+      showError(new Error("Failed to update marks"))
     } finally {
       setIsSaving(false)
     }
@@ -361,7 +367,11 @@ export function GradingReviewPage() {
               It may have been removed. Head back to grading to pick another.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate(gradingBase)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(gradingBase)}
+          >
             <ArrowLeftIcon className="size-4" />
             Back to grading
           </Button>
@@ -574,7 +584,10 @@ export function GradingReviewPage() {
                 Answer key
               </span>
               <div className="text-secondary-foreground [&_.katex]:text-[1em] [&_p+p]:mt-2">
-                <ReactMarkdown remarkPlugins={MD_REMARK} rehypePlugins={MD_REHYPE}>
+                <ReactMarkdown
+                  remarkPlugins={MD_REMARK}
+                  rehypePlugins={MD_REHYPE}
+                >
                   {formatAnswerKey(q.answer_key)}
                 </ReactMarkdown>
               </div>
@@ -587,7 +600,10 @@ export function GradingReviewPage() {
           <div className="mt-3 flex items-start gap-2.5 border-l-2 border-border pl-3 text-sm text-secondary-foreground">
             <PaperhintMark className="mt-0.5 size-3.5 shrink-0 text-primary" />
             <div className="leading-relaxed">
-              <ReactMarkdown remarkPlugins={MD_REMARK} rehypePlugins={MD_REHYPE}>
+              <ReactMarkdown
+                remarkPlugins={MD_REMARK}
+                rehypePlugins={MD_REHYPE}
+              >
                 {qm.feedback}
               </ReactMarkdown>
             </div>
@@ -928,7 +944,11 @@ export function GradingReviewPage() {
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="start" sideOffset={8} className="w-80 gap-0 p-0">
+                  <PopoverContent
+                    align="start"
+                    sideOffset={8}
+                    className="w-80 gap-0 p-0"
+                  >
                     <div className="flex items-center justify-between border-b border-border px-4 py-3">
                       <p className="flex items-center gap-2 text-sm font-medium">
                         <SlidersHorizontalIcon className="size-4 text-muted-foreground" />
@@ -943,7 +963,9 @@ export function GradingReviewPage() {
                           Clear all
                         </button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">None applied</span>
+                        <span className="text-xs text-muted-foreground">
+                          None applied
+                        </span>
                       )}
                     </div>
                     <div className="flex flex-col gap-5 p-4">
@@ -993,7 +1015,11 @@ export function GradingReviewPage() {
                         {filteredTotal} of {marks.length} questions
                       </span>
                       <PopoverClose asChild>
-                        <Button size="sm" variant="outline" className="h-7 text-xs">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                        >
                           Done
                         </Button>
                       </PopoverClose>

@@ -44,7 +44,7 @@ export const fetchSchool = createAsyncThunk<
     }
   } catch (err) {
     return rejectWithValue(
-      err instanceof Error ? err.message : "Failed to fetch school",
+      err instanceof Error ? err.message : "Failed to fetch school"
     )
   }
 })

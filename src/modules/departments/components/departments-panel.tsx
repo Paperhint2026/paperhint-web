@@ -7,6 +7,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -90,7 +92,7 @@ export function DepartmentsPanel() {
           if (done) toast.success(done)
         })
         .catch((e) => {
-          toast.error(e instanceof Error ? e.message : "That did not save")
+          showError(e, "That did not save")
           return load() // resync: the local copy is now a guess
         })
       return chain.current
@@ -111,7 +113,7 @@ export function DepartmentsPanel() {
       if (done) toast.success(done)
       await load()
     } catch (e) {
-      if (e instanceof Error) toast.error(e.message)
+      showError(e)
     } finally {
       setBusy(null)
     }

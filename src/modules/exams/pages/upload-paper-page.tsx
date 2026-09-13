@@ -1,7 +1,19 @@
 import { useCallback, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { ArrowLeftIcon, CheckCircleIcon, FileTextIcon, CircleNotchIcon, ScanIcon, MagnifyingGlassIcon, SparkleIcon, CloudArrowUpIcon, XIcon } from "@phosphor-icons/react"
+import {
+  ArrowLeftIcon,
+  CheckCircleIcon,
+  FileTextIcon,
+  CircleNotchIcon,
+  ScanIcon,
+  MagnifyingGlassIcon,
+  SparkleIcon,
+  CloudArrowUpIcon,
+  XIcon,
+} from "@phosphor-icons/react"
 import { toast } from "sonner"
+
+import { showError } from "@/lib/show-error"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -10,7 +22,10 @@ const PROCESSING_STEPS = [
   { label: "Uploading question paper...", icon: CloudArrowUpIcon },
   { label: "Extracting text from paper...", icon: ScanIcon },
   { label: "Identifying questions & sections...", icon: FileTextIcon },
-  { label: "Searching knowledge base for answer keys...", icon: MagnifyingGlassIcon },
+  {
+    label: "Searching knowledge base for answer keys...",
+    icon: MagnifyingGlassIcon,
+  },
   { label: "Generating answer keys with AI...", icon: SparkleIcon },
 ]
 
@@ -22,7 +37,10 @@ const ACCEPTED_TYPES = [
 ]
 
 export function UploadPaperPage() {
-  const { classSubjectId, examId } = useParams<{ classSubjectId: string; examId: string }>()
+  const { classSubjectId, examId } = useParams<{
+    classSubjectId: string
+    examId: string
+  }>()
   const navigate = useNavigate()
   const backUrl = `/class/${classSubjectId}/exams`
 
@@ -34,11 +52,13 @@ export function UploadPaperPage() {
 
   const handleFile = useCallback((f: File) => {
     if (!ACCEPTED_TYPES.includes(f.type)) {
-      toast.error("Only PDF and image files (PNG, JPG, WebP) are accepted")
+      showError(
+        new Error("Only PDF and image files (PNG, JPG, WebP) are accepted")
+      )
       return
     }
     if (f.size > 20 * 1024 * 1024) {
-      toast.error("File size must be under 20 MB")
+      showError(new Error("File size must be under 20 MB"))
       return
     }
     setFile(f)
@@ -50,7 +70,7 @@ export function UploadPaperPage() {
       setDragActive(false)
       if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0])
     },
-    [handleFile],
+    [handleFile]
   )
 
   const handleUpload = async () => {
@@ -82,7 +102,7 @@ export function UploadPaperPage() {
             Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
           },
           body: formData,
-        },
+        }
       )
 
       if (!res.ok) {
@@ -96,7 +116,8 @@ export function UploadPaperPage() {
       setCurrentStep(PROCESSING_STEPS.length - 1)
       setIsDone(true)
 
-      const qCount = data.questions?.questions?.length ?? data.questions?.length ?? 0
+      const qCount =
+        data.questions?.questions?.length ?? data.questions?.length ?? 0
       toast.success(`${qCount} questions extracted successfully!`)
 
       setTimeout(() => {
@@ -164,7 +185,7 @@ export function UploadPaperPage() {
                   ? "border-sky-500 bg-sky-50/50 dark:bg-sky-950/20"
                   : file
                     ? "border-sky-300 bg-sky-50/30 dark:border-sky-800 dark:bg-sky-950/10"
-                    : "border-muted-foreground/20 hover:border-muted-foreground/40 hover:bg-muted/30",
+                    : "border-muted-foreground/20 hover:border-muted-foreground/40 hover:bg-muted/30"
               )}
             >
               {file ? (
@@ -248,18 +269,24 @@ export function UploadPaperPage() {
                     key={idx}
                     className={cn(
                       "flex items-center gap-4 rounded-xl border px-5 py-3.5 transition-all duration-500",
-                      isActive && "border-sky-400/40 bg-sky-50/50 shadow-sm dark:bg-sky-950/20",
+                      isActive &&
+                        "border-sky-400/40 bg-sky-50/50 shadow-sm dark:bg-sky-950/20",
                       isCompleted &&
                         "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20",
-                      !isActive && !isCompleted && "border-transparent bg-muted/30 opacity-40",
+                      !isActive &&
+                        !isCompleted &&
+                        "border-transparent bg-muted/30 opacity-40"
                     )}
                   >
                     <div
                       className={cn(
                         "flex size-9 shrink-0 items-center justify-center rounded-lg transition-all",
-                        isActive && "bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400",
+                        isActive &&
+                          "bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400",
                         isCompleted && "bg-green-500/10 text-green-500",
-                        !isActive && !isCompleted && "bg-muted text-muted-foreground",
+                        !isActive &&
+                          !isCompleted &&
+                          "bg-muted text-muted-foreground"
                       )}
                     >
                       {isActive ? (
@@ -275,7 +302,7 @@ export function UploadPaperPage() {
                         "text-sm font-medium transition-colors",
                         isActive && "text-foreground",
                         isCompleted && "text-green-600 dark:text-green-400",
-                        !isActive && !isCompleted && "text-muted-foreground",
+                        !isActive && !isCompleted && "text-muted-foreground"
                       )}
                     >
                       {step.label}

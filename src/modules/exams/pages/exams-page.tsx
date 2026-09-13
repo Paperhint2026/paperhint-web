@@ -24,6 +24,8 @@ import {
 import dayjs from "dayjs"
 import { AnimatePresence, motion } from "motion/react"
 import { toast } from "sonner"
+
+import { showError } from "@/lib/show-error"
 import "katex/dist/katex.min.css"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
@@ -631,10 +633,11 @@ export function ExamsPage() {
   }
 
   const handleSave = async () => {
-    if (!examName.trim()) return toast.error("Exam name is required")
-    if (chapters.length === 0) return toast.error("Select at least one chapter")
+    if (!examName.trim()) return showError(new Error("Exam name is required"))
+    if (chapters.length === 0)
+      return showError(new Error("Select at least one chapter"))
     if (!showBlueprintSections || blueprint.length === 0)
-      return toast.error("Select or create a blueprint")
+      return showError(new Error("Select or create a blueprint"))
     if (passMarks != null && (passMarks <= 0 || passMarks > totalMarks)) {
       return toast.error(`Pass mark must be between 1 and ${totalMarks}`)
     }
@@ -1396,7 +1399,10 @@ export function ExamsPage() {
                                               ]}
                                               rehypePlugins={[
                                                 rehypeRaw,
-                                                [rehypeSanitize, sanitizeSchema],
+                                                [
+                                                  rehypeSanitize,
+                                                  sanitizeSchema,
+                                                ],
                                                 rehypeKatex,
                                               ]}
                                             >
@@ -1488,11 +1494,16 @@ export function ExamsPage() {
                                                       ]}
                                                       rehypePlugins={[
                                                         rehypeRaw,
-                                                        [rehypeSanitize, sanitizeSchema],
+                                                        [
+                                                          rehypeSanitize,
+                                                          sanitizeSchema,
+                                                        ],
                                                         rehypeKatex,
                                                       ]}
                                                     >
-                                                      {formatAnswerKey(q.answer_key!)}
+                                                      {formatAnswerKey(
+                                                        q.answer_key!
+                                                      )}
                                                     </ReactMarkdown>
                                                   </div>
                                                 </div>
@@ -2198,7 +2209,7 @@ function DuplicateExamPopover({
       onDuplicated()
       setOpen(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to duplicate")
+      showError(err, "Failed to duplicate")
     } finally {
       setBusy(false)
     }
@@ -2323,7 +2334,7 @@ function CloneFromSectionSheet({
       })
       .catch((err) => {
         if (cancelled) return
-        toast.error(err instanceof Error ? err.message : "Failed to load exams")
+        showError(err, "Failed to load exams")
         setExams([])
       })
       .finally(() => {
@@ -2353,7 +2364,7 @@ function CloneFromSectionSheet({
       toast.success("Cloned into this section")
       onCloned(hit.new_exam_id)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Clone failed")
+      showError(err, "Clone failed")
     } finally {
       setCloningId(null)
     }

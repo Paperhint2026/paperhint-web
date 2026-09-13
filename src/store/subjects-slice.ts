@@ -35,7 +35,7 @@ export const fetchSubjects = createAsyncThunk<
     return res.subjects ?? []
   } catch (err) {
     return rejectWithValue(
-      err instanceof Error ? err.message : "Failed to fetch subjects",
+      err instanceof Error ? err.message : "Failed to fetch subjects"
     )
   }
 })

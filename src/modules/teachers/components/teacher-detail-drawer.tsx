@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, useReducedMotion } from "motion/react"
 import { toast } from "sonner"
+
+import { showError } from "@/lib/show-error"
 import { useIsMobile } from "@/hooks/use-mobile"
 import dayjs from "dayjs"
 import {
@@ -368,7 +370,7 @@ export function TeacherDetailDrawer({
       await navigator.clipboard.writeText(teacher.email)
       toast.success("Email copied")
     } catch {
-      toast.error("Couldn't copy the email")
+      showError(new Error("Couldn't copy the email"))
     }
   }
 

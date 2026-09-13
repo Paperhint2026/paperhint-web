@@ -15,105 +15,81 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { FadersIcon, FileTextIcon, LinkIcon, CopyIcon, ArrowBendUpRightIcon, TrashIcon, ArrowBendUpLeftIcon, ChartLineIcon, ClockCounterClockwiseIcon, BellIcon, ArrowUpIcon, ArrowDownIcon, StarIcon, DotsThreeIcon } from "@phosphor-icons/react"
+import {
+  FadersIcon,
+  FileTextIcon,
+  LinkIcon,
+  CopyIcon,
+  ArrowBendUpRightIcon,
+  TrashIcon,
+  ArrowBendUpLeftIcon,
+  ChartLineIcon,
+  ClockCounterClockwiseIcon,
+  BellIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  StarIcon,
+  DotsThreeIcon,
+} from "@phosphor-icons/react"
 const data = [
   [
     {
       label: "Customize Page",
-      icon: (
-        <FadersIcon
-        />
-      ),
+      icon: <FadersIcon />,
     },
     {
       label: "Turn into wiki",
-      icon: (
-        <FileTextIcon
-        />
-      ),
+      icon: <FileTextIcon />,
     },
   ],
   [
     {
       label: "Copy Link",
-      icon: (
-        <LinkIcon
-        />
-      ),
+      icon: <LinkIcon />,
     },
     {
       label: "Duplicate",
-      icon: (
-        <CopyIcon
-        />
-      ),
+      icon: <CopyIcon />,
     },
     {
       label: "Move to",
-      icon: (
-        <ArrowBendUpRightIcon
-        />
-      ),
+      icon: <ArrowBendUpRightIcon />,
     },
     {
       label: "Move to Trash",
-      icon: (
-        <TrashIcon
-        />
-      ),
+      icon: <TrashIcon />,
     },
   ],
   [
     {
       label: "Undo",
-      icon: (
-        <ArrowBendUpLeftIcon
-        />
-      ),
+      icon: <ArrowBendUpLeftIcon />,
     },
     {
       label: "View analytics",
-      icon: (
-        <ChartLineIcon
-        />
-      ),
+      icon: <ChartLineIcon />,
     },
     {
       label: "Version History",
-      icon: (
-        <ClockCounterClockwiseIcon
-        />
-      ),
+      icon: <ClockCounterClockwiseIcon />,
     },
     {
       label: "Show delete pages",
-      icon: (
-        <TrashIcon
-        />
-      ),
+      icon: <TrashIcon />,
     },
     {
       label: "Notifications",
-      icon: (
-        <BellIcon
-        />
-      ),
+      icon: <BellIcon />,
     },
   ],
   [
     {
       label: "Import",
-      icon: (
-        <ArrowUpIcon
-        />
-      ),
+      icon: <ArrowUpIcon />,
     },
     {
       label: "Export",
-      icon: (
-        <ArrowDownIcon
-        />
-      ),
+      icon: <ArrowDownIcon />,
     },
   ],
 ]
@@ -131,8 +107,7 @@ export function NavActions() {
         Edit Oct 08
       </div>
       <Button variant="ghost" size="icon" className="h-7 w-7">
-        <StarIcon
-        />
+        <StarIcon />
       </Button>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
@@ -141,8 +116,7 @@ export function NavActions() {
             size="icon"
             className="h-7 w-7 data-[state=open]:bg-accent"
           >
-            <DotsThreeIcon
-            />
+            <DotsThreeIcon />
           </Button>
         </PopoverTrigger>
         <PopoverContent

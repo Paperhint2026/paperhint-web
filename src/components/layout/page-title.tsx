@@ -34,7 +34,9 @@ export function PageTitle({
           </h1>
         </div>
         {description ? (
-          <p className="max-w-xl text-sm text-muted-foreground">{description}</p>
+          <p className="max-w-xl text-sm text-muted-foreground">
+            {description}
+          </p>
         ) : null}
       </div>
       {headerActions ? (

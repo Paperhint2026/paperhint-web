@@ -13,7 +13,10 @@ export function formatAnswerKey(raw: string): string {
   // numbered steps "1. Capital…" (sentence dot before is fine; decimals can't match)
   t = t.replace(/(?<!\d)\s(\d{1,2})\.\s+(?=[A-Z($\\])/g, "\n\n$1. ")
   // lead-ins get their own bolded line
-  t = t.replace(/\s+(Step-by-step Explanation:|Explanation:)/g, "\n\n**$1**\n\n")
+  t = t.replace(
+    /\s+(Step-by-step Explanation:|Explanation:)/g,
+    "\n\n**$1**\n\n"
+  )
   // alternative-solution marker
   t = t.replace(/\s+OR\s+\(/g, "\n\nOR (")
   return t.trim()

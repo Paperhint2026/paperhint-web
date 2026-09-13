@@ -10,6 +10,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAppDispatch } from "@/store"
@@ -122,7 +124,7 @@ export function ProfileSection({ user }: { user: User }) {
       toast.success("Photo updated")
     } catch {
       setPreviewSrc(profileUrl)
-      toast.error("Failed to upload photo. Please try again.")
+      showError(new Error("Failed to upload photo. Please try again."))
     } finally {
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -153,7 +155,7 @@ export function ProfileSection({ user }: { user: User }) {
       window.setTimeout(() => setJustSaved(false), 1600)
       toast.success("Profile updated")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save profile")
+      showError(err, "Failed to save profile")
     } finally {
       setIsSaving(false)
     }

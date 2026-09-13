@@ -6,6 +6,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import {
   AlertDialog,
@@ -106,7 +108,7 @@ export function AcademicYearCard() {
       setConfirm(false)
       load()
     } catch (e) {
-      if (e instanceof Error) toast.error(e.message)
+      showError(e)
     } finally {
       setSaving(false)
     }

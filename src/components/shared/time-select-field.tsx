@@ -56,7 +56,7 @@ function TimeColumn<T extends string | number>({
           onClick={() => onSelect(o)}
           aria-pressed={value === o}
           className={cn(
-            "min-w-12 rounded-md px-2.5 py-1.5 text-center text-sm transition-colors tabular-nums",
+            "min-w-12 rounded-md px-2.5 py-1.5 text-center text-sm tabular-nums transition-colors",
             value === o
               ? "bg-primary font-medium text-primary-foreground"
               : "text-secondary-foreground hover:bg-muted"

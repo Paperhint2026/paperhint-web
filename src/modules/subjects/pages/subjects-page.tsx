@@ -7,6 +7,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -67,7 +69,7 @@ export function SubjectsPage() {
   const send = useCallback(
     (fn: () => Promise<unknown>) => {
       chain.current = chain.current.then(fn).catch((e) => {
-        toast.error(e instanceof Error ? e.message : "That did not save")
+        showError(e, "That did not save")
         return load()
       })
       return chain.current
@@ -89,7 +91,7 @@ export function SubjectsPage() {
       if (done) toast.success(done)
       await load()
     } catch (e) {
-      if (e instanceof Error) toast.error(e.message)
+      showError(e)
     } finally {
       setBusy(null)
     }

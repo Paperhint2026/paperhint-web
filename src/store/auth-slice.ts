@@ -47,14 +47,9 @@ export const login = createAsyncThunk<
   { rejectValue: string }
 >("auth/login", async (credentials, { rejectWithValue }) => {
   try {
-    return await apiClient.post<LoginResponse>(
-      "/api/auth/login",
-      credentials,
-    )
+    return await apiClient.post<LoginResponse>("/api/auth/login", credentials)
   } catch (err) {
-    return rejectWithValue(
-      err instanceof Error ? err.message : "Login failed",
-    )
+    return rejectWithValue(err instanceof Error ? err.message : "Login failed")
   }
 })
 

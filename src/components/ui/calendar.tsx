@@ -10,7 +10,11 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { CaretLeftIcon, CaretRightIcon, CaretDownIcon } from "@phosphor-icons/react"
+import {
+  CaretLeftIcon,
+  CaretRightIcon,
+  CaretDownIcon,
+} from "@phosphor-icons/react"
 function Calendar({
   className,
   classNames,
@@ -152,10 +156,7 @@ function Calendar({
 
           if (orientation === "right") {
             return (
-              <CaretRightIcon
-                className={cn("size-4", className)}
-                {...props}
-              />
+              <CaretRightIcon className={cn("size-4", className)} {...props} />
             )
           }
 

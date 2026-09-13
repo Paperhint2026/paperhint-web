@@ -23,7 +23,14 @@ export interface CustomFieldDef {
   id: string
   field_key: string
   label: string
-  field_type: "text" | "number" | "date" | "select" | "phone" | "email" | "boolean"
+  field_type:
+    | "text"
+    | "number"
+    | "date"
+    | "select"
+    | "phone"
+    | "email"
+    | "boolean"
   options: string[] | null
   required: boolean
   section?: string | null
@@ -125,7 +132,11 @@ export function CustomFieldsInputs({
             </label>
           ) : def.field_type === "select" ? (
             <Select
-              value={values[def.field_key] != null ? String(values[def.field_key]) : ""}
+              value={
+                values[def.field_key] != null
+                  ? String(values[def.field_key])
+                  : ""
+              }
               onValueChange={(v) => set(def.field_key, v)}
             >
               <SelectTrigger className="w-full">
@@ -143,7 +154,11 @@ export function CustomFieldsInputs({
             <Input
               type={inputTypeFor[def.field_type] ?? "text"}
               placeholder={def.placeholder ?? undefined}
-              value={values[def.field_key] != null ? String(values[def.field_key]) : ""}
+              value={
+                values[def.field_key] != null
+                  ? String(values[def.field_key])
+                  : ""
+              }
               onChange={(e) =>
                 set(
                   def.field_key,
@@ -182,7 +197,12 @@ export function CustomFieldsDisplay({
           : raw
       return { label: d.label, value }
     })
-    .filter((r) => r.value !== undefined && r.value !== null && String(r.value).trim() !== "")
+    .filter(
+      (r) =>
+        r.value !== undefined &&
+        r.value !== null &&
+        String(r.value).trim() !== ""
+    )
 
   if (rows.length === 0) return null
 
@@ -193,7 +213,9 @@ export function CustomFieldsDisplay({
           <span className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
             {r.label}
           </span>
-          <span className="truncate text-sm text-foreground">{String(r.value)}</span>
+          <span className="truncate text-sm text-foreground">
+            {String(r.value)}
+          </span>
         </div>
       ))}
     </div>

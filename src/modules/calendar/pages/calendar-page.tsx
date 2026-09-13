@@ -37,6 +37,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import {
   TimeSelectField,
@@ -195,7 +197,9 @@ const gradesLabel = (grades: number[] | null) =>
 function academicYearMonths(academicYear: string): Date[] {
   const start = Number(academicYear.split("-")[0])
   if (!Number.isFinite(start)) return []
-  return Array.from({ length: 12 }, (_, i) => addMonths(new Date(start, 5, 1), i))
+  return Array.from({ length: 12 }, (_, i) =>
+    addMonths(new Date(start, 5, 1), i)
+  )
 }
 
 /** Which weekdays the school works, from its week settings. getDay():
@@ -239,7 +243,10 @@ function CalendarSkeleton() {
       </div>
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border">
         {Array.from({ length: 35 }).map((_, i) => (
-          <div key={i} className="flex min-h-20 flex-col gap-1 bg-background p-2">
+          <div
+            key={i}
+            className="flex min-h-20 flex-col gap-1 bg-background p-2"
+          >
             <Skeleton className="h-3 w-5" />
             {i % 5 === 1 && <Skeleton className="h-4 w-full rounded" />}
           </div>
@@ -333,7 +340,11 @@ export function CalendarPage() {
     }
     if (wasProcessing.current && status === "failed") {
       wasProcessing.current = false
-      toast.error("Extraction failed — try re-uploading, or add events manually")
+      showError(
+        new Error(
+          "Extraction failed — try re-uploading, or add events manually"
+        )
+      )
     }
   }, [data, selectedYear, fetchCalendar])
 
@@ -344,7 +355,11 @@ export function CalendarPage() {
       return
     }
     setHeaderActions(
-      <Button size="lg" className="rounded-full" onClick={() => setUploadOpen(true)}>
+      <Button
+        size="lg"
+        className="rounded-full"
+        onClick={() => setUploadOpen(true)}
+      >
         <UploadSimpleIcon className="size-3.5" />
         <span className="hidden sm:inline">Upload calendar</span>
       </Button>
@@ -402,10 +417,14 @@ export function CalendarPage() {
         calendar_id: calendar.id,
         publish: next,
       })
-      toast.success(next ? "Calendar published — teachers can see it now" : "Calendar unpublished")
+      toast.success(
+        next
+          ? "Calendar published — teachers can see it now"
+          : "Calendar unpublished"
+      )
       await fetchCalendar(selectedYear)
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsPublishing(false)
     }
@@ -420,7 +439,7 @@ export function CalendarPage() {
       setEventToDelete(null)
       await fetchCalendar(selectedYear)
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsDeleting(false)
     }
@@ -459,7 +478,10 @@ export function CalendarPage() {
               </p>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
-            <Button variant="outline" onClick={() => fetchCalendar(selectedYear)}>
+            <Button
+              variant="outline"
+              onClick={() => fetchCalendar(selectedYear)}
+            >
               Try again
             </Button>
           </div>
@@ -586,9 +608,13 @@ export function CalendarPage() {
                     {selectedTypes.map((t) => (
                       <FilterChip
                         key={t}
-                        label={EVENT_TYPES.find((x) => x.value === t)?.label ?? t}
+                        label={
+                          EVENT_TYPES.find((x) => x.value === t)?.label ?? t
+                        }
                         onRemove={() =>
-                          setSelectedTypes((prev) => prev.filter((x) => x !== t))
+                          setSelectedTypes((prev) =>
+                            prev.filter((x) => x !== t)
+                          )
                         }
                       />
                     ))}
@@ -601,7 +627,9 @@ export function CalendarPage() {
                         key={g}
                         label={`Grade ${g}`}
                         onRemove={() =>
-                          setSelectedGrades((prev) => prev.filter((x) => x !== g))
+                          setSelectedGrades((prev) =>
+                            prev.filter((x) => x !== g)
+                          )
                         }
                       />
                     ))}
@@ -634,9 +662,11 @@ export function CalendarPage() {
               <div className="flex items-center gap-2.5 rounded-xl border border-border bg-sidebar/50 px-4 py-3 text-xs text-secondary-foreground">
                 <CircleNotchIcon className="size-4 animate-spin text-primary" />
                 <span>
-                  <span className="font-medium">Extracting events from the uploaded calendar…</span>{" "}
-                  A large planner takes a minute or two. You can leave this
-                  page — the draft will be waiting when it's done.
+                  <span className="font-medium">
+                    Extracting events from the uploaded calendar…
+                  </span>{" "}
+                  A large planner takes a minute or two. You can leave this page
+                  — the draft will be waiting when it's done.
                 </span>
               </div>
             )}
@@ -645,7 +675,9 @@ export function CalendarPage() {
               <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-secondary-foreground">
                 <WarningIcon className="size-4 shrink-0 text-destructive" />
                 <span>
-                  <span className="font-medium">The last extraction failed.</span>{" "}
+                  <span className="font-medium">
+                    The last extraction failed.
+                  </span>{" "}
                   Re-upload the file, or add events manually — existing events
                   are untouched.
                 </span>
@@ -653,16 +685,21 @@ export function CalendarPage() {
             )}
 
             {/* draft banner */}
-            {isAdmin && calendar && calendar.status !== "processing" && !calendar.is_published && (
-              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                <WarningIcon className="mt-0.5 size-3.5 shrink-0" />
-                <span>
-                  <span className="font-medium">Draft — teachers can't see this yet.</span>{" "}
-                  Review the extracted events (dates especially), fix anything
-                  the OCR misread, then publish.
-                </span>
-              </div>
-            )}
+            {isAdmin &&
+              calendar &&
+              calendar.status !== "processing" &&
+              !calendar.is_published && (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                  <WarningIcon className="mt-0.5 size-3.5 shrink-0" />
+                  <span>
+                    <span className="font-medium">
+                      Draft — teachers can't see this yet.
+                    </span>{" "}
+                    Review the extracted events (dates especially), fix anything
+                    the OCR misread, then publish.
+                  </span>
+                </div>
+              )}
 
             {!calendar ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-5 rounded-xl border border-border bg-background px-5 py-14 text-center">
@@ -683,7 +720,10 @@ export function CalendarPage() {
                       <UploadSimpleIcon className="size-3.5" />
                       Upload calendar
                     </Button>
-                    <Button variant="outline" onClick={() => setEventDialog({ mode: "create" })}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setEventDialog({ mode: "create" })}
+                    >
                       <PlusIcon className="size-3.5" />
                       Add event manually
                     </Button>
@@ -696,11 +736,16 @@ export function CalendarPage() {
                 events={events}
                 onAddAt={(date) => setEventDialog({ mode: "create", date })}
                 onShowDetail={(e) => setDetailEvent(e)}
-                weekStartsOn={data?.week_settings?.week_start === "sunday" ? 0 : 1}
+                weekStartsOn={
+                  data?.week_settings?.week_start === "sunday" ? 0 : 1
+                }
                 weekSettings={data?.week_settings}
-                onPrev={() => monthIndex > 0 && setMonth(months[monthIndex - 1])}
+                onPrev={() =>
+                  monthIndex > 0 && setMonth(months[monthIndex - 1])
+                }
                 onNext={() =>
-                  monthIndex < months.length - 1 && setMonth(months[monthIndex + 1])
+                  monthIndex < months.length - 1 &&
+                  setMonth(months[monthIndex + 1])
                 }
                 hasPrev={monthIndex > 0}
                 hasNext={monthIndex < months.length - 1}
@@ -732,7 +777,9 @@ export function CalendarPage() {
         <EventDialog
           mode={eventDialog.mode}
           event={eventDialog.mode === "edit" ? eventDialog.event : null}
-          defaultDate={eventDialog.mode === "create" ? eventDialog.date : undefined}
+          defaultDate={
+            eventDialog.mode === "create" ? eventDialog.date : undefined
+          }
           academicYear={activeYear}
           onClose={() => setEventDialog(null)}
           onSaved={() => {
@@ -870,7 +917,9 @@ function MonthGrid({
               key={t.value}
               className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"
             >
-              <span className={cn("size-1.5 rounded-full", TYPE_STYLE[t.value].dot)} />
+              <span
+                className={cn("size-1.5 rounded-full", TYPE_STYLE[t.value].dot)}
+              />
               {t.label}
             </span>
           ))}
@@ -883,7 +932,10 @@ function MonthGrid({
             ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
             : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
           ).map((d) => (
-            <div key={d} className="py-1.5 text-[11px] font-medium text-muted-foreground">
+            <div
+              key={d}
+              className="py-1.5 text-[11px] font-medium text-muted-foreground"
+            >
               {d}
             </div>
           ))}
@@ -891,7 +943,9 @@ function MonthGrid({
         <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-7 gap-px bg-border">
           {days.map((day) => {
             const inMonth = isSameMonth(day, month)
-            const dayEvents = inMonth ? events.filter((e) => eventCoversDay(e, day, workingDays)) : []
+            const dayEvents = inMonth
+              ? events.filter((e) => eventCoversDay(e, day, workingDays))
+              : []
             const isToday = isSameDay(day, today)
             return (
               <div
@@ -902,7 +956,9 @@ function MonthGrid({
                 className={cn(
                   "flex min-h-0 flex-col gap-1 overflow-hidden bg-background p-1.5",
                   !inMonth && "bg-muted/40",
-                  isAdmin && inMonth && "cursor-pointer transition-colors hover:bg-primary/[0.04]"
+                  isAdmin &&
+                    inMonth &&
+                    "cursor-pointer transition-colors hover:bg-primary/[0.04]"
                 )}
               >
                 <span
@@ -979,7 +1035,9 @@ function MonthGrid({
                                 TYPE_STYLE[e.event_type].chip
                               )}
                             >
-                              {e.start_time ? `${e.start_time.slice(0, 5)} ` : ""}
+                              {e.start_time
+                                ? `${e.start_time.slice(0, 5)} `
+                                : ""}
                               {e.title}
                             </button>
                           ))}
@@ -1158,7 +1216,7 @@ function WeekSettingsPopover({
       setOpen(false)
       onSaved()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
@@ -1167,7 +1225,11 @@ function WeekSettingsPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 rounded-full text-xs">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 rounded-full text-xs"
+        >
           <GearSixIcon className="size-3.5" />
           Week settings
         </Button>
@@ -1177,8 +1239,8 @@ function WeekSettingsPopover({
           <div className="flex flex-col gap-0.5">
             <p className="text-sm font-medium">Working week</p>
             <p className="text-xs text-muted-foreground">
-              How "second week of July" style rows in an uploaded calendar
-              turn into dates. Applies to future uploads.
+              How "second week of July" style rows in an uploaded calendar turn
+              into dates. Applies to future uploads.
             </p>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -1262,7 +1324,7 @@ function UploadDialog({
 
   const upload = async () => {
     if (!file || !year) {
-      toast.error("Pick the calendar file and the academic year")
+      showError(new Error("Pick the calendar file and the academic year"))
       return
     }
     setIsUploading(true)
@@ -1275,7 +1337,7 @@ function UploadDialog({
       onOpenChange(false)
       onUploaded(year)
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsUploading(false)
     }
@@ -1320,7 +1382,11 @@ function UploadDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isUploading}
+          >
             Cancel
           </Button>
           <Button onClick={upload} disabled={isUploading || !file}>
@@ -1470,7 +1536,7 @@ function CalendarFiltersPopover({
                   onClick={() => onToggleGrade(g)}
                   aria-pressed={selectedGrades.includes(g)}
                   className={cn(
-                    "flex size-7 items-center justify-center rounded-full border text-[11px] font-medium transition-colors tabular-nums",
+                    "flex size-7 items-center justify-center rounded-full border text-[11px] font-medium tabular-nums transition-colors",
                     selectedGrades.includes(g)
                       ? "border-primary/40 bg-primary/10 text-primary"
                       : "border-border bg-background text-muted-foreground hover:bg-muted"
@@ -1739,34 +1805,42 @@ function EventDialog({
 }) {
   const [title, setTitle] = useState(event?.title ?? "")
   const [description, setDescription] = useState(event?.description ?? "")
-  const [eventType, setEventType] = useState<EventType>(event?.event_type ?? "other")
-  const [startsOn, setStartsOn] = useState(event?.starts_on ?? defaultDate ?? "")
+  const [eventType, setEventType] = useState<EventType>(
+    event?.event_type ?? "other"
+  )
+  const [startsOn, setStartsOn] = useState(
+    event?.starts_on ?? defaultDate ?? ""
+  )
   const [endsOn, setEndsOn] = useState(event?.ends_on ?? "")
-  const [startTime, setStartTime] = useState(event?.start_time?.slice(0, 5) ?? "")
+  const [startTime, setStartTime] = useState(
+    event?.start_time?.slice(0, 5) ?? ""
+  )
   const [endTime, setEndTime] = useState(event?.end_time?.slice(0, 5) ?? "")
   const [grades, setGrades] = useState<number[]>(event?.grades ?? [])
   const [isSaving, setIsSaving] = useState(false)
 
   const toggleGrade = (g: number) =>
     setGrades((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g].sort((a, b) => a - b)
+      prev.includes(g)
+        ? prev.filter((x) => x !== g)
+        : [...prev, g].sort((a, b) => a - b)
     )
 
   const save = async () => {
     if (!title.trim() || !startsOn) {
-      toast.error("Title and start date are required")
+      showError(new Error("Title and start date are required"))
       return
     }
     if (endsOn && endsOn < startsOn) {
-      toast.error("End date can't be before the start date")
+      showError(new Error("End date can't be before the start date"))
       return
     }
     if (endTime && !startTime) {
-      toast.error("An end time needs a start time")
+      showError(new Error("An end time needs a start time"))
       return
     }
     if (startTime && endTime && !endsOn && endTime <= startTime) {
-      toast.error("End time must be after the start time")
+      showError(new Error("End time must be after the start time"))
       return
     }
     setIsSaving(true)
@@ -1793,7 +1867,7 @@ function EventDialog({
       }
       onSaved()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
@@ -1841,7 +1915,10 @@ function EventDialog({
                     <SelectItem key={t.value} value={t.value}>
                       <span className="inline-flex items-center gap-1.5">
                         <span
-                          className={cn("size-2 rounded-full", TYPE_STYLE[t.value].dot)}
+                          className={cn(
+                            "size-2 rounded-full",
+                            TYPE_STYLE[t.value].dot
+                          )}
                         />
                         {t.label}
                       </span>
@@ -1860,7 +1937,7 @@ function EventDialog({
                     onClick={() => toggleGrade(g)}
                     aria-pressed={grades.includes(g)}
                     className={cn(
-                      "flex size-6 items-center justify-center rounded-full border text-[10px] font-medium transition-colors tabular-nums",
+                      "flex size-6 items-center justify-center rounded-full border text-[10px] font-medium tabular-nums transition-colors",
                       grades.includes(g)
                         ? "border-primary/40 bg-primary/10 text-primary"
                         : "border-border bg-background text-muted-foreground hover:bg-muted"

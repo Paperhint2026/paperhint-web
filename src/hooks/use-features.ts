@@ -41,7 +41,9 @@ export function resetFeaturesCache() {
 
 export function useFeatures() {
   const { user } = useAuth()
-  const [features, setFeatures] = useState<Record<string, boolean> | null>(cached)
+  const [features, setFeatures] = useState<Record<string, boolean> | null>(
+    cached
+  )
 
   useEffect(() => {
     if (!user || cached) return

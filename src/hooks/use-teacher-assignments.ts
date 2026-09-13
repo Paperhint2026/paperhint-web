@@ -19,7 +19,10 @@ export function classLabel(a: Assignment) {
 
 export function classSlug(a: Assignment) {
   if (!a.class || !a.subject) return a.class_subject_id
-  return `${a.class.grade}${a.class.section}-${a.subject.subject_name}`.replace(/\s+/g, "-")
+  return `${a.class.grade}${a.class.section}-${a.subject.subject_name}`.replace(
+    /\s+/g,
+    "-"
+  )
 }
 
 let cachedAssignments: Assignment[] | null = null
@@ -28,9 +31,11 @@ let cacheUserId: string | null = null
 export function useTeacherAssignments() {
   const { user } = useAuth()
   const [assignments, setAssignments] = useState<Assignment[]>(
-    cacheUserId === user?.id ? (cachedAssignments ?? []) : [],
+    cacheUserId === user?.id ? (cachedAssignments ?? []) : []
   )
-  const [isLoading, setIsLoading] = useState(!cachedAssignments || cacheUserId !== user?.id)
+  const [isLoading, setIsLoading] = useState(
+    !cachedAssignments || cacheUserId !== user?.id
+  )
 
   const fetchAssignments = useCallback(async () => {
     // The overview endpoint is teacher-scoped (.single() on role='teacher'),
@@ -43,7 +48,7 @@ export function useTeacherAssignments() {
     setIsLoading(true)
     try {
       const res = await apiClient.get<{ teacher: TeacherOverview }>(
-        `/api/auth/teacher/${user.id}/overview`,
+        `/api/auth/teacher/${user.id}/overview`
       )
       const list = res.teacher.assignments ?? []
       cachedAssignments = list

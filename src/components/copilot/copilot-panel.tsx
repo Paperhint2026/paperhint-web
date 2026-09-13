@@ -1369,7 +1369,10 @@ export function CopilotPanel({
                             disabled={isAsking}
                             className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
                           >
-                            <ArrowClockwiseIcon aria-hidden className="size-3.5" />
+                            <ArrowClockwiseIcon
+                              aria-hidden
+                              className="size-3.5"
+                            />
                             Try again
                           </button>
                         ) : (

@@ -67,7 +67,13 @@ export function PlatformPage() {
   if (user && user.role !== "platform") return <Navigate to="/" replace />
 
   return (
-    <div className={cn(PAGE_GUTTER, PAGE_TOP, "flex min-h-full flex-col gap-5 pb-12")}>
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "flex min-h-full flex-col gap-5 pb-12"
+      )}
+    >
       <PageHeader
         icon={BuildingsIcon}
         title="Platform Console"
@@ -76,7 +82,9 @@ export function PlatformPage() {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {schools ? `${schools.length} school${schools.length === 1 ? "" : "s"}` : ""}
+          {schools
+            ? `${schools.length} school${schools.length === 1 ? "" : "s"}`
+            : ""}
         </p>
         <Button
           size="sm"
@@ -152,12 +160,17 @@ export function PlatformPage() {
                     <td className="border-b border-border px-3 py-3 text-muted-foreground">
                       {s.plan_name ?? "—"}
                       {s.valid_until && (
-                        <span className="block text-[11px]">until {s.valid_until}</span>
+                        <span className="block text-[11px]">
+                          until {s.valid_until}
+                        </span>
                       )}
                     </td>
                     <td className="border-b border-border px-3 py-3">
                       {disabled.length === 0 ? (
-                        <Badge variant="secondary" className="rounded-full text-[10px]">
+                        <Badge
+                          variant="secondary"
+                          className="rounded-full text-[10px]"
+                        >
                           all modules
                         </Badge>
                       ) : (
@@ -179,7 +192,10 @@ export function PlatformPage() {
               })}
               {schools.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-10 text-center text-sm text-muted-foreground"
+                  >
                     No schools yet — create the first one.
                   </td>
                 </tr>
@@ -188,8 +204,6 @@ export function PlatformPage() {
           </table>
         </div>
       )}
-
-
     </div>
   )
 }

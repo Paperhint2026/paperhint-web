@@ -58,7 +58,7 @@ export function useClassAiChat(classSubjectId: string | null): ClassAiChat {
   const [materials, setMaterials] = useState<Material[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
-    null,
+    null
   )
 
   const abortRef = useRef<AbortController | null>(null)
@@ -80,7 +80,7 @@ export function useClassAiChat(classSubjectId: string | null): ClassAiChat {
     let active = true
     apiClient
       .get<{ materials: Material[] }>(
-        `/api/knowledge/materials/${classSubjectId}`,
+        `/api/knowledge/materials/${classSubjectId}`
       )
       .then((res) => {
         if (active) setMaterials(res.materials ?? [])
@@ -210,7 +210,8 @@ export function useClassAiChat(classSubjectId: string | null): ClassAiChat {
             let dataLine = ""
             for (const line of rawFrame.split("\n")) {
               if (line.startsWith("event:")) eventName = line.slice(6).trim()
-              else if (line.startsWith("data:")) dataLine += line.slice(5).trim()
+              else if (line.startsWith("data:"))
+                dataLine += line.slice(5).trim()
             }
 
             if (dataLine) {
@@ -221,16 +222,19 @@ export function useClassAiChat(classSubjectId: string | null): ClassAiChat {
                     prev.map((m) =>
                       m.id === assistantMsgId
                         ? { ...m, content: m.content + payload.t }
-                        : m,
-                    ),
+                        : m
+                    )
                   )
-                } else if (eventName === "sources" && Array.isArray(payload.sources)) {
+                } else if (
+                  eventName === "sources" &&
+                  Array.isArray(payload.sources)
+                ) {
                   setMessages((prev) =>
                     prev.map((m) =>
                       m.id === assistantMsgId
                         ? { ...m, sources: payload.sources }
-                        : m,
-                    ),
+                        : m
+                    )
                   )
                 } else if (eventName === "error") {
                   throw new Error(payload.error || "Stream error")
@@ -260,8 +264,8 @@ export function useClassAiChat(classSubjectId: string | null): ClassAiChat {
                   content: `Sorry, I hit an error: ${msg}`,
                   isError: true,
                 }
-              : m,
-          ),
+              : m
+          )
         )
       } finally {
         if (abortRef.current === controller) abortRef.current = null
@@ -273,7 +277,7 @@ export function useClassAiChat(classSubjectId: string | null): ClassAiChat {
         }
       }
     },
-    [classSubjectId, isStreaming, messages],
+    [classSubjectId, isStreaming, messages]
   )
 
   return {

@@ -15,6 +15,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -110,7 +112,7 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
       setOriginal(res.custom_fields ?? [])
       setDraft(res.custom_fields ?? [])
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
       setOriginal([])
       setDraft([])
     }
@@ -353,7 +355,7 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
       setSelection(null)
       await load()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
@@ -796,7 +798,7 @@ function PropertiesPanel({
   )
 
   const apply = () => {
-    if (!label.trim()) return toast.error("Give the field a label")
+    if (!label.trim()) return showError(new Error("Give the field a label"))
     const options =
       fieldType === "select"
         ? optionsText
@@ -805,7 +807,7 @@ function PropertiesPanel({
             .filter(Boolean)
         : undefined
     if (fieldType === "select" && (options?.length ?? 0) < 2) {
-      return toast.error("A dropdown needs at least 2 options")
+      return showError(new Error("A dropdown needs at least 2 options"))
     }
     const values = {
       label: label.trim(),

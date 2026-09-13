@@ -18,6 +18,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
@@ -364,7 +366,7 @@ export function GradingPage() {
   const uploadSheet = async (studentId: string, rawFile: File) => {
     if (!selectedExamId) return
     if (!ACCEPTED.includes(rawFile.type)) {
-      toast.error("Use a PDF or a JPG, PNG or WebP photo")
+      showError(new Error("Use a PDF or a JPG, PNG or WebP photo"))
       return
     }
 

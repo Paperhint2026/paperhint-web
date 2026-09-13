@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import { CircleNotchIcon, FileTextIcon } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { tameCaps } from "@/lib/format"
 import { Button } from "@/components/ui/button"
@@ -101,9 +103,7 @@ export function MaterialLinksDialog({
       )
       onOpenChange(false)
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Couldn't update the classes"
-      )
+      showError(err, "Couldn't update the classes")
     } finally {
       setSaving(false)
     }

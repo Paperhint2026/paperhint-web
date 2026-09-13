@@ -25,6 +25,8 @@ import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -183,7 +185,7 @@ export function QuestionsPage() {
       setExpandedSections(sections)
     } catch (err) {
       console.error("Failed to fetch exam:", err)
-      toast.error("Failed to load question paper")
+      showError(new Error("Failed to load question paper"))
     } finally {
       setIsLoading(false)
     }
@@ -298,7 +300,8 @@ export function QuestionsPage() {
   }
 
   const handleAddQuestion = async (section: string) => {
-    if (!newQuestionText.trim()) return toast.error("Question text is required")
+    if (!newQuestionText.trim())
+      return showError(new Error("Question text is required"))
     setIsAddingQuestion(true)
     try {
       const sectionQuestions = sectionGroups[section] || []
@@ -625,7 +628,11 @@ export function QuestionsPage() {
                                     >
                                       <ReactMarkdown
                                         remarkPlugins={[remarkMath, remarkGfm]}
-                                        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
+                                        rehypePlugins={[
+                                          rehypeRaw,
+                                          [rehypeSanitize, sanitizeSchema],
+                                          rehypeKatex,
+                                        ]}
                                       >
                                         {q.question_text}
                                       </ReactMarkdown>
@@ -651,8 +658,15 @@ export function QuestionsPage() {
                                         </p>
                                         <div className="text-xs leading-relaxed text-green-700 dark:text-green-300 [&_p+p]:mt-1.5">
                                           <ReactMarkdown
-                                            remarkPlugins={[remarkMath, remarkGfm]}
-                                            rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
+                                            remarkPlugins={[
+                                              remarkMath,
+                                              remarkGfm,
+                                            ]}
+                                            rehypePlugins={[
+                                              rehypeRaw,
+                                              [rehypeSanitize, sanitizeSchema],
+                                              rehypeKatex,
+                                            ]}
                                           >
                                             {formatAnswerKey(q.answer_key)}
                                           </ReactMarkdown>

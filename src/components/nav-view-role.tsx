@@ -33,7 +33,9 @@ export function NavViewRole() {
               type="button"
               role="radio"
               aria-checked={selected}
-              onClick={() => setPreview(o.value === actualRole ? null : o.value)}
+              onClick={() =>
+                setPreview(o.value === actualRole ? null : o.value)
+              }
               className={cn(
                 "rounded-md px-2 py-1 text-xs transition-colors",
                 selected

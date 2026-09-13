@@ -18,6 +18,8 @@ import {
 import dayjs from "dayjs"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
@@ -206,7 +208,7 @@ export function KnowledgePage() {
   const handleUploadAndProcess = async () => {
     if (selectedFiles.length === 0 || !classSubjectId) return
     if (selectedFiles.some((f) => !f.title.trim())) {
-      return toast.error("All files need a title")
+      return showError(new Error("All files need a title"))
     }
 
     setIsUploading(true)
@@ -310,7 +312,7 @@ export function KnowledgePage() {
       )
       toast.success("Material analyzed successfully")
     } catch {
-      toast.error("Processing failed. Please try again.")
+      showError(new Error("Processing failed. Please try again."))
     } finally {
       setRetryingIds((prev) => {
         const next = new Set(prev)
@@ -384,9 +386,7 @@ export function KnowledgePage() {
         toast.success("Removed from this class")
       }
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to remove material"
-      )
+      showError(err, "Failed to remove material")
     } finally {
       setDeletingIds((prev) => {
         const next = new Set(prev)

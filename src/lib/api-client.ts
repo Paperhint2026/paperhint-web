@@ -6,7 +6,7 @@ interface RequestOptions extends Omit<RequestInit, "body"> {
 
 async function request<T>(
   endpoint: string,
-  options: RequestOptions = {},
+  options: RequestOptions = {}
 ): Promise<T> {
   const { body, headers: customHeaders, ...rest } = options
 
@@ -26,11 +26,12 @@ async function request<T>(
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     headers,
-    body: body == null
-      ? undefined
-      : isFormData
-        ? (body as FormData)
-        : JSON.stringify(body),
+    body:
+      body == null
+        ? undefined
+        : isFormData
+          ? (body as FormData)
+          : JSON.stringify(body),
     ...rest,
   })
 

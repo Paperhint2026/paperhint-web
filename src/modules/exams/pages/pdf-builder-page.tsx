@@ -52,6 +52,8 @@ import {
   BlobProvider,
 } from "@react-pdf/renderer"
 import { toast } from "sonner"
+
+import { showError } from "@/lib/show-error"
 import { AnimatePresence, motion } from "motion/react"
 
 import { cn } from "@/lib/utils"
@@ -998,7 +1000,7 @@ export function PdfBuilderPage() {
       setBlocks(initial)
     } catch (err) {
       console.error("Failed to fetch exam:", err)
-      toast.error("Failed to load question paper")
+      showError(new Error("Failed to load question paper"))
     } finally {
       setIsLoading(false)
     }

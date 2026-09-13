@@ -22,6 +22,8 @@ import {
 import dayjs from "dayjs"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
@@ -338,9 +340,7 @@ export function LibraryPage() {
           : "Hidden from the school bank"
       )
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update visibility"
-      )
+      showError(err, "Failed to update visibility")
     } finally {
       setTogglingIds((prev) => {
         const nextSet = new Set(prev)
@@ -487,9 +487,7 @@ export function LibraryPage() {
         toast.success("Material deleted")
       }
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to delete material"
-      )
+      showError(err, "Failed to delete material")
     } finally {
       setDeletingIds((prev) => {
         const next = new Set(prev)
@@ -1230,7 +1228,7 @@ function UploadDialog({
       onComplete(uploaded)
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed")
+      showError(err, "Upload failed")
     } finally {
       setUploading(false)
     }

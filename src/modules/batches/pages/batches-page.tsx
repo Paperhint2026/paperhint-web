@@ -17,6 +17,8 @@ import {
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
+import { showError } from "@/lib/show-error"
+
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -97,7 +99,10 @@ interface DetainedStudent {
   roll_number: string | number | null
 }
 
-interface PromotionSource extends Omit<ContextClass, "is_pending_promotion" | "detained_count"> {
+interface PromotionSource extends Omit<
+  ContextClass,
+  "is_pending_promotion" | "detained_count"
+> {
   subjects: TemplateSubject[]
   teachers: DraftTeacher[]
   detained_students: DetainedStudent[]
@@ -254,8 +259,8 @@ export function BatchesPage() {
             Admins only
           </p>
           <p className="text-sm text-muted-foreground">
-            Batch management moves whole classes between years, so it's
-            reserved for your school admin.
+            Batch management moves whole classes between years, so it's reserved
+            for your school admin.
           </p>
         </div>
       </div>
@@ -418,7 +423,7 @@ function RolloverHome() {
       setDone(null)
       setDrafts(next)
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsDrafting(false)
     }
@@ -540,7 +545,7 @@ function RolloverHome() {
       toast.success("Rollover completed")
       await fetchContext()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsExecuting(false)
       setConfirmOpen(false)
@@ -582,9 +587,7 @@ function RolloverHome() {
             <span className="inline-flex items-center gap-2 rounded-full bg-sidebar px-3 py-1.5 text-xs font-medium text-secondary-foreground ring-1 ring-border/60">
               <CalendarDotsIcon className="size-3.5 text-muted-foreground" />
               School year:{" "}
-              <span className="text-foreground">
-                {activeYear ?? "not set"}
-              </span>
+              <span className="text-foreground">{activeYear ?? "not set"}</span>
             </span>
             <Button
               variant="outline"
@@ -641,8 +644,8 @@ function RolloverHome() {
                 </p>
                 <p className="text-sm text-muted-foreground">
                   All {currentClasses.length} active classes are in {activeYear}
-                  . When the year ends, switch to the next academic year and
-                  the promotion plan will appear here.
+                  . When the year ends, switch to the next academic year and the
+                  promotion plan will appear here.
                 </p>
               </div>
             </div>
@@ -683,8 +686,8 @@ function RolloverHome() {
                     from the previous year
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Pick which classes to promote into {activeYear}, then
-                    review the auto-built plan before anything is saved.
+                    Pick which classes to promote into {activeYear}, then review
+                    the auto-built plan before anything is saved.
                   </p>
                 </div>
                 <Button
@@ -841,7 +844,12 @@ function DraftPlan({
   activeYear: string
   detainedOptionsFor: (grade: number) => { value: string; label: string }[]
   unresolvedCount: number
-  summary: { classes: number; promote: number; repeat: number; graduate: number }
+  summary: {
+    classes: number
+    promote: number
+    repeat: number
+    graduate: number
+  }
   isExecuting: boolean
   onEdit: (draftId: string) => void
   onDetainedTarget: (draftId: string, studentId: string, value: string) => void
@@ -914,8 +922,8 @@ function DraftPlan({
                         <span className="flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
                           <WarningIcon className="size-3" />
                           New section — subjects from{" "}
-                          {classLabel(d.source.template_class)}; assign
-                          teachers in Edit or later.
+                          {classLabel(d.source.template_class)}; assign teachers
+                          in Edit or later.
                         </span>
                       ) : (
                         <span className="text-[11px] text-muted-foreground/70">
@@ -1116,7 +1124,8 @@ function DraftEditDialog({
     if (!subject || !teacher) return
     if (
       kept.some(
-        (t) => t.teacher_id === teacher.id && t.subject_id === subject.subject_id
+        (t) =>
+          t.teacher_id === teacher.id && t.subject_id === subject.subject_id
       )
     ) {
       toast.info("Already assigned")
@@ -1138,7 +1147,7 @@ function DraftEditDialog({
   const save = () => {
     const section = targetSection.trim().toUpperCase()
     if (action === "promote" && (!targetGrade || !section)) {
-      toast.error("Target grade and section are required")
+      showError(new Error("Target grade and section are required"))
       return
     }
     onSave({
@@ -1395,8 +1404,7 @@ function SwitchYearDialog({
       : derived
   }, [existingYears, currentYear])
 
-  const defaultYear =
-    options.find((o) => o !== currentYear) ?? options[0] ?? ""
+  const defaultYear = options.find((o) => o !== currentYear) ?? options[0] ?? ""
   const [year, setYear] = useState(defaultYear)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -1413,7 +1421,7 @@ function SwitchYearDialog({
       onOpenChange(false)
       onSwitched()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
@@ -1424,7 +1432,9 @@ function SwitchYearDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {currentYear ? "Start a new academic year" : "Set the academic year"}
+            {currentYear
+              ? "Start a new academic year"
+              : "Set the academic year"}
           </DialogTitle>
           <DialogDescription>
             {currentYear
@@ -1456,7 +1466,10 @@ function SwitchYearDialog({
           >
             Cancel
           </Button>
-          <Button onClick={save} disabled={isSaving || !year || year === currentYear}>
+          <Button
+            onClick={save}
+            disabled={isSaving || !year || year === currentYear}
+          >
             {isSaving ? (
               <>
                 <CircleNotchIcon className="size-3.5 animate-spin" />
@@ -1599,7 +1612,7 @@ function NewClassDialog({
 
   const create = async (withCarryOver: boolean) => {
     if (!grade || !section || !year) {
-      toast.error("Grade, section, and academic year are required")
+      showError(new Error("Grade, section, and academic year are required"))
       return
     }
     setIsSaving(true)
@@ -1630,7 +1643,7 @@ function NewClassDialog({
       onOpenChange(false)
       onCreated()
     } catch (err) {
-      if (err instanceof Error) toast.error(err.message)
+      showError(err)
     } finally {
       setIsSaving(false)
     }
@@ -1646,8 +1659,8 @@ function NewClassDialog({
           <DialogTitle>New class</DialogTitle>
           <DialogDescription>
             For extra sections or splits the automatic plan can't cover.
-            Subjects and teachers from the current year's class are carried
-            over unless you remove them.
+            Subjects and teachers from the current year's class are carried over
+            unless you remove them.
           </DialogDescription>
         </DialogHeader>
 
@@ -1822,8 +1835,8 @@ function NewClassDialog({
 
           {!isLoadingTemplate && template && !hasTemplate && section && (
             <div className="rounded-lg border border-border px-3 py-2.5 text-xs text-muted-foreground">
-              No current Grade {grade} - {section} class to copy from. The
-              class will be created empty — add subjects from the class editor
+              No current Grade {grade} - {section} class to copy from. The class
+              will be created empty — add subjects from the class editor
               afterwards.
             </div>
           )}
@@ -1963,7 +1976,7 @@ function PastBatches() {
         )
         setStudents((prev) => ({ ...prev, [classId]: res.students ?? [] }))
       } catch (err) {
-        if (err instanceof Error) toast.error(err.message)
+        showError(err)
       } finally {
         setLoadingStudents(null)
       }
@@ -2007,7 +2020,9 @@ function PastBatches() {
           {/* year filter */}
           {yearOptions.length > 1 && (
             <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Batch year</Label>
+              <Label className="text-xs text-muted-foreground">
+                Batch year
+              </Label>
               <Select value={yearFilter} onValueChange={setYearFilter}>
                 <SelectTrigger className="h-8 w-44 text-xs">
                   <SelectValue />
