@@ -15,6 +15,12 @@ import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
 import { DepartmentCard } from "@/modules/departments/components/department-card"
@@ -34,6 +40,7 @@ export function DepartmentsPage() {
   const [error, setError] = useState("")
   const [newName, setNewName] = useState("")
   const [busy, setBusy] = useState(false)
+  const [adding, setAdding] = useState(false)
 
   const load = useCallback(() => {
     apiClient
@@ -60,6 +67,7 @@ export function DepartmentsPage() {
           : `${newName.trim()} added`
       )
       setNewName("")
+      setAdding(false)
       navigate(`/departments/${r.department.id}`)
     } catch (e) {
       showError(e)
@@ -82,28 +90,51 @@ export function DepartmentsPage() {
         description="How the school groups its teachers, and which subjects each group owns."
       >
         {isAdmin && departments !== null && (
-          <form
-            className="flex max-w-sm gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (newName.trim()) create()
-            }}
-          >
-            <Input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="New department"
-              className="h-9"
-            />
-            <Button type="submit" disabled={!newName.trim() || busy}>
-              {busy ? (
-                <CircleNotchIcon className="size-4 animate-spin" />
-              ) : (
+          /* A bare input under the page title reads as a search box. This is an
+             action, so it looks like one and asks for the name once opened. */
+          <Popover open={adding} onOpenChange={setAdding}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-fit">
                 <PlusIcon className="size-4" />
-              )}
-              Add
-            </Button>
-          </form>
+                New department
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80">
+              <form
+                className="flex flex-col gap-3"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (newName.trim()) create()
+                }}
+              >
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="new-department" className="text-xs">
+                    Department name
+                  </Label>
+                  <Input
+                    id="new-department"
+                    autoFocus
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="e.g. Commerce"
+                    className="h-9"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    A subject of the same name comes with it — remove it if this
+                    department teaches several, or none.
+                  </p>
+                </div>
+                <Button type="submit" disabled={!newName.trim() || busy}>
+                  {busy ? (
+                    <CircleNotchIcon className="size-4 animate-spin" />
+                  ) : (
+                    <PlusIcon className="size-4" />
+                  )}
+                  Add department
+                </Button>
+              </form>
+            </PopoverContent>
+          </Popover>
         )}
       </PageHeader>
 
