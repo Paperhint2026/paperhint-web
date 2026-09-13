@@ -37,7 +37,7 @@ export function DepartmentsPage() {
       className={cn(
         PAGE_GUTTER,
         PAGE_TOP,
-        "@container flex min-h-full flex-col gap-5 pb-12"
+        "@container flex h-full min-h-0 flex-col gap-5 overflow-hidden pb-6"
       )}
     >
       <PageHeader

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   CircleNotchIcon,
   PlusIcon,
@@ -83,13 +83,38 @@ export function DepartmentsPanel() {
     [departments, selectedId]
   )
 
-  const run = async (
+  /**
+   * Writes are serialised and applied locally first. Toggling a set sends the
+   * whole set, so two clicks in flight must not each compute it from the same
+   * stale copy — the local patch lands before the next click reads it, and the
+   * queue keeps the server seeing them in the order they were made.
+   */
+  const chain = useRef<Promise<unknown>>(Promise.resolve())
+  const send = useCallback(
+    (fn: () => Promise<unknown>, done?: string) => {
+      chain.current = chain.current
+        .then(fn)
+        .then(() => {
+          if (done) toast.success(done)
+        })
+        .catch((e) => {
+          toast.error(e instanceof Error ? e.message : "That did not save")
+          return load() // resync: the local copy is now a guess
+        })
+      return chain.current
+    },
+    [load]
+  )
+
+  /** Structural changes (create, delete) still reload — ids come from the server. */
+  const runStructural = async (
     key: string,
     fn: () => Promise<unknown>,
     done?: string
   ) => {
     setBusy(key)
     try {
+      await chain.current
       await fn()
       if (done) toast.success(done)
       await load()
@@ -100,15 +125,18 @@ export function DepartmentsPanel() {
     }
   }
 
+  const patch = (id: string, fn: (d: Department) => Department) =>
+    setDepartments(
+      (prev) => prev?.map((d) => (d.id === id ? fn(d) : d)) ?? prev
+    )
+
   const createDepartment = () =>
-    run(
+    runStructural(
       "new",
       async () => {
         const r = await apiClient.post<{ department: { id: string } }>(
           "/api/departments",
-          {
-            name: newName.trim(),
-          }
+          { name: newName.trim() }
         )
         setNewName("")
         setSelectedId(r.department.id)
@@ -116,44 +144,53 @@ export function DepartmentsPanel() {
       "Department added"
     )
 
-  const toggleGrade = (d: Department, g: number) =>
-    run(`g${g}`, () =>
-      apiClient.put(`/api/departments/${d.id}/grades`, {
-        grades: d.grades.includes(g)
-          ? d.grades.filter((x) => x !== g)
-          : [...d.grades, g],
-      })
-    )
+  const toggleGrade = (d: Department, g: number) => {
+    const grades = (
+      d.grades.includes(g) ? d.grades.filter((x) => x !== g) : [...d.grades, g]
+    ).sort((a, b) => a - b)
+    patch(d.id, (x) => ({ ...x, grades }))
+    send(() => apiClient.put(`/api/departments/${d.id}/grades`, { grades }))
+  }
 
-  const toggleHead = (d: Department, t: Teacher) =>
-    run(`h${t.id}`, () =>
+  const toggleHead = (d: Department, t: Teacher) => {
+    const heads = d.heads.some((h) => h.id === t.id)
+      ? d.heads.filter((h) => h.id !== t.id)
+      : [...d.heads, { id: t.id, full_name: t.full_name }]
+    patch(d.id, (x) => ({ ...x, heads }))
+    send(() =>
       apiClient.put(`/api/departments/${d.id}/heads`, {
-        user_ids: d.heads.some((h) => h.id === t.id)
-          ? d.heads.filter((h) => h.id !== t.id).map((h) => h.id)
-          : [...d.heads.map((h) => h.id), t.id],
-      })
-    )
-
-  const toggleSubject = (d: Department, s: SubjectLite) =>
-    run(`s${s.id}`, () =>
-      apiClient.put(`/api/departments/${d.id}/subjects`, {
-        subject_ids: d.subjects.some((x) => x.id === s.id)
-          ? d.subjects.filter((x) => x.id !== s.id).map((x) => x.id)
-          : [...d.subjects.map((x) => x.id), s.id],
-      })
-    )
-
-  const toggleSubjectGrade = (s: SubjectLite, g: number) => {
-    const cur = gradeSubjects[s.id] ?? []
-    return run(`sg${s.id}${g}`, () =>
-      apiClient.put(`/api/departments/grade-subjects/${s.id}`, {
-        grades: cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g],
+        user_ids: heads.map((h) => h.id),
       })
     )
   }
 
+  const toggleSubject = (d: Department, s: SubjectLite) => {
+    const next = d.subjects.some((x) => x.id === s.id)
+      ? d.subjects.filter((x) => x.id !== s.id)
+      : [...d.subjects, s].sort((a, b) =>
+          a.subject_name.localeCompare(b.subject_name)
+        )
+    patch(d.id, (x) => ({ ...x, subjects: next }))
+    send(() =>
+      apiClient.put(`/api/departments/${d.id}/subjects`, {
+        subject_ids: next.map((x) => x.id),
+      })
+    )
+  }
+
+  const toggleSubjectGrade = (s: SubjectLite, g: number) => {
+    const cur = gradeSubjects[s.id] ?? []
+    const grades = (
+      cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]
+    ).sort((a, b) => a - b)
+    setGradeSubjects((prev) => ({ ...prev, [s.id]: grades }))
+    send(() =>
+      apiClient.put(`/api/departments/grade-subjects/${s.id}`, { grades })
+    )
+  }
+
   const createSubject = (d: Department, name: string) =>
-    run(
+    runStructural(
       "newsub",
       async () => {
         const r = await apiClient.post<{ subject: SubjectLite }>(
@@ -170,7 +207,7 @@ export function DepartmentsPanel() {
     )
 
   const removeDepartment = (d: Department) =>
-    run(
+    runStructural(
       "del",
       async () => {
         await apiClient.delete(`/api/departments/${d.id}`)
@@ -187,36 +224,18 @@ export function DepartmentsPanel() {
   }, [teachers, selected])
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : departments === null ? (
-        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton className="min-h-0 flex-1 rounded-xl" />
       ) : (
-        <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-background md:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background md:flex-row">
           {/* Level 3 — the list, divided from the detail by a real edge */}
-          <aside className="flex shrink-0 flex-col gap-0.5 border-b border-border p-2 md:w-56 md:border-r md:border-b-0">
-            {departments.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => setSelectedId(d.id)}
-                aria-current={selectedId === d.id ? "true" : undefined}
-                className={cn(
-                  "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                  selectedId === d.id
-                    ? "bg-muted font-medium text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                )}
-              >
-                <span className="truncate">{d.name}</span>
-                <span className="text-[11px] text-muted-foreground tabular-nums">
-                  {d.member_count}
-                </span>
-              </button>
-            ))}
+          <aside className="flex shrink-0 flex-col border-b border-border md:w-60 md:border-r md:border-b-0">
+            {/* Adding comes first: the list below it can be long */}
             <form
-              className="mt-2 flex gap-1"
+              className="flex shrink-0 gap-1 border-b border-border p-2"
               onSubmit={(e) => {
                 e.preventDefault()
                 if (newName.trim()) createDepartment()
@@ -241,12 +260,33 @@ export function DepartmentsPanel() {
                 )}
               </Button>
             </form>
+            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
+              {departments.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setSelectedId(d.id)}
+                  aria-current={selectedId === d.id ? "true" : undefined}
+                  className={cn(
+                    "flex shrink-0 items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    selectedId === d.id
+                      ? "bg-muted font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
+                >
+                  <span className="truncate">{d.name}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                    {d.member_count}
+                  </span>
+                </button>
+              ))}
+            </div>
           </aside>
 
           {/* Detail */}
           {selected ? (
-            <div className="flex min-w-0 flex-1 flex-col">
-              <div className="flex items-start justify-between gap-3 px-5 py-4">
+            <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+              <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-4">
                 <div>
                   <h3 className="text-base font-medium text-foreground">
                     {selected.name}
@@ -322,7 +362,6 @@ export function DepartmentsPanel() {
                             full_name: h.full_name,
                           })
                         }
-                        disabled={busy === `h${h.id}`}
                         className="grid size-3.5 place-items-center rounded-full text-muted-foreground hover:bg-background hover:text-destructive"
                       >
                         <XIcon className="size-2.5" />
@@ -370,14 +409,23 @@ export function DepartmentsPanel() {
                     </li>
                   )}
                   {selected.subjects.map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex flex-wrap items-center gap-2 px-3 py-2"
-                    >
-                      <span className="min-w-28 text-sm text-foreground">
-                        {s.subject_name}
-                      </span>
-                      <div className="flex flex-wrap gap-1">
+                    <li key={s.id} className="flex flex-col gap-2 px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {s.subject_name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleSubject(selected, s)}
+                          className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="mr-1 text-[11px] text-muted-foreground">
+                          Runs in
+                        </span>
                         {GRADES.map((g) => {
                           const on = (gradeSubjects[s.id] ?? []).includes(g)
                           return (
@@ -387,10 +435,10 @@ export function DepartmentsPanel() {
                               aria-pressed={on}
                               onClick={() => toggleSubjectGrade(s, g)}
                               className={cn(
-                                "min-w-6 rounded border px-1 text-[11px] tabular-nums",
+                                "min-w-7 rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums transition-colors",
                                 on
-                                  ? "border-primary/60 bg-primary/10 text-foreground"
-                                  : "border-border/60 text-muted-foreground/70 hover:bg-muted"
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border text-muted-foreground hover:bg-muted"
                               )}
                             >
                               {gradeLabel(g)}
@@ -398,13 +446,6 @@ export function DepartmentsPanel() {
                           )
                         })}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleSubject(selected, s)}
-                        className="ml-auto text-xs text-muted-foreground hover:text-destructive"
-                      >
-                        Remove
-                      </button>
                     </li>
                   ))}
                 </ul>
