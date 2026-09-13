@@ -9,7 +9,6 @@ import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -188,15 +187,15 @@ export function DepartmentsPanel() {
   }, [teachers, selected])
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col">
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : departments === null ? (
         <Skeleton className="h-40 w-full rounded-lg" />
       ) : (
-        <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-          {/* Department list */}
-          <div className="flex flex-col gap-1">
+        <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-background md:flex-row">
+          {/* Level 3 — the list, divided from the detail by a real edge */}
+          <aside className="flex shrink-0 flex-col gap-0.5 border-b border-border p-2 md:w-56 md:border-r md:border-b-0">
             {departments.map((d) => (
               <button
                 key={d.id}
@@ -242,12 +241,12 @@ export function DepartmentsPanel() {
                 )}
               </Button>
             </form>
-          </div>
+          </aside>
 
           {/* Detail */}
           {selected ? (
-            <div className="flex min-w-0 flex-col gap-5">
-              <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex items-start justify-between gap-3 px-5 py-4">
                 <div>
                   <h3 className="text-base font-medium text-foreground">
                     {selected.name}
@@ -278,7 +277,7 @@ export function DepartmentsPanel() {
               </div>
 
               {/* Grades served */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 border-t border-dashed border-border px-5 py-4">
                 <Label className="text-xs">Grades this department serves</Label>
                 <div className="flex flex-wrap gap-1">
                   {GRADES.map((g) => {
@@ -305,7 +304,7 @@ export function DepartmentsPanel() {
 
               {/* Heads — selection plus an Add picker, never every candidate
                   (docs/modules/00-principles.md) */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 border-t border-dashed border-border px-5 py-4">
                 <Label className="text-xs">Heads of department</Label>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {selected.heads.map((h) => (
@@ -425,23 +424,9 @@ export function DepartmentsPanel() {
                   createLabel="Create subject"
                 />
               </div>
-
-              {selected.heads.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {selected.heads.map((h) => (
-                    <Badge
-                      key={h.id}
-                      variant="secondary"
-                      className="rounded-full"
-                    >
-                      Head · {h.full_name}
-                    </Badge>
-                  ))}
-                </div>
-              )}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="flex-1 p-8 text-center text-sm text-muted-foreground">
               Pick a department, or add the first one.
             </p>
           )}

@@ -103,7 +103,13 @@ export function AllotmentsPage() {
   }, [board, grade, gapsOnly])
 
   return (
-    <div className={cn(PAGE_GUTTER, PAGE_TOP, "flex flex-col gap-6 pb-12")}>
+    <div
+      className={cn(
+        PAGE_GUTTER,
+        PAGE_TOP,
+        "@container flex min-h-full flex-col gap-5 pb-12"
+      )}
+    >
       <PageHeader
         icon={ChalkboardTeacherIcon}
         title="Allotments"
