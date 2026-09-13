@@ -30,7 +30,9 @@ At most **three levels of navigation** on any screen, always in this order:
 3. **Level 3 — a side panel inside the tab.** A master list whose selection drives
    the detail beside it (e.g. the department list beside the department's detail).
 
-Never a fourth. Anything deeper opens as a drawer or dialog over the content. A
-secondary section list may never be a vertical rail (that is level 2 in level 3's
-clothes). Pickers show what is selected and offer an Add button with search — never
+Never a fourth. Anything deeper opens as a drawer or dialog over the content.
+
+**The swap.** Tabs hold up to **seven** sections. A module with more than seven
+sections swaps levels 2 and 3: the sections become a side panel (level 2) and the
+tabs move inside it (level 3). Below seven, a section list is never a vertical rail. Pickers show what is selected and offer an Add button with search — never
 every candidate as a chip.

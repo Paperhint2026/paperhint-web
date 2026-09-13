@@ -213,5 +213,6 @@ changes. Dated. "Unknown until pilot" is a valid answer and is recorded as such.
 
 - **Three levels of navigation, maximum**: main sidebar (level 1) → tabs at the top of
   the content (level 2) → a side panel inside the tab (level 3). Never a fourth.
-  Recorded in `docs/modules/00-principles.md`. Trigger: the Setup page stacked three
+  Tabs hold up to seven sections; past seven, levels 2 and 3 swap (side panel of
+  sections, tabs inside). Recorded in `docs/modules/00-principles.md`. Trigger: the Setup page stacked three
   vertical rails and the content had half the width left.
