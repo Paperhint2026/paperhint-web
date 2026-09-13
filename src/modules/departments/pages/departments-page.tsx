@@ -15,6 +15,7 @@ import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import {
   Popover,
@@ -24,6 +25,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
 import { DepartmentCard } from "@/modules/departments/components/department-card"
+import { looksLikeSubject } from "@/modules/departments/lib/subject-words"
 import type { Department } from "@/modules/departments/lib/types"
 
 /**
@@ -41,11 +43,21 @@ export function DepartmentsPage() {
   const [newName, setNewName] = useState("")
   const [busy, setBusy] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [subjectNames, setSubjectNames] = useState<string[]>([])
+  // Touched once, the tick stops following what is typed.
+  const [withSubject, setWithSubject] = useState<boolean | null>(null)
 
   const load = useCallback(() => {
-    apiClient
-      .get<{ departments: Department[] }>("/api/departments")
-      .then((r) => setDepartments(r.departments ?? []))
+    Promise.all([
+      apiClient.get<{ departments: Department[] }>("/api/departments"),
+      apiClient
+        .get<{ subjects: { subject_name: string }[] }>("/api/subjects")
+        .catch(() => ({ subjects: [] })),
+    ])
+      .then(([d, s]) => {
+        setDepartments(d.departments ?? [])
+        setSubjectNames((s.subjects ?? []).map((x) => x.subject_name))
+      })
       .catch((e) =>
         setError(e instanceof Error ? e.message : "Could not load departments")
       )
@@ -53,6 +65,9 @@ export function DepartmentsPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  // On for a name that reads like something taught, off for a place or a house.
+  const suggestSubject = withSubject ?? looksLikeSubject(newName, subjectNames)
 
   const create = async () => {
     setBusy(true)
@@ -67,6 +82,7 @@ export function DepartmentsPage() {
           : `${newName.trim()} added`
       )
       setNewName("")
+      setWithSubject(null)
       setAdding(false)
       navigate(`/departments/${r.department.id}`)
     } catch (e) {
@@ -119,11 +135,24 @@ export function DepartmentsPage() {
                     placeholder="e.g. Commerce"
                     className="h-9"
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    A subject of the same name comes with it — remove it if this
-                    department teaches several, or none.
-                  </p>
                 </div>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-muted-foreground">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={suggestSubject}
+                    onCheckedChange={(v) => setWithSubject(v === true)}
+                  />
+                  <span>
+                    Also create a subject called{" "}
+                    <span className="text-foreground">
+                      {newName.trim() || "the same name"}
+                    </span>
+                    <span className="block text-[11px]">
+                      A department that teaches several subjects, or none,
+                      leaves this off.
+                    </span>
+                  </span>
+                </label>
                 <Button type="submit" disabled={!newName.trim() || busy}>
                   {busy ? (
                     <CircleNotchIcon className="size-4 animate-spin" />
