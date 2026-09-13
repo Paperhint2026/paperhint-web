@@ -263,3 +263,12 @@ subjects paste-list flow. One shared import component, not one per module.
 - **Reshuffle is a list, not a rule.** Class teachers work it out offline and hand
   the admin "student → section"; the admin applies it. No rule-based sorting.
 - **Admin executes.** They hold the lists.
+
+## Rollover gates (2026-09-13, founder)
+
+- A rollover can only start once the current academic year has **actually
+  finished** (its own end date, set on the year). Opening the next year is
+  refused before that date. A school with no end_date set has nothing to gate
+  against.
+- The wizard's draft plan can be **cancelled** at any point before execute —
+  nothing has moved yet, so cancelling only discards the plan.

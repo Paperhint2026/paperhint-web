@@ -72,3 +72,11 @@ active year without the years table and allowed going backwards.
 Schema (additive): `rollover_plans (id, school_id, from_year_id, to_year_id, status
 draft|executed, plan jsonb, created_by, updated_at)`. The jsonb is the class plan
 plus per-student exceptions; the preview and execute read it, never the client.
+
+## Gates (truth.md, 2026-09-13)
+
+Opening the next year (POST /api/academic-years) is refused with 409
+`year_not_finished` while the open year's `end_date` is still in the future;
+the dialog shows the date plainly instead of a generic error. The wizard's
+draft plan can be cancelled at any step via POST /rollover/plan/cancel — safe
+because nothing writes to classes or students before execute.
