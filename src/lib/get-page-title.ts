@@ -10,6 +10,7 @@ export function getPageTitleFromPath(pathname: string): string {
     return "Class overview"
   if (path.startsWith("/classes")) return "Classes"
   if (path.startsWith("/allotments")) return "Allotments"
+  if (path.startsWith("/departments")) return "Departments & subjects"
   if (path.startsWith("/setup")) return "School setup"
   if (path.includes("/teachers/") && path.includes("/overview"))
     return "Teacher overview"

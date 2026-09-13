@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  BookOpenIcon,
   CircleNotchIcon,
   PlusIcon,
   TrashIcon,
@@ -22,7 +21,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 
 /**
- * Setup › Departments & subjects (module 02). A department groups people; a
+ * Departments & subjects (module 02) — the page body. A department groups people; a
  * subject is what a grade teaches. Department → subjects it owns → grades each
  * subject runs in. Heads are many. Subject-less departments (PT, Library) are
  * valid. "General" is the fallback and cannot be deleted.
@@ -43,7 +42,7 @@ type Teacher = { id: string; full_name: string; department_id?: string | null }
 const GRADES = Array.from({ length: 13 }, (_, i) => i) // 0 = KG … 12
 const gradeLabel = (g: number) => (g === 0 ? "KG" : String(g))
 
-export function DepartmentsCard() {
+export function DepartmentsPanel() {
   const [departments, setDepartments] = useState<Department[] | null>(null)
   const [subjects, setSubjects] = useState<SubjectLite[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
@@ -189,20 +188,7 @@ export function DepartmentsCard() {
   }, [teachers, selected])
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-border bg-background p-5">
-      <div className="flex items-center gap-2">
-        <BookOpenIcon className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold text-foreground">
-          Departments &amp; subjects
-        </h2>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        A department groups people and owns subjects; a grade decides which
-        subjects run. Heads see their department&apos;s work. Physical Training
-        or Library can be departments with no subject. General holds anything
-        without a home.
-      </p>
-
+    <div className="flex flex-col gap-4">
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : departments === null ? (
@@ -461,7 +447,7 @@ export function DepartmentsCard() {
           )}
         </div>
       )}
-    </section>
+    </div>
   )
 }
 

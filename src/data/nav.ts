@@ -120,7 +120,7 @@ export const ADMIN_NAV: NavGroup[] = [
         key: "departments",
         title: "Departments & subjects",
         icon: BookOpenIcon,
-        path: "/setup/departments",
+        path: "/departments",
         status: "live",
       },
       {

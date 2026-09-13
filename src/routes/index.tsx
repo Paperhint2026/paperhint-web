@@ -36,6 +36,7 @@ import { PlatformSchoolNewPage } from "@/modules/platform/pages/platform-school-
 import { FeatureRoute } from "@/components/shared/feature-route"
 import { ComingSoonPage } from "@/modules/coming-soon/pages/coming-soon-page"
 import { AllotmentsPage } from "@/modules/allotments/pages/allotments-page"
+import { DepartmentsPage } from "@/modules/departments/pages/departments-page"
 
 export const router = createBrowserRouter([
   { path: "login", element: <LoginPage /> },
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
           // School admin's configuration home (role-gated in the page)
           { path: "soon/:slug", element: <ComingSoonPage /> },
           { path: "allotments", element: <AllotmentsPage /> },
+          { path: "departments", element: <DepartmentsPage /> },
           { path: "setup", element: <SetupPage /> },
           { path: "setup/:section", element: <SetupPage /> },
           { path: "platform", element: <PlatformPage /> },

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
-  BookOpenIcon,
   CalendarCheckIcon,
   CalendarDotsIcon,
   ChalkboardTeacherIcon,
@@ -35,7 +34,6 @@ import {
 } from "@/modules/timetable/pages/timetable-page"
 import { FormBuilder } from "@/modules/setup/components/form-builder"
 import { AcademicYearCard } from "@/modules/setup/components/academic-year-card"
-import { DepartmentsCard } from "@/modules/setup/components/departments-card"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /setup — the school admin's configuration home: working week, bell
@@ -62,12 +60,6 @@ const SECTIONS = [
     label: "Bell timing",
     icon: ClockIcon,
     hint: "Periods & breaks",
-  },
-  {
-    key: "departments",
-    label: "Departments & subjects",
-    icon: BookOpenIcon,
-    hint: "Heads, grades, subjects",
   },
   {
     key: "student-form",
@@ -124,7 +116,7 @@ export function SetupPage() {
       <PageHeader
         icon={GearSixIcon}
         title="School setup"
-        description="The academic year, working week, bell schedule, departments and subjects, and the fields on your forms."
+        description="The academic year, working week, bell schedule, and the fields on your forms."
       />
 
       {/* Level 2 — sections as tabs. Six of them, under the seven-tab rule
@@ -167,7 +159,6 @@ export function SetupPage() {
           {active === "year" && <AcademicYearCard />}
           {active === "week" && <WorkingWeekCard />}
           {active === "bell" && <BellScheduleCard />}
-          {active === "departments" && <DepartmentsCard />}
           {active === "student-form" && <FormBuilder entity="student" />}
           {active === "teacher-form" && <FormBuilder entity="teacher" />}
         </div>
