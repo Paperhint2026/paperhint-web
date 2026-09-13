@@ -1,5 +1,3 @@
-import { useNavigate } from "react-router-dom"
-
 import { cn } from "@/lib/utils"
 import { lookFor } from "@/modules/departments/lib/department-look"
 
@@ -25,8 +23,6 @@ export function DepartmentCard({
   index?: number
 }) {
   const { Icon, palette } = lookFor(name)
-  const navigate = useNavigate()
-  void navigate
 
   return (
     <div

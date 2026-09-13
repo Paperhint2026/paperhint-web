@@ -37,6 +37,7 @@ import { FeatureRoute } from "@/components/shared/feature-route"
 import { ComingSoonPage } from "@/modules/coming-soon/pages/coming-soon-page"
 import { AllotmentsPage } from "@/modules/allotments/pages/allotments-page"
 import { DepartmentsPage } from "@/modules/departments/pages/departments-page"
+import { DepartmentDetailPage } from "@/modules/departments/pages/department-detail-page"
 import { SubjectsPage } from "@/modules/subjects/pages/subjects-page"
 
 export const router = createBrowserRouter([
@@ -80,6 +81,7 @@ export const router = createBrowserRouter([
           { path: "soon/:slug", element: <ComingSoonPage /> },
           { path: "allotments", element: <AllotmentsPage /> },
           { path: "departments", element: <DepartmentsPage /> },
+          { path: "departments/:id", element: <DepartmentDetailPage /> },
           { path: "subjects", element: <SubjectsPage /> },
           { path: "setup", element: <SetupPage /> },
           { path: "setup/:section", element: <SetupPage /> },
