@@ -45,30 +45,24 @@ export function DepartmentsPanel() {
   const [departments, setDepartments] = useState<Department[] | null>(null)
   const [subjects, setSubjects] = useState<SubjectLite[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
-  const [gradeSubjects, setGradeSubjects] = useState<Record<string, number[]>>(
-    {}
-  )
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [newName, setNewName] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
+  const [narrowing, setNarrowing] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [d, s, t, g] = await Promise.all([
+      const [d, s, t] = await Promise.all([
         apiClient.get<{ departments: Department[] }>("/api/departments"),
         apiClient.get<{ subjects: SubjectLite[] }>("/api/subjects"),
         apiClient
           .get<{ teachers: Teacher[] }>("/api/auth/teachers")
           .catch(() => ({ teachers: [] })),
-        apiClient.get<{ grade_subjects: Record<string, number[]> }>(
-          "/api/departments/grade-subjects"
-        ),
       ])
       setDepartments(d.departments ?? [])
       setSubjects(s.subjects ?? [])
       setTeachers(t.teachers ?? [])
-      setGradeSubjects(g.grade_subjects ?? {})
       setSelectedId((cur) => cur ?? d.departments?.[0]?.id ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load departments")
@@ -144,6 +138,12 @@ export function DepartmentsPanel() {
       "Department added"
     )
 
+  const setGrades = (d: Department, grades: number[]) => {
+    patch(d.id, (x) => ({ ...x, grades }))
+    setNarrowing(null)
+    send(() => apiClient.put(`/api/departments/${d.id}/grades`, { grades }))
+  }
+
   const toggleGrade = (d: Department, g: number) => {
     const grades = (
       d.grades.includes(g) ? d.grades.filter((x) => x !== g) : [...d.grades, g]
@@ -175,17 +175,6 @@ export function DepartmentsPanel() {
       apiClient.put(`/api/departments/${d.id}/subjects`, {
         subject_ids: next.map((x) => x.id),
       })
-    )
-  }
-
-  const toggleSubjectGrade = (s: SubjectLite, g: number) => {
-    const cur = gradeSubjects[s.id] ?? []
-    const grades = (
-      cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]
-    ).sort((a, b) => a - b)
-    setGradeSubjects((prev) => ({ ...prev, [s.id]: grades }))
-    send(() =>
-      apiClient.put(`/api/departments/grade-subjects/${s.id}`, { grades })
     )
   }
 
@@ -316,30 +305,59 @@ export function DepartmentsPanel() {
                 )}
               </div>
 
-              {/* Grades served */}
+              {/* Grades served — empty means all of them. A school with no
+                  bands never touches this; Music or a primary-only department
+                  narrows it. */}
               <div className="flex flex-col gap-2 border-t border-dashed border-border px-5 py-4">
-                <Label className="text-xs">Grades this department serves</Label>
-                <div className="flex flex-wrap gap-1">
-                  {GRADES.map((g) => {
-                    const on = selected.grades.includes(g)
-                    return (
-                      <button
-                        key={g}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => toggleGrade(selected, g)}
-                        className={cn(
-                          "min-w-8 rounded-md border px-2 py-1 text-xs tabular-nums transition-colors",
-                          on
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {gradeLabel(g)}
-                      </button>
-                    )
-                  })}
+                <div className="flex items-center justify-between gap-3">
+                  <Label className="text-xs">
+                    Grades this department serves
+                  </Label>
+                  {selected.grades.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setGrades(selected, [])}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Serve all grades
+                    </button>
+                  )}
                 </div>
+                {selected.grades.length === 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-foreground">All grades</span>
+                    <button
+                      type="button"
+                      onClick={() => setNarrowing(selected.id)}
+                      className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      Narrow to specific grades
+                    </button>
+                  </div>
+                ) : null}
+                {(selected.grades.length > 0 || narrowing === selected.id) && (
+                  <div className="flex flex-wrap gap-1">
+                    {GRADES.map((g) => {
+                      const on = selected.grades.includes(g)
+                      return (
+                        <button
+                          key={g}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => toggleGrade(selected, g)}
+                          className={cn(
+                            "min-w-8 rounded-md border px-2 py-1 text-xs tabular-nums transition-colors",
+                            on
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border text-muted-foreground hover:bg-muted"
+                          )}
+                        >
+                          {gradeLabel(g)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Heads — selection plus an Add picker, never every candidate
@@ -409,43 +427,20 @@ export function DepartmentsPanel() {
                     </li>
                   )}
                   {selected.subjects.map((s) => (
-                    <li key={s.id} className="flex flex-col gap-2 px-3 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {s.subject_name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => toggleSubject(selected, s)}
-                          className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1">
-                        <span className="mr-1 text-[11px] text-muted-foreground">
-                          Runs in
-                        </span>
-                        {GRADES.map((g) => {
-                          const on = (gradeSubjects[s.id] ?? []).includes(g)
-                          return (
-                            <button
-                              key={g}
-                              type="button"
-                              aria-pressed={on}
-                              onClick={() => toggleSubjectGrade(s, g)}
-                              className={cn(
-                                "min-w-7 rounded-md border px-1.5 py-0.5 text-[11px] tabular-nums transition-colors",
-                                on
-                                  ? "border-primary bg-primary text-primary-foreground"
-                                  : "border-border text-muted-foreground hover:bg-muted"
-                              )}
-                            >
-                              {gradeLabel(g)}
-                            </button>
-                          )
-                        })}
-                      </div>
+                    <li
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5"
+                    >
+                      <span className="truncate text-sm text-foreground">
+                        {s.subject_name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSubject(selected, s)}
+                        className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+                      >
+                        Remove
+                      </button>
                     </li>
                   ))}
                 </ul>
