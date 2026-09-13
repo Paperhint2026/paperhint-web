@@ -625,19 +625,9 @@ function RolloverHome() {
               </Button>
             </div>
           ) : pending.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-background px-5 py-10 text-center">
-              <Sticker name="happy" size={96} />
-              <div className="flex max-w-[400px] flex-col gap-1">
-                <p className="text-base font-medium text-secondary-foreground">
-                  Everything is current
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  All {currentClasses.length} active classes are in {activeYear}
-                  . When the year ends, switch to the next academic year and the
-                  promotion plan will appear here.
-                </p>
-              </div>
-            </div>
+            /* Nothing to promote, but the batch itself is worth seeing: this is
+               the tab's resting state, not an empty one. */
+            <CurrentBatch classes={currentClasses} year={activeYear} />
           ) : drafts ? (
             <DraftPlan
               drafts={drafts}
@@ -1765,5 +1755,104 @@ function PastBatches() {
         </div>
       )}
     </LoadingSwap>
+  )
+}
+
+/**
+ * The batch as it stands: every current class by grade, with how many students
+ * sit in each section and how many are marked detained. Shown when nothing is
+ * pending, so the tab always tells you something about the year.
+ */
+function CurrentBatch({
+  classes,
+  year,
+}: {
+  classes: ContextClass[]
+  year: string | null
+}) {
+  const byGrade = new Map<number, ContextClass[]>()
+  for (const c of classes) {
+    const list = byGrade.get(c.grade) ?? []
+    list.push(c)
+    byGrade.set(c.grade, list)
+  }
+  const grades = [...byGrade.keys()].sort((a, b) => a - b)
+  const students = classes.reduce((n, c) => n + c.student_count, 0)
+  const detained = classes.reduce((n, c) => n + c.detained_count, 0)
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted-foreground">
+        All {classes.length} {classes.length === 1 ? "class is" : "classes are"}{" "}
+        in <span className="text-foreground">{year}</span>
+        {" · "}
+        {students} students
+        {detained > 0 && (
+          <>
+            {" · "}
+            <span className="text-foreground">{detained}</span> marked detained
+          </>
+        )}
+        . When the year ends, start the next one and the promotion plan appears
+        here.
+      </p>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="w-24 px-3 py-2 font-medium">Grade</th>
+              <th className="px-3 py-2 font-medium">Sections</th>
+              <th className="w-28 px-3 py-2 text-right font-medium">
+                Students
+              </th>
+              <th className="w-28 px-3 py-2 text-right font-medium">
+                Detained
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {grades.map((g) => {
+              const rows = byGrade.get(g) ?? []
+              const total = rows.reduce((n, c) => n + c.student_count, 0)
+              const held = rows.reduce((n, c) => n + c.detained_count, 0)
+              return (
+                <tr key={g}>
+                  <td className="px-3 py-2.5 font-medium text-foreground">
+                    Grade {g}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {rows
+                        .sort((a, b) => a.section.localeCompare(b.section))
+                        .map((c) => (
+                          <span
+                            key={c.id}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground"
+                          >
+                            {c.section}
+                            <span className="text-muted-foreground tabular-nums">
+                              {c.student_count}
+                            </span>
+                          </span>
+                        ))}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-foreground tabular-nums">
+                    {total}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">
+                    {held > 0 ? (
+                      <span className="text-foreground">{held}</span>
+                    ) : (
+                      <span className="text-muted-foreground/50">—</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
