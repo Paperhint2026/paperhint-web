@@ -118,9 +118,16 @@ export const ADMIN_NAV: NavGroup[] = [
       },
       {
         key: "departments",
-        title: "Departments & subjects",
+        title: "Departments",
         icon: BookOpenIcon,
         path: "/departments",
+        status: "live",
+      },
+      {
+        key: "subjects",
+        title: "Subjects",
+        icon: StackIcon,
+        path: "/subjects",
         status: "live",
       },
       {

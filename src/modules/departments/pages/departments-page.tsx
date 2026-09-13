@@ -42,8 +42,8 @@ export function DepartmentsPage() {
     >
       <PageHeader
         icon={BookOpenIcon}
-        title="Departments & subjects"
-        description="A department groups people and owns subjects; a grade decides which subjects run."
+        title="Departments"
+        description="How the school groups its teachers, and which subjects each group owns."
       />
       <DepartmentsPanel />
     </div>

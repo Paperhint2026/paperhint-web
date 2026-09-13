@@ -18,6 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
+import { describeGrades, GRADES, gradeLabel } from "@/lib/grades"
 
 /**
  * Departments & subjects (module 02) — the page body. A department groups people; a
@@ -37,43 +38,6 @@ type Department = {
   member_count: number
 }
 type Teacher = { id: string; full_name: string; department_id?: string | null }
-
-const GRADES = Array.from({ length: 13 }, (_, i) => i) // 0 = KG … 12
-const gradeLabel = (g: number) => (g === 0 ? "KG" : String(g))
-
-/**
- * Conventional Indian school bands. A band is a TAG read back from the grades
- * that are ticked (founder, 2026-09-13) — never a field anyone fills in. Where
- * a school defines its own bands is grade/class creation, not here; this only
- * names what the selection already says.
- */
-const BANDS: { name: string; grades: number[] }[] = [
-  { name: "Kindergarten", grades: [0] },
-  { name: "Primary", grades: [1, 2, 3, 4, 5] },
-  { name: "Middle", grades: [6, 7, 8] },
-  { name: "Secondary", grades: [9, 10] },
-  { name: "Higher secondary", grades: [11, 12] },
-]
-
-/** "Primary", "Primary + Middle", or a plain range when it matches no band. */
-function describeGrades(grades: number[]): string {
-  if (grades.length === 0) return "All grades"
-  const set = new Set(grades)
-  const hit: string[] = []
-  const covered = new Set<number>()
-  for (const b of BANDS) {
-    if (b.grades.every((g) => set.has(g))) {
-      hit.push(b.name)
-      b.grades.forEach((g) => covered.add(g))
-    }
-  }
-  const rest = grades.filter((g) => !covered.has(g))
-  if (hit.length > 0 && rest.length === 0) return hit.join(" + ")
-  const list = grades.map(gradeLabel).join(", ")
-  return hit.length > 0
-    ? `${hit.join(" + ")} + ${rest.map(gradeLabel).join(", ")}`
-    : list
-}
 
 export function DepartmentsPanel() {
   const [departments, setDepartments] = useState<Department[] | null>(null)
