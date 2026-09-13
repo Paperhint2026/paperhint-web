@@ -127,9 +127,14 @@ export function SetupPage() {
         description="The academic year, working week, bell schedule, departments and subjects, and the fields on your forms."
       />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-6 md:flex-row">
-        {/* Section nav — the settings' own sidebar (never scrolls) */}
-        <nav className="flex shrink-0 gap-1 max-md:overflow-x-auto max-md:pb-1 md:w-56 md:flex-col">
+      {/* Level 2 — sections as tabs. Six of them, under the seven-tab rule
+          (docs/modules/00-principles.md); a side panel here would be a second
+          vertical rail beside the app's own. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-5">
+        <nav
+          aria-label="School setup sections"
+          className="-mb-px flex shrink-0 gap-1 overflow-x-auto border-b border-border"
+        >
           {SECTIONS.map((s) => (
             <button
               key={s.key}
@@ -137,19 +142,14 @@ export function SetupPage() {
               onClick={() => navigate(`/setup/${s.key}`, { replace: true })}
               aria-current={active === s.key ? "page" : undefined}
               className={cn(
-                "flex shrink-0 items-start gap-2.5 rounded-lg px-3 py-2 text-left transition-colors md:w-full",
+                "flex shrink-0 items-center gap-2 border-b-2 px-3 pb-2.5 text-sm whitespace-nowrap transition-colors",
                 active === s.key
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  ? "border-primary font-medium text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              <s.icon className="mt-0.5 size-4 shrink-0" />
-              <span className="flex flex-col">
-                <span className="text-sm">{s.label}</span>
-                <span className="hidden text-[11px] font-normal text-muted-foreground md:block">
-                  {s.hint}
-                </span>
-              </span>
+              <s.icon className="size-4 shrink-0" />
+              {s.label}
             </button>
           ))}
         </nav>

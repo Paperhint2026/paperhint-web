@@ -4,6 +4,7 @@ import {
   CircleNotchIcon,
   PlusIcon,
   TrashIcon,
+  XIcon,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
@@ -13,6 +14,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 
 /**
@@ -47,7 +53,6 @@ export function DepartmentsCard() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [newName, setNewName] = useState("")
-  const [newSubject, setNewSubject] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -149,17 +154,16 @@ export function DepartmentsCard() {
     )
   }
 
-  const createSubject = (d: Department) =>
+  const createSubject = (d: Department, name: string) =>
     run(
       "newsub",
       async () => {
         const r = await apiClient.post<{ subject: SubjectLite }>(
           "/api/subjects",
           {
-            subject_name: newSubject.trim(),
+            subject_name: name.trim(),
           }
         )
-        setNewSubject("")
         await apiClient.put(`/api/departments/${d.id}/subjects`, {
           subject_ids: [...d.subjects.map((x) => x.id), r.subject.id],
         })
@@ -280,11 +284,6 @@ export function DepartmentsCard() {
                       selected.member_count > 0 ||
                       selected.subjects.length > 0
                     }
-                    title={
-                      selected.member_count > 0 || selected.subjects.length > 0
-                        ? "Move members and subjects out first"
-                        : undefined
-                    }
                   >
                     <TrashIcon className="size-4" />
                     Delete
@@ -318,41 +317,60 @@ export function DepartmentsCard() {
                 </div>
               </div>
 
-              {/* Heads */}
+              {/* Heads — selection plus an Add picker, never every candidate
+                  (docs/modules/00-principles.md) */}
               <div className="flex flex-col gap-2">
                 <Label className="text-xs">Heads of department</Label>
-                {deptTeachers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    Add teachers first, then pick heads here.
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {selected.heads.map((h) => (
+                    <span
+                      key={h.id}
+                      className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground"
+                    >
+                      {h.full_name}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${h.full_name} as head`}
+                        onClick={() =>
+                          toggleHead(selected, {
+                            id: h.id,
+                            full_name: h.full_name,
+                          })
+                        }
+                        disabled={busy === `h${h.id}`}
+                        className="grid size-3.5 place-items-center rounded-full text-muted-foreground hover:bg-background hover:text-destructive"
+                      >
+                        <XIcon className="size-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                  <AddPicker
+                    label="Add head"
+                    empty={
+                      deptTeachers.length === 0
+                        ? "Add teachers first, then pick heads here."
+                        : "No one matches."
+                    }
+                    options={deptTeachers
+                      .filter((t) => !selected.heads.some((h) => h.id === t.id))
+                      .map((t) => ({
+                        id: t.id,
+                        label: t.full_name,
+                        note:
+                          t.department_id === selected.id
+                            ? "in this department"
+                            : undefined,
+                      }))}
+                    onPick={(id) => {
+                      const t = teachers.find((x) => x.id === id)
+                      if (t) toggleHead(selected, t)
+                    }}
+                  />
+                </div>
+                {selected.heads.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    No head yet. A head sees their department&apos;s work.
                   </p>
-                ) : (
-                  <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto">
-                    {deptTeachers.map((t) => {
-                      const on = selected.heads.some((h) => h.id === t.id)
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => toggleHead(selected, t)}
-                          className={cn(
-                            "rounded-full border px-2.5 py-1 text-xs transition-colors",
-                            on
-                              ? "border-primary bg-primary/10 text-foreground"
-                              : "border-border text-muted-foreground hover:bg-muted",
-                            t.department_id === selected.id &&
-                              !on &&
-                              "border-dashed"
-                          )}
-                        >
-                          {t.full_name}
-                          {on && (
-                            <span className="ml-1 text-primary">· head</span>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
                 )}
               </div>
 
@@ -405,45 +423,21 @@ export function DepartmentsCard() {
                     </li>
                   ))}
                 </ul>
-                <div className="flex flex-wrap items-center gap-1">
-                  {subjects
+                <AddPicker
+                  label="Add subject"
+                  empty="Every subject is already here. Type a name to create one."
+                  options={subjects
                     .filter(
-                      (s) => !selected.subjects.some((x) => x.id === s.id)
+                      (x) => !selected.subjects.some((y) => y.id === x.id)
                     )
-                    .map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => toggleSubject(selected, s)}
-                        className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
-                      >
-                        + {s.subject_name}
-                      </button>
-                    ))}
-                  <form
-                    className="flex gap-1"
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      if (newSubject.trim()) createSubject(selected)
-                    }}
-                  >
-                    <Input
-                      value={newSubject}
-                      onChange={(e) => setNewSubject(e.target.value)}
-                      placeholder="New subject"
-                      className="h-7 w-36 text-xs"
-                    />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="outline"
-                      className="h-7"
-                      disabled={!newSubject.trim() || busy === "newsub"}
-                    >
-                      Add
-                    </Button>
-                  </form>
-                </div>
+                    .map((x) => ({ id: x.id, label: x.subject_name }))}
+                  onPick={(id) => {
+                    const sub = subjects.find((x) => x.id === id)
+                    if (sub) toggleSubject(selected, sub)
+                  }}
+                  onCreate={(name) => createSubject(selected, name)}
+                  createLabel="Create subject"
+                />
               </div>
 
               {selected.heads.length > 0 && (
@@ -468,5 +462,104 @@ export function DepartmentsCard() {
         </div>
       )}
     </section>
+  )
+}
+
+/**
+ * The picker pattern used everywhere a set is chosen: what is selected lives
+ * outside as chips; this shows only the rest, searchable, behind one button.
+ * `onCreate` turns the search text into a new option when nothing matches.
+ */
+function AddPicker({
+  label,
+  options,
+  onPick,
+  onCreate,
+  createLabel,
+  empty,
+}: {
+  label: string
+  options: { id: string; label: string; note?: string }[]
+  onPick: (id: string) => void
+  onCreate?: (name: string) => void | Promise<unknown>
+  createLabel?: string
+  empty: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const q = query.trim().toLowerCase()
+  const shown = q
+    ? options.filter((o) => o.label.toLowerCase().includes(q))
+    : options
+  const exact = options.some((o) => o.label.toLowerCase() === q)
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) setQuery("")
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <PlusIcon className="size-3" />
+          {label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-0">
+        <div className="border-b border-border p-2">
+          <Input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search"
+            className="h-8 text-sm"
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto p-1">
+          {shown.length === 0 ? (
+            <p className="px-2 py-3 text-xs text-muted-foreground">{empty}</p>
+          ) : (
+            shown.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => {
+                  onPick(o.id)
+                  setOpen(false)
+                  setQuery("")
+                }}
+                className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+              >
+                <span className="truncate">{o.label}</span>
+                {o.note && (
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {o.note}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+          {onCreate && q && !exact && (
+            <button
+              type="button"
+              onClick={async () => {
+                await onCreate(query.trim())
+                setOpen(false)
+                setQuery("")
+              }}
+              className="mt-1 flex w-full items-center gap-1.5 rounded-md border-t border-border px-2 py-2 text-left text-sm text-primary hover:bg-muted"
+            >
+              <PlusIcon className="size-3.5" />
+              {createLabel ?? "Create"} &ldquo;{query.trim()}&rdquo;
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
