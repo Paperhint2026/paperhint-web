@@ -1378,6 +1378,7 @@ function SwitchYearDialog({
   )
   const year = nextYear
   const [isSaving, setIsSaving] = useState(false)
+  const [blockedUntil, setBlockedUntil] = useState<string | null>(null)
 
   const save = async () => {
     if (!year) return
@@ -1389,7 +1390,16 @@ function SwitchYearDialog({
       onSwitched()
       navigate("/rollover")
     } catch (err) {
-      showError(err)
+      // The gate (founder, 2026-09-13): the open year has to finish first.
+      const data =
+        err instanceof Error
+          ? (err as Error & { data?: { code?: string; ends_on?: string } }).data
+          : undefined
+      if (data?.code === "year_not_finished" && data.ends_on) {
+        setBlockedUntil(data.ends_on)
+      } else {
+        showError(err)
+      }
     } finally {
       setIsSaving(false)
     }
@@ -1410,16 +1420,26 @@ function SwitchYearDialog({
               : "This tells the system which year your school is operating in."}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-1.5 py-2">
-          <Label className="text-xs">Opening</Label>
-          <div className="flex h-10 items-center rounded-md border border-border bg-muted/40 px-3 text-base font-medium text-foreground tabular-nums">
-            {year || "—"}
+        {blockedUntil ? (
+          <div className="flex flex-col gap-1.5 py-2">
+            <p className="rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              {currentYear} runs until{" "}
+              <span className="font-medium">{blockedUntil}</span>. The next year
+              can open once that date has passed.
+            </p>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Always the year after {currentYear ?? "the current one"}. A school
-            moves forward one year at a time.
-          </p>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-1.5 py-2">
+            <Label className="text-xs">Opening</Label>
+            <div className="flex h-10 items-center rounded-md border border-border bg-muted/40 px-3 text-base font-medium text-foreground tabular-nums">
+              {year || "—"}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Always the year after {currentYear ?? "the current one"}. A school
+              moves forward one year at a time.
+            </p>
+          </div>
+        )}
         <DialogFooter>
           <Button
             variant="outline"
@@ -1430,7 +1450,9 @@ function SwitchYearDialog({
           </Button>
           <Button
             onClick={save}
-            disabled={isSaving || !year || year === currentYear}
+            disabled={
+              isSaving || !year || year === currentYear || !!blockedUntil
+            }
           >
             {isSaving ? (
               <>

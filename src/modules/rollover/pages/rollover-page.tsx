@@ -4,13 +4,26 @@ import {
   ArrowLeftIcon,
   CaretRightIcon,
   UsersThreeIcon,
+  XCircleIcon,
 } from "@phosphor-icons/react"
+import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
+import { showError } from "@/lib/show-error"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
 import { ClassPlanStep } from "@/modules/rollover/components/class-plan-step"
@@ -43,6 +56,23 @@ export function RolloverPage() {
   const [error, setError] = useState("")
   const [step, setStep] = useState<StepKey>("classes")
   const [done, setDone] = useState<Record<string, unknown> | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+
+  const cancelRollover = async () => {
+    setCancelling(true)
+    try {
+      await apiClient.post("/api/rollover/plan/cancel", {})
+      toast.success("Rollover cancelled")
+      setPlan(null)
+      setStep("classes")
+      setConfirmCancel(false)
+    } catch (e) {
+      showError(e)
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   const load = () => {
     apiClient
@@ -165,27 +195,37 @@ export function RolloverPage() {
         </div>
       ) : (
         <>
-          <nav
-            aria-label="Rollover steps"
-            className="-mb-px flex shrink-0 gap-1 overflow-x-auto border-b border-border"
-          >
-            {STEPS.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => setStep(s.key)}
-                aria-current={step === s.key ? "page" : undefined}
-                className={cn(
-                  "flex shrink-0 items-center gap-2 border-b-2 px-3 pb-2.5 text-sm whitespace-nowrap transition-colors",
-                  step === s.key
-                    ? "border-primary font-medium text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {s.label}
-              </button>
-            ))}
-          </nav>
+          <div className="flex items-center justify-between gap-3 border-b border-border">
+            <nav
+              aria-label="Rollover steps"
+              className="-mb-px flex shrink-0 gap-1 overflow-x-auto"
+            >
+              {STEPS.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => setStep(s.key)}
+                  aria-current={step === s.key ? "page" : undefined}
+                  className={cn(
+                    "flex shrink-0 items-center gap-2 border-b-2 px-3 pb-2.5 text-sm whitespace-nowrap transition-colors",
+                    step === s.key
+                      ? "border-primary font-medium text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </nav>
+            <button
+              type="button"
+              onClick={() => setConfirmCancel(true)}
+              className="mb-2 flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+            >
+              <XCircleIcon className="size-3.5" />
+              Cancel rollover
+            </button>
+          </div>
 
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <UsersThreeIcon className="size-3.5" />
@@ -217,6 +257,27 @@ export function RolloverPage() {
           )}
         </>
       )}
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this rollover?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Nothing has moved yet, so cancelling only discards the plan — the
+              class actions and student exceptions built so far. {plan?.to_year}{" "}
+              stays open; start a fresh rollover whenever you are ready.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>
+              Keep working on it
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={cancelRollover} disabled={cancelling}>
+              {cancelling ? "Cancelling…" : "Cancel rollover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -47,10 +47,14 @@ async function request<T>(
     const error = await response.json().catch(() => ({}))
     const err = new Error(
       error.message || error.error || `Request failed: ${response.status}`
-    ) as Error & { field?: string }
+    ) as Error & { field?: string; data?: Record<string, unknown> }
     // Some endpoints name the form field a validation error belongs to, so
     // forms can highlight it instead of only toasting.
     if (typeof error.field === "string") err.field = error.field
+    // The rest of the body — a machine-readable `code`, extra context like
+    // `ends_on` — for callers that need more than the message (e.g. the
+    // year-not-finished gate).
+    err.data = error
     throw err
   }
 
