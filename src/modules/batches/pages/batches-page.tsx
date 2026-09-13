@@ -1361,34 +1361,28 @@ function SwitchYearDialog({
   existingYears: string[]
   onSwitched: () => void
 }) {
-  const options = useMemo(() => {
-    const derived = deriveYearOptions(
-      existingYears.length > 0
-        ? existingYears
-        : currentYear
-          ? [currentYear]
-          : []
-    )
-    // allow re-selecting the current year's shape too (switch back)
-    return currentYear && !derived.includes(currentYear)
-      ? [currentYear, ...derived]
-      : derived
-  }, [existingYears, currentYear])
-
-  const defaultYear = options.find((o) => o !== currentYear) ?? options[0] ?? ""
-  const [year, setYear] = useState(defaultYear)
+  // A school moves forward one year, and never back (truth.md): the next year
+  // is not a choice, it is a fact derived from the current one.
+  const nextYear = useMemo(
+    () =>
+      deriveYearOptions(
+        existingYears.length > 0
+          ? existingYears
+          : currentYear
+            ? [currentYear]
+            : []
+      )[0] ?? "",
+    [existingYears, currentYear]
+  )
+  const year = nextYear
   const [isSaving, setIsSaving] = useState(false)
-
-  useEffect(() => {
-    if (open) setYear(defaultYear)
-  }, [open, defaultYear])
 
   const save = async () => {
     if (!year) return
     setIsSaving(true)
     try {
-      await apiClient.post("/api/batches/switch-year", { academic_year: year })
-      toast.success(`School year set to ${year}`)
+      await apiClient.post("/api/academic-years", { label: year })
+      toast.success(`${year} is now the open year`)
       onOpenChange(false)
       onSwitched()
     } catch (err) {
@@ -1409,25 +1403,19 @@ function SwitchYearDialog({
           </DialogTitle>
           <DialogDescription>
             {currentYear
-              ? `Classes of ${currentYear} become the previous batch. Nothing moves yet — you'll promote them in the next step, and you can switch back until a rollover is saved.`
+              ? `Classes of ${currentYear} become the previous batch. Nothing moves yet — you promote them in the next step. ${currentYear} closes for good once ${year} opens.`
               : "This tells the system which year your school is operating in."}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-1.5 px-6 py-4">
-          <Label className="text-xs">Academic year</Label>
-          <Select value={year || undefined} onValueChange={setYear}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select…" />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((y) => (
-                <SelectItem key={y} value={y}>
-                  {y}
-                  {y === currentYear ? " (current)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-1.5 py-2">
+          <Label className="text-xs">Opening</Label>
+          <div className="flex h-10 items-center rounded-md border border-border bg-muted/40 px-3 text-base font-medium text-foreground tabular-nums">
+            {year || "—"}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Always the year after {currentYear ?? "the current one"}. A school
+            moves forward one year at a time.
+          </p>
         </div>
         <DialogFooter>
           <Button
@@ -1444,10 +1432,10 @@ function SwitchYearDialog({
             {isSaving ? (
               <>
                 <CircleNotchIcon className="size-3.5 animate-spin" />
-                Switching…
+                Opening…
               </>
             ) : (
-              "Switch year"
+              `Open ${year}`
             )}
           </Button>
         </DialogFooter>
