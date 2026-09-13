@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { PlusIcon, ChalkboardIcon } from "@phosphor-icons/react"
 import { useHeaderActions } from "@/components/layout/header-actions-context"
 
@@ -28,7 +28,6 @@ import {
   AddClassDrawer,
   type ClassFormData,
 } from "@/modules/classes/components/add-class-drawer"
-import { GradeOverviewSheet } from "@/modules/classes/components/grade-overview-sheet"
 
 interface SubjectInfo {
   id: string
@@ -108,7 +107,6 @@ export function ClassesPage() {
   const navigate = useNavigate()
   // `/classes/:grade/overview` renders this same page with the grade's sheet
   // open, so the grid stays put underneath and the link is shareable.
-  const { grade: openGrade } = useParams<{ grade?: string }>()
   const { setHeaderActions } = useHeaderActions()
 
   const dispatch = useAppDispatch()
@@ -323,14 +321,6 @@ export function ClassesPage() {
           </div>
         )}
       </LoadingSwap>
-
-      <GradeOverviewSheet
-        grade={openGrade ?? null}
-        open={!!openGrade}
-        onOpenChange={(open) => {
-          if (!open) navigate("/classes")
-        }}
-      />
 
       {isAdmin && (
         <AddClassDrawer

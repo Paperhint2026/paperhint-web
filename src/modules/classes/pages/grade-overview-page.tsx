@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import {
+  ArrowLeftIcon,
+  CaretRightIcon,
   ArrowRightIcon,
   ArrowsSplitIcon,
-  CaretRightIcon,
   BooksIcon,
   ChalkboardIcon,
   ChalkboardTeacherIcon,
@@ -12,15 +13,14 @@ import {
   BookOpenIcon,
   TableIcon,
   UsersIcon,
-  XIcon,
   type Icon,
 } from "@phosphor-icons/react"
 
-import { useIsMobile } from "@/hooks/use-mobile"
 import { useAuth } from "@/lib/auth"
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { tameCaps } from "@/lib/format"
+import { PAGE_GUTTER } from "@/components/layout/page-container"
 import {
   Avatar,
   AvatarFallback,
@@ -35,14 +35,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Sticker } from "@/components/shared/sticker"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { coverFor } from "@/modules/classes/lib/grade-palette"
@@ -232,16 +224,13 @@ function SheetSkeleton() {
  * with who teaches them, and each section's roster — so the Classes grid
  * stays underneath and a teacher can flick between grades without leaving.
  */
-export function GradeOverviewSheet({
-  grade,
-  open,
-  onOpenChange,
-}: {
-  grade: string | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}) {
-  const isMobile = useIsMobile()
+/**
+ * One grade's page. It used to slide in as a sheet over the grid; a card with
+ * contents of its own is a page with a trail back (founder, 2026-09-13), so it
+ * has its own URL and the breadcrumb leads home.
+ */
+export function GradeOverviewPage() {
+  const { grade = null } = useParams()
   const reduceMotion = useReducedMotion()
   const navigate = useNavigate()
 
@@ -259,7 +248,6 @@ export function GradeOverviewSheet({
     kind: "student" | "teacher"
     id: string
   } | null>(null)
-  const personOpen = person !== null
 
   // Timetable tab — lazy: fetched only when the tab is opened for a section,
   // then cached per section id for the life of the sheet.
@@ -298,7 +286,7 @@ export function GradeOverviewSheet({
           return next
         })
       })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [tab, sectionId, ttBySection, ttPeriods])
 
   const fetchOverview = useCallback(async () => {
@@ -324,8 +312,8 @@ export function GradeOverviewSheet({
   }, [grade])
 
   useEffect(() => {
-    if (open && grade) fetchOverview()
-  }, [open, grade, fetchOverview])
+    if (grade) fetchOverview()
+  }, [grade, fetchOverview])
 
   const section = useMemo(
     () => data?.sections.find((s) => s.id === sectionId) ?? null,
@@ -391,30 +379,28 @@ export function GradeOverviewSheet({
     : []
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side={isMobile ? "bottom" : "right"}
-        size={isMobile ? "full" : "2xl"}
-        showCloseButton={false}
-        className={cn(
-          "flex h-full w-full flex-col gap-0 p-0",
-          personOpen &&
-            "data-[side=right]:-translate-x-6 data-[side=right]:scale-[0.98] data-[side=right]:opacity-90"
-        )}
-      >
-        {/* Toolbar */}
-        <div className="flex shrink-0 items-center justify-end gap-1 px-3 pt-3">
-          <SheetClose asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-full"
-              aria-label="Close"
-            >
-              <XIcon className="size-4" />
-            </Button>
-          </SheetClose>
-        </div>
+    <>
+      <div className="flex h-full w-full flex-col gap-0">
+        {/* The trail back */}
+        <nav
+          aria-label="Breadcrumb"
+          className={cn(
+            PAGE_GUTTER,
+            "flex shrink-0 items-center gap-1 pt-6 text-sm text-muted-foreground md:pt-8"
+          )}
+        >
+          <Link
+            to="/classes"
+            className="inline-flex items-center gap-1 rounded px-1 py-0.5 hover:text-foreground"
+          >
+            <ArrowLeftIcon className="size-3.5" />
+            Classes
+          </Link>
+          <CaretRightIcon className="size-3" aria-hidden />
+          <span className="truncate text-foreground">
+            {grade ? `Grade ${grade}` : "Grade"}
+          </span>
+        </nav>
 
         <LoadingSwap
           loading={isLoading}
@@ -446,7 +432,7 @@ export function GradeOverviewSheet({
               >
                 {/* Hero — the grade's cover, name and year */}
                 <motion.div variants={ENTER}>
-                  <SheetHeader className="relative gap-0 overflow-hidden px-6 pt-2 pb-0 text-left">
+                  <header className="relative gap-0 overflow-hidden px-6 pt-2 pb-0 text-left">
                     <span
                       aria-hidden
                       className="pointer-events-none absolute -top-8 right-2 text-[8rem] leading-none font-bold tracking-tighter text-foreground/[0.035] select-none"
@@ -463,20 +449,20 @@ export function GradeOverviewSheet({
                         {data.grade}
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
-                        <SheetTitle className="text-2xl font-semibold tracking-tight text-foreground">
+                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                           Grade {data.grade}
-                        </SheetTitle>
-                        <SheetDescription className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        </h1>
+                        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                           {data.academic_year}
                           <span className="text-border">·</span>
                           <span className="flex items-center gap-1.5">
                             <span className="size-1.5 rounded-full bg-primary" />
                             Current batch
                           </span>
-                        </SheetDescription>
+                        </p>
                       </div>
                     </div>
-                  </SheetHeader>
+                  </header>
                 </motion.div>
 
                 {/* Counts on a hairline */}
@@ -726,7 +712,6 @@ export function GradeOverviewSheet({
                           periods={ttPeriods}
                           isAdmin={isAdmin}
                           onOpenBuilder={() => {
-                            onOpenChange(false)
                             navigate(`/timetable?class=${section.id}`)
                           }}
                         />
@@ -846,7 +831,6 @@ export function GradeOverviewSheet({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    onOpenChange(false)
                     navigate("/students")
                   }}
                 >
@@ -857,7 +841,6 @@ export function GradeOverviewSheet({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    onOpenChange(false)
                     navigate("/teachers")
                   }}
                 >
@@ -868,9 +851,9 @@ export function GradeOverviewSheet({
             </div>
           )}
         </LoadingSwap>
-      </SheetContent>
+      </div>
 
-      {/* Stacked person sheets — the grade sheet eases back while one is open */}
+      {/* A person still opens as a drawer over the page */}
       <StudentDetailDrawer
         studentId={person?.kind === "student" ? person.id : null}
         open={person?.kind === "student"}
@@ -883,7 +866,7 @@ export function GradeOverviewSheet({
         onOpenChange={(o) => !o && setPerson(null)}
         canManage={false}
       />
-    </Sheet>
+    </>
   )
 }
 

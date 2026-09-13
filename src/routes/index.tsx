@@ -9,6 +9,7 @@ import { SetPasswordPage } from "@/modules/auth/pages/set-password-page"
 import { HomePage } from "@/modules/home/pages/home-page"
 import { ClassesPage } from "@/modules/classes/pages/classes-page"
 import { ClassHomePage } from "@/modules/classes/pages/class-home-page"
+import { GradeOverviewPage } from "@/modules/classes/pages/grade-overview-page"
 import { TeachersPage } from "@/modules/teachers/pages/teachers-page"
 import { TeacherOverviewPage } from "@/modules/teachers/pages/teacher-overview-page"
 import { StudentsPage } from "@/modules/students/pages/students-page"
@@ -54,7 +55,8 @@ export const router = createBrowserRouter([
           { index: true, element: <HomePage /> },
           // One route for the grid and the grade sheet, so opening or closing
           // the sheet only changes params — the page never remounts.
-          { path: "classes/:grade?/overview?", element: <ClassesPage /> },
+          { path: "classes", element: <ClassesPage /> },
+          { path: "classes/:grade/overview", element: <GradeOverviewPage /> },
           { path: "teachers", element: <TeachersPage /> },
           { path: "teachers/:id/overview", element: <TeacherOverviewPage /> },
           { path: "students", element: <StudentsPage /> },
