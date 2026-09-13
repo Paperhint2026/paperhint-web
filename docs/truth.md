@@ -208,3 +208,10 @@ changes. Dated. "Unknown until pilot" is a valid answer and is recorded as such.
 - **Platform role**: PaperHint team accounts with no school; they see only the Platform
   Console (school provisioning, module licensing). `navForRole("platform")`.
 - Grading UX and Ask Hint retry changes (no scheme impact).
+
+## Layout (2026-09-13)
+
+- **Three levels of navigation, maximum**: main sidebar (level 1) → tabs at the top of
+  the content (level 2) → a side panel inside the tab (level 3). Never a fourth.
+  Recorded in `docs/modules/00-principles.md`. Trigger: the Setup page stacked three
+  vertical rails and the content had half the width left.

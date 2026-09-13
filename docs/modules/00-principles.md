@@ -17,3 +17,20 @@ Founder's rule, 2026-09-10: **the whole app should be seamless.** In testable te
 Each module document has the same six headings: Scope · Schema · API · Screens and
 pickers · Acceptance · Out of scope. Migrations are additive, idempotent, and
 recorded in `paperhint-service/migrations/README.md` in the same commit.
+
+## Navigation depth — the thumb rule (founder, 2026-09-13)
+
+At most **three levels of navigation** on any screen, always in this order:
+
+1. **Level 1 — main sidebar.** The modules. The only vertical rail that belongs to
+   the shell.
+2. **Level 2 — tabs** across the top of the content area. Sections within a module
+   (e.g. School setup: Academic year · Working week · Bell timing · Departments &
+   subjects · Student form · Teacher form).
+3. **Level 3 — a side panel inside the tab.** A master list whose selection drives
+   the detail beside it (e.g. the department list beside the department's detail).
+
+Never a fourth. Anything deeper opens as a drawer or dialog over the content. A
+secondary section list may never be a vertical rail (that is level 2 in level 3's
+clothes). Pickers show what is selected and offer an Add button with search — never
+every candidate as a chip.
