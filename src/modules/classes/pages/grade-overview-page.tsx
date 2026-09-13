@@ -428,13 +428,12 @@ export function GradeOverviewPage() {
               >
                 {/* Hero — the grade's cover, name and year */}
                 <motion.div variants={ENTER}>
-                  <header className="relative gap-0 overflow-hidden px-6 pt-2 pb-0 text-left">
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute -top-8 right-2 text-[8rem] leading-none font-bold tracking-tighter text-foreground/[0.035] select-none"
-                    >
-                      {data.grade}
-                    </span>
+                  <header
+                    className={cn(
+                      PAGE_GUTTER,
+                      "relative gap-0 pt-2 pb-0 text-left"
+                    )}
+                  >
                     <div className="relative flex items-center gap-4">
                       <span
                         className={cn(
@@ -482,7 +481,10 @@ export function GradeOverviewPage() {
                   not, and it keeps the choice in view while you read. */}
                 <motion.div
                   variants={ENTER}
-                  className="flex min-h-0 flex-1 flex-col gap-4 px-6 md:flex-row md:gap-6"
+                  className={cn(
+                    PAGE_GUTTER,
+                    "flex min-h-0 flex-1 flex-col gap-4 md:flex-row md:gap-6"
+                  )}
                 >
                   <aside className="flex shrink-0 flex-col gap-1 md:w-56">
                     <BlockHeading
@@ -798,37 +800,6 @@ export function GradeOverviewPage() {
                   </div>
                 </motion.div>
               </motion.div>
-            </div>
-          )}
-
-          {/* Footer — where to go to change things */}
-          {data && (
-            <div className="flex shrink-0 items-center justify-between gap-2 px-6 pt-2 pb-4">
-              <span className="text-xs text-muted-foreground">
-                Enrolment and staffing live on their own pages.
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    navigate("/students")
-                  }}
-                >
-                  Students
-                  <ArrowRightIcon className="size-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    navigate("/teachers")
-                  }}
-                >
-                  Teachers
-                  <ArrowRightIcon className="size-3.5" />
-                </Button>
-              </div>
             </div>
           )}
         </LoadingSwap>
