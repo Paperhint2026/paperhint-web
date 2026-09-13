@@ -6,6 +6,7 @@ import { apiClient } from "@/lib/api-client"
 import { describeGrades } from "@/lib/grades"
 import { showError } from "@/lib/show-error"
 import { Button } from "@/components/ui/button"
+import { ModuleAction } from "@/components/ui/module-action"
 import {
   Dialog,
   DialogContent,
@@ -87,10 +88,10 @@ export function BulkAddDialog({ onDone }: { onDone: () => void }) {
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="w-full justify-start">
-          <UploadSimpleIcon className="size-4" />
-          Paste a list
-        </Button>
+        <ModuleAction variant="outline">
+          <UploadSimpleIcon className="size-3.5" />
+          <span className="hidden sm:inline">Paste a list</span>
+        </ModuleAction>
       </DialogTrigger>
       <DialogContent className="flex max-h-[85vh] flex-col gap-0 sm:max-w-2xl">
         <DialogHeader>
