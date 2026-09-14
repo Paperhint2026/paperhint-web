@@ -257,16 +257,6 @@ function RolloverHome() {
     fetchContext()
   }, [fetchContext])
 
-  useEffect(() => {
-    setHeaderActions(
-      <ModuleAction onClick={() => setSwitchOpen(true)}>
-        <ArrowsClockwiseIcon className="size-3.5" />
-        <span className="hidden sm:inline">Start new academic year</span>
-      </ModuleAction>
-    )
-    return () => setHeaderActions(null)
-  }, [setHeaderActions])
-
   const activeYear = context?.active_academic_year ?? null
   const classes = useMemo(() => context?.classes ?? [], [context])
   const pending = useMemo(
@@ -277,6 +267,26 @@ function RolloverHome() {
     () => classes.filter((c) => !c.is_pending_promotion),
     [classes]
   )
+
+  // One name, one action, wherever it appears (founder, 2026-09-14): while
+  // classes are mid-rollover, "Open rollover wizard" is what actually needs
+  // doing — starting yet another year makes no sense until this one finishes.
+  const hasPending = pending.length > 0
+  useEffect(() => {
+    setHeaderActions(
+      <ModuleAction
+        onClick={() =>
+          hasPending ? navigate("/rollover") : setSwitchOpen(true)
+        }
+      >
+        <ArrowsClockwiseIcon className="size-3.5" />
+        <span className="hidden sm:inline">
+          {hasPending ? "Open rollover wizard" : "Start new academic year"}
+        </span>
+      </ModuleAction>
+    )
+    return () => setHeaderActions(null)
+  }, [hasPending, navigate, setHeaderActions])
 
   return (
     <LoadingSwap
@@ -347,7 +357,7 @@ function RolloverHome() {
                 </p>
               </div>
               <Button onClick={() => navigate("/rollover")}>
-                Open the rollover wizard
+                Open rollover wizard
               </Button>
             </div>
           )}
