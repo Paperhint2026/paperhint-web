@@ -80,3 +80,12 @@ Opening the next year (POST /api/academic-years) is refused with 409
 the dialog shows the date plainly instead of a generic error. The wizard's
 draft plan can be cancelled at any step via POST /rollover/plan/cancel — safe
 because nothing writes to classes or students before execute.
+
+## Collapsed to two steps (truth.md, 2026-09-14)
+
+Class plan and Students are one screen now: a table of every pending class,
+pre-filled (promote to next grade, same section; the school's own highest
+existing grade graduates — never a hardcoded 12), where opening a row shows
+that class's roster inline for detain / reshuffle / withdraw. Review & run is
+the second and last step. `ClassRosterPanel` carries the per-student UI,
+reused from the deleted `StudentsStep`; `PlanStep` replaces `ClassPlanStep`.

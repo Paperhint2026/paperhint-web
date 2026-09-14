@@ -26,14 +26,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
-import { ClassPlanStep } from "@/modules/rollover/components/class-plan-step"
+import { PlanStep } from "@/modules/rollover/components/plan-step"
 import { ReviewStep } from "@/modules/rollover/components/review-step"
-import { StudentsStep } from "@/modules/rollover/components/students-step"
 import type { RolloverPlan } from "@/modules/rollover/lib/types"
 
 const STEPS = [
-  { key: "classes", label: "Class plan" },
-  { key: "students", label: "Students" },
+  { key: "plan", label: "Plan" },
   { key: "review", label: "Review & run" },
 ] as const
 type StepKey = (typeof STEPS)[number]["key"]
@@ -54,7 +52,7 @@ export function RolloverPage() {
 
   const [plan, setPlan] = useState<RolloverPlan | null | undefined>(undefined)
   const [error, setError] = useState("")
-  const [step, setStep] = useState<StepKey>("classes")
+  const [step, setStep] = useState<StepKey>("plan")
   const [done, setDone] = useState<Record<string, unknown> | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -65,7 +63,7 @@ export function RolloverPage() {
       await apiClient.post("/api/rollover/plan/cancel", {})
       toast.success("Rollover cancelled")
       setPlan(null)
-      setStep("classes")
+      setStep("plan")
       setConfirmCancel(false)
     } catch (e) {
       showError(e)
@@ -232,21 +230,12 @@ export function RolloverPage() {
             {plan.from_year} → {plan.to_year}
           </p>
 
-          {step === "classes" && (
-            <ClassPlanStep
+          {step === "plan" && (
+            <PlanStep
               toYear={plan.to_year}
               plan={plan}
               onSaved={setPlan}
-            />
-          )}
-          {step === "students" && (
-            <StudentsStep
-              planClasses={plan.plan.classes}
-              onExceptionsChanged={(students) =>
-                setPlan((p) =>
-                  p ? { ...p, plan: { ...p.plan, students } } : p
-                )
-              }
+              onContinue={() => setStep("review")}
             />
           )}
           {step === "review" && (

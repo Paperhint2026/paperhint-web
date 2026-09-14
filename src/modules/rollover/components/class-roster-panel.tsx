@@ -6,7 +6,6 @@ import {
 } from "@phosphor-icons/react"
 
 import { apiClient } from "@/lib/api-client"
-import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,61 +24,49 @@ import {
 } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
-import type {
-  RolloverException,
-  RolloverPlan,
-  RolloverPlanClass,
-  RosterRow,
-} from "@/modules/rollover/lib/types"
+import type { RolloverException, RosterRow } from "@/modules/rollover/lib/types"
 
 /**
- * Step 3: the per-student exceptions. Everyone not listed here follows the
- * default from the class plan — promoted with the class, same section; a
- * detained student stays in the same grade and section (truth.md). Listing a
- * student here is the override: a different section, promotion despite
- * detention, or withdrawal.
+ * One class's roster, opened inline under its row in the plan table (founder,
+ * 2026-09-14): "show the list of classes, and within each of these have a
+ * picker to move students to another section or mark them detained" — not a
+ * separate tab a step away from the class it belongs to.
+ *
+ * Everyone not listed here follows the class default: promoted with the
+ * class, same section; a detained student stays in the same grade and
+ * section (truth.md). Listing a student is the override.
  */
-export function StudentsStep({
-  planClasses,
-  onExceptionsChanged,
+export function ClassRosterPanel({
+  sourceClassId,
+  classAction,
+  onExceptions,
 }: {
-  planClasses: RolloverPlanClass[]
-  onExceptionsChanged: (exceptions: RolloverException[]) => void
+  sourceClassId: string
+  classAction: "promote" | "graduate"
+  /** The full, current exception list for THIS class — replaces, not appends. */
+  onExceptions: (sourceClassId: string, exceptions: RolloverException[]) => void
 }) {
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(
-    planClasses[0]?.source_class_id ?? null
-  )
   const [roster, setRoster] = useState<RosterRow[] | null>(null)
   const [error, setError] = useState("")
   const [query, setQuery] = useState("")
-  const [exceptions, setExceptions] = useState<RolloverException[]>([])
   const [bulkOpen, setBulkOpen] = useState(false)
 
-  const loadRoster = useCallback((classId: string) => {
+  const loadRoster = useCallback(() => {
     // the reset runs in a microtask, not synchronously in the effect body
     Promise.resolve().then(() => setRoster(null))
     apiClient
       .get<{ roster: RosterRow[] }>(
-        `/api/rollover/plan/roster?source_class_id=${classId}`
+        `/api/rollover/plan/roster?source_class_id=${sourceClassId}`
       )
-      .then((r) => {
-        setRoster(r.roster)
-        setExceptions((prev) => {
-          const others = prev.filter((e) => e.source_class_id !== classId)
-          const mine = r.roster
-            .map((row) => row.exception)
-            .filter((e): e is RolloverException => !!e)
-          return [...others, ...mine]
-        })
-      })
+      .then((r) => setRoster(r.roster))
       .catch((e) =>
         setError(e instanceof Error ? e.message : "Could not load the roster")
       )
-  }, [])
+  }, [sourceClassId])
 
   useEffect(() => {
-    if (selectedClassId) loadRoster(selectedClassId)
-  }, [selectedClassId, loadRoster])
+    loadRoster()
+  }, [loadRoster])
 
   const shown = useMemo(() => {
     if (!roster) return []
@@ -90,141 +77,99 @@ export function StudentsStep({
   }, [roster, query])
 
   const setException = (row: RosterRow, ex: RolloverException | null) => {
-    if (!selectedClassId) return
-    // StudentActionCell does not know which class it is in — stamp it here.
-    const stamped = ex ? { ...ex, source_class_id: selectedClassId } : null
-    setExceptions((prev) => {
-      const rest = prev.filter((e) => e.student_id !== row.student_id)
-      return stamped ? [...rest, stamped] : rest
-    })
-    setRoster((prev) =>
-      prev
-        ? prev.map((r) =>
-            r.student_id === row.student_id ? { ...r, exception: ex } : r
-          )
-        : prev
+    const stamped = ex ? { ...ex, source_class_id: sourceClassId } : null
+    const next = (roster ?? []).map((r) =>
+      r.student_id === row.student_id ? { ...r, exception: ex } : r
     )
+    setRoster(next)
+    onExceptions(
+      sourceClassId,
+      next.map((r) => r.exception).filter((e): e is RolloverException => !!e)
+    )
+    void stamped
   }
 
-  const save = useCallback(
-    async (list: RolloverException[]) => {
-      try {
-        const r = await apiClient.put<{ plan: RolloverPlan }>(
-          "/api/rollover/plan/students",
-          { students: list }
-        )
-        onExceptionsChanged(r.plan.plan.students)
-      } catch (e) {
-        showError(e)
-      }
-    },
-    [onExceptionsChanged]
-  )
-
-  // save shortly after each local change — the exceptions list is small, so a
-  // plain debounce is enough
-  useEffect(() => {
-    const t = setTimeout(() => save(exceptions), 500)
-    return () => clearTimeout(t)
-  }, [exceptions, save])
-
-  const current = planClasses.find((c) => c.source_class_id === selectedClassId)
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
-      {/* Level 3 — which class's roster is open */}
-      <aside className="flex shrink-0 flex-col gap-0.5 md:w-56">
-        {planClasses.map((c) => (
-          <button
-            key={c.source_class_id}
-            type="button"
-            onClick={() => setSelectedClassId(c.source_class_id)}
-            aria-pressed={selectedClassId === c.source_class_id}
-            className={cn(
-              "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-              selectedClassId === c.source_class_id
-                ? "bg-muted font-medium text-foreground"
-                : "text-muted-foreground hover:bg-muted/60"
-            )}
-          >
-            {c.action === "graduate"
-              ? "Graduating class"
-              : `→ Grade ${c.target?.grade}${c.target?.section}`}
-          </button>
-        ))}
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find a student"
-              className="h-9 pl-8"
-            />
-          </div>
-          {current && current.action === "promote" && (
-            <BulkReshuffleDialog
-              open={bulkOpen}
-              onOpenChange={setBulkOpen}
-              roster={roster ?? []}
-              onApply={(moves) => {
-                for (const m of moves) {
-                  const row = roster?.find((r) => r.student_id === m.student_id)
-                  if (row) {
-                    setException(row, {
-                      student_id: m.student_id,
-                      source_class_id: selectedClassId!,
-                      kind: "move_section",
-                      target_section: m.target_section,
-                    })
-                  }
-                }
-              }}
-            />
-          )}
+    <div className="flex flex-col gap-3 p-4">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find a student"
+            className="h-9 pl-8"
+          />
         </div>
-
-        {error ? (
-          <p className="text-sm text-destructive">{error}</p>
-        ) : !roster ? (
-          <Skeleton className="h-64 w-full rounded-xl" />
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Student</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {shown.map((row) => (
-                  <tr key={row.student_id}>
-                    <td className="px-3 py-2.5">
-                      <span className="text-foreground">{row.full_name}</span>
-                      {row.detained && (
-                        <span className="ml-1.5 text-[11px] text-amber-600 dark:text-amber-400">
-                          detained
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <StudentActionCell
-                        row={row}
-                        classAction={current?.action ?? "promote"}
-                        onChange={(ex) => setException(row, ex)}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {classAction === "promote" && (
+          <BulkReshuffleDialog
+            open={bulkOpen}
+            onOpenChange={setBulkOpen}
+            roster={roster ?? []}
+            onApply={(moves) => {
+              const next = (roster ?? []).map((r) => {
+                const m = moves.find((x) => x.student_id === r.student_id)
+                return m
+                  ? {
+                      ...r,
+                      exception: {
+                        student_id: r.student_id,
+                        source_class_id: sourceClassId,
+                        kind: "move_section" as const,
+                        target_section: m.target_section,
+                      },
+                    }
+                  : r
+              })
+              setRoster(next)
+              onExceptions(
+                sourceClassId,
+                next
+                  .map((r) => r.exception)
+                  .filter((e): e is RolloverException => !!e)
+              )
+            }}
+          />
         )}
       </div>
+
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : !roster ? (
+        <Skeleton className="h-40 w-full rounded-xl" />
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border bg-background">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Student</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {shown.map((row) => (
+                <tr key={row.student_id}>
+                  <td className="px-3 py-2.5">
+                    <span className="text-foreground">{row.full_name}</span>
+                    {row.detained && (
+                      <span className="ml-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                        detained
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <StudentActionCell
+                      row={row}
+                      classAction={classAction}
+                      onChange={(ex) => setException(row, ex)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

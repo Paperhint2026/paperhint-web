@@ -272,3 +272,17 @@ subjects paste-list flow. One shared import component, not one per module.
   against.
 - The wizard's draft plan can be **cancelled** at any point before execute —
   nothing has moved yet, so cancelling only discards the plan.
+
+## Rollover: one screen, not three (2026-09-14, founder)
+
+- The wizard is **two steps, not three**: Plan (classes + their students, one
+  table) then Review & run. A class row expands into its own roster inline —
+  detain, reshuffle, withdraw — instead of a separate "Students" tab a step
+  away from the class it belongs to.
+- **The terminal grade is derived from the school's own classes**, never
+  assumed to be 12. A school's structure is its own; hardcoding a number
+  invents a fact nobody confirmed. Highest existing grade graduates.
+- The founder's mental model: "click a button, it sorts itself out for me,
+  then I correct what's needed, then I click another button that does the
+  job." The plan arrives pre-built (promote, same section, next grade); a
+  person only touches what needs to change.
