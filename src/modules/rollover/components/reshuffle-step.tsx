@@ -52,9 +52,10 @@ export function ReshuffleStep({
     return counts
   }, [plan.plan.students])
 
-  const actionFor = (classId: string) =>
-    plan.plan.classes.find((c) => c.source_class_id === classId)?.action ??
-    "promote"
+  const classFor = (classId: string) =>
+    plan.plan.classes.find((c) => c.source_class_id === classId)
+
+  const actionFor = (classId: string) => classFor(classId)?.action ?? "promote"
 
   // Each class's roster owns its own slice of exceptions; saving replaces
   // that slice inside the plan's full list rather than the whole thing.
@@ -127,6 +128,8 @@ export function ReshuffleStep({
               key={selected}
               sourceClassId={selected}
               classAction={actionFor(selected)}
+              targetGrade={classFor(selected)?.target?.grade}
+              toYear={plan.to_year}
               onExceptions={saveExceptions}
             />
           ) : (

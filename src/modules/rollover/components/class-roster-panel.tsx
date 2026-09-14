@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   MagnifyingGlassIcon,
+  PlusIcon,
   UploadSimpleIcon,
   UserMinusIcon,
 } from "@phosphor-icons/react"
@@ -23,22 +24,29 @@ import { Textarea } from "@/components/ui/textarea"
 import type { RolloverException, RosterRow } from "@/modules/rollover/lib/types"
 
 /**
- * One class's roster, opened inline under its row in the plan table (founder,
- * 2026-09-14): "show the list of classes, and within each of these have a
- * picker to move students to another section or mark them detained" — not a
- * separate tab a step away from the class it belongs to.
+ * One class's reshuffling — who moves to which section. Who's promoted vs
+ * detained is already settled in the grade-promotion step; this only
+ * arranges the promoted ones (and any detained student who still needs a
+ * section for the repeat) into sections, including brand new ones (founder,
+ * 2026-09-14: "in reshuffling I could create a new section if I need to,
+ * then move people there — if I have a list, I can drop that as well").
  *
- * Everyone not listed here follows the class default: promoted with the
- * class, same section; a detained student stays in the same grade and
- * section (truth.md). Listing a student is the override.
+ * Everyone not listed here follows the default: promoted with the class,
+ * same section; a detained student stays in the same grade and section
+ * (truth.md). Listing a student is the override.
  */
 export function ClassRosterPanel({
   sourceClassId,
   classAction,
+  targetGrade,
+  toYear,
   onExceptions,
 }: {
   sourceClassId: string
   classAction: "promote" | "graduate"
+  /** Where a promoted student in this class lands by default. */
+  targetGrade?: number
+  toYear: string
   /** The full, current exception list for THIS class — replaces, not appends. */
   onExceptions: (sourceClassId: string, exceptions: RolloverException[]) => void
 }) {
@@ -46,8 +54,9 @@ export function ClassRosterPanel({
   const [error, setError] = useState("")
   const [query, setQuery] = useState("")
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [newSectionOpen, setNewSectionOpen] = useState(false)
 
-  const loadRoster = useCallback(() => {
+  useEffect(() => {
     // the reset runs in a microtask, not synchronously in the effect body
     Promise.resolve().then(() => setRoster(null))
     apiClient
@@ -59,10 +68,6 @@ export function ClassRosterPanel({
         setError(e instanceof Error ? e.message : "Could not load the roster")
       )
   }, [sourceClassId])
-
-  useEffect(() => {
-    loadRoster()
-  }, [loadRoster])
 
   const shown = useMemo(() => {
     if (!roster) return []
@@ -85,43 +90,6 @@ export function ClassRosterPanel({
     void stamped
   }
 
-  /**
-   * Detain/Promote is a real switch, not a plan-time guess: it writes the
-   * student's annual_result (the same field a teacher sets from Results),
-   * because that is what "detained" means everywhere else in the app. Any
-   * section override on the row is cleared — a fresh detain defaults to
-   * staying put (truth.md), a fresh promote drops a stale detain-only choice.
-   */
-  const [togglingId, setTogglingId] = useState<string | null>(null)
-  const toggleDetain = async (row: RosterRow) => {
-    const nextDetained = !row.detained
-    setTogglingId(row.student_id)
-    try {
-      await apiClient.patch("/api/batches/annual-result", {
-        updates: [
-          {
-            student_id: row.student_id,
-            annual_result: nextDetained ? "detained" : "pass",
-          },
-        ],
-      })
-      const next = (roster ?? []).map((r) =>
-        r.student_id === row.student_id
-          ? { ...r, detained: nextDetained, exception: null }
-          : r
-      )
-      setRoster(next)
-      onExceptions(
-        sourceClassId,
-        next.map((r) => r.exception).filter((e): e is RolloverException => !!e)
-      )
-    } catch (e) {
-      showError(e)
-    } finally {
-      setTogglingId(null)
-    }
-  }
-
   return (
     <div className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
@@ -134,6 +102,12 @@ export function ClassRosterPanel({
             className="h-9 pl-8"
           />
         </div>
+        <NewSectionDialog
+          open={newSectionOpen}
+          onOpenChange={setNewSectionOpen}
+          defaultGrade={targetGrade}
+          toYear={toYear}
+        />
         {classAction === "promote" && (
           <BulkReshuffleDialog
             open={bulkOpen}
@@ -142,17 +116,14 @@ export function ClassRosterPanel({
             onApply={(moves) => {
               const next = (roster ?? []).map((r) => {
                 const m = moves.find((x) => x.student_id === r.student_id)
-                return m
-                  ? {
-                      ...r,
-                      exception: {
-                        student_id: r.student_id,
-                        source_class_id: sourceClassId,
-                        kind: "move_section" as const,
-                        target_section: m.target_section,
-                      },
-                    }
-                  : r
+                if (!m) return r
+                const exception: RolloverException = {
+                  student_id: r.student_id,
+                  source_class_id: sourceClassId,
+                  kind: r.detained ? "detain_move" : "move_section",
+                  target_section: m.target_section,
+                }
+                return { ...r, exception }
               })
               setRoster(next)
               onExceptions(
@@ -176,7 +147,7 @@ export function ClassRosterPanel({
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Student</th>
-                <th className="w-44 px-3 py-2 font-medium">Grade</th>
+                <th className="w-24 px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">
                   Section &amp; other changes
                 </th>
@@ -189,36 +160,16 @@ export function ClassRosterPanel({
                     <span className="text-foreground">{row.full_name}</span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        aria-pressed={!row.detained}
-                        disabled={togglingId === row.student_id}
-                        onClick={() => row.detained && toggleDetain(row)}
-                        className={cn(
-                          "rounded-md border px-2 py-1 text-xs transition-colors disabled:opacity-60",
-                          !row.detained
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        Promote
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={row.detained}
-                        disabled={togglingId === row.student_id}
-                        onClick={() => !row.detained && toggleDetain(row)}
-                        className={cn(
-                          "rounded-md border px-2 py-1 text-xs transition-colors disabled:opacity-60",
-                          row.detained
-                            ? "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                            : "border-border text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        Detain
-                      </button>
-                    </div>
+                    <span
+                      className={cn(
+                        "rounded-md border px-2 py-1 text-xs",
+                        row.detained
+                          ? "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                          : "border-border text-muted-foreground"
+                      )}
+                    >
+                      {row.detained ? "Detained" : "Promoted"}
+                    </span>
                   </td>
                   <td className="px-3 py-2.5">
                     <StudentActionCell
@@ -321,6 +272,102 @@ function StudentActionCell({
         Withdraw
       </button>
     </div>
+  )
+}
+
+/**
+ * A section only exists once a class row exists for it. Creating one here —
+ * rather than only discovering it by typing a new letter into a student's
+ * section field — makes it a real, visible class right away (founder,
+ * 2026-09-14: "I could also create a new section and then promote all the
+ * students to next year").
+ */
+function NewSectionDialog({
+  open,
+  onOpenChange,
+  defaultGrade,
+  toYear,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  defaultGrade?: number
+  toYear: string
+}) {
+  const [grade, setGrade] = useState(String(defaultGrade ?? ""))
+  const [section, setSection] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (open) setGrade(String(defaultGrade ?? ""))
+  }, [open, defaultGrade])
+
+  const create = async () => {
+    const g = Number(grade)
+    const s = section.trim().toUpperCase()
+    if (!g || !s) return
+    setSaving(true)
+    try {
+      await apiClient.post("/api/classes", {
+        grade: g,
+        section: s,
+        academic_year: toYear,
+      })
+      onOpenChange(false)
+      setSection("")
+    } catch (e) {
+      showError(e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onOpenChange(true)}
+      >
+        <PlusIcon className="size-3.5" />
+        New section
+      </Button>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Create a new section</DialogTitle>
+          <DialogDescription>
+            For {toYear}. Once created, type its letter into a student's section
+            field to move them there.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Grade</span>
+          <Input
+            value={grade}
+            onChange={(e) => setGrade(e.target.value.replace(/\D/g, ""))}
+            className="h-9 w-16 text-center"
+            inputMode="numeric"
+          />
+          <span className="text-sm text-muted-foreground">Section</span>
+          <Input
+            value={section}
+            onChange={(e) =>
+              setSection(e.target.value.toUpperCase().slice(0, 2))
+            }
+            className="h-9 w-16 text-center"
+            placeholder="C"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={!grade || !section || saving} onClick={create}>
+            {saving ? "Creating…" : "Create section"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

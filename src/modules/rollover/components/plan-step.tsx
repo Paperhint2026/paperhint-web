@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState } from "react"
-import { CircleNotchIcon, GraduationCapIcon } from "@phosphor-icons/react"
+import { Fragment, useEffect, useMemo, useState } from "react"
+import {
+  CaretDownIcon,
+  CaretRightIcon,
+  CircleNotchIcon,
+  GraduationCapIcon,
+} from "@phosphor-icons/react"
 
 import { apiClient } from "@/lib/api-client"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ClassIdentifyPanel } from "@/modules/rollover/components/class-identify-panel"
 import type {
   ContextClass,
   RolloverPlan,
@@ -13,14 +19,24 @@ import type {
 } from "@/modules/rollover/lib/types"
 
 /**
- * Step 1 of 3: which grade every class moves into. Pre-filled — promote to
- * the next grade, same section letter — so the only classes that show a
+ * Step 1 of 3: which grade every class moves into, and — only where it
+ * actually matters — who in it repeats instead. Pre-filled — promote to the
+ * next grade, same section letter — so the only classes that show a
  * Promote/Graduate choice are the ones actually AT the school's own terminal
  * grade (derived from its classes, never assumed to be 12: a school's
  * structure is its own). Everything below that just states its target;
  * "Graduate" is not an option a Grade 6 class could ever need.
  *
- * Reshuffling students is its own step, right after this one.
+ * A class with no one detained is a single click — nothing to review. A
+ * class that already has someone detained opens straight to that list
+ * (founder, 2026-09-14: "until eighth or ninth grade there's no detaining —
+ * we just click promote; tenth to twelfth is where you identify who's
+ * promoted"). Any class can still be opened by hand — this is a default, not
+ * a hard grade cutoff, since a school's own results decide it, not a number
+ * in the code.
+ *
+ * Reshuffling sections — including creating a new one — is its own step,
+ * right after this one.
  */
 export function PlanStep({
   toYear,
@@ -36,6 +52,7 @@ export function PlanStep({
   const [rows, setRows] = useState<Record<string, RolloverPlanClass>>({})
   const [terminalGrade, setTerminalGrade] = useState(12)
   const [saving, setSaving] = useState(false)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     apiClient
@@ -70,12 +87,28 @@ export function PlanStep({
           }
         }
         setRows(initial)
+        // A class with anyone already detained opens straight to that list;
+        // everything else stays a one-click Promote until asked to open.
+        setExpanded((prev) => {
+          const next = { ...prev }
+          for (const c of active) {
+            if (c.detained_count > 0 && !(c.id in next)) next[c.id] = true
+          }
+          return next
+        })
       })
       .catch((e) =>
         setError(e instanceof Error ? e.message : "Could not load classes")
       )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toYear])
+
+  const setDetainedCount = (classId: string, count: number) =>
+    setClasses((prev) =>
+      (prev ?? []).map((c) =>
+        c.id === classId ? { ...c, detained_count: count } : c
+      )
+    )
 
   const patch = (id: string, fn: (r: RolloverPlanClass) => RolloverPlanClass) =>
     setRows((prev) => ({ ...prev, [id]: fn(prev[id]) }))
@@ -156,105 +189,136 @@ export function PlanStep({
                   if (!row) return null
                   const isGraduate = row.action === "graduate"
                   const canGraduate = c.grade >= terminalGrade
+                  const isOpen = !!expanded[c.id]
                   return (
-                    <tr key={c.id}>
-                      <td className="px-3 py-2.5 font-medium text-foreground">
-                        {c.grade}
-                        {c.section}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-muted-foreground tabular-nums">
-                        {c.student_count}
-                        {c.detained_count > 0 && (
-                          <span className="ml-1 text-[11px]">
-                            ({c.detained_count} detained)
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {canGraduate ? (
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              aria-pressed={!isGraduate}
-                              onClick={() =>
-                                patch(c.id, (r) => ({
-                                  ...r,
-                                  action: "promote",
-                                  target: r.target ?? {
-                                    grade: c.grade + 1,
-                                    section: c.section,
-                                    academic_year: toYear,
-                                  },
-                                }))
-                              }
-                              className={cn(
-                                "rounded-md border px-2 py-1 text-xs transition-colors",
-                                !isGraduate
-                                  ? "border-primary bg-primary/10 text-foreground"
-                                  : "border-border text-muted-foreground hover:bg-muted"
-                              )}
-                            >
-                              Promote
-                            </button>
-                            <button
-                              type="button"
-                              aria-pressed={isGraduate}
-                              onClick={() =>
-                                patch(c.id, (r) => ({
-                                  ...r,
-                                  action: "graduate",
-                                  target: undefined,
-                                }))
-                              }
-                              className={cn(
-                                "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
-                                isGraduate
-                                  ? "border-primary bg-primary/10 text-foreground"
-                                  : "border-border text-muted-foreground hover:bg-muted"
-                              )}
-                            >
-                              <GraduationCapIcon className="size-3" />
-                              Graduate
-                            </button>
-                          </div>
-                        ) : (
-                          // A Grade 6 class has exactly one valid action — no
-                          // choice to make, so no button pretending there is one.
-                          <span className="text-xs text-muted-foreground">
-                            Promotes
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {isGraduate ? (
-                          <span className="text-xs text-muted-foreground">
-                            Leaves the school
-                          </span>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
+                    <Fragment key={c.id}>
+                      <tr>
+                        <td className="px-3 py-2.5 font-medium text-foreground">
+                          {c.grade}
+                          {c.section}
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-muted-foreground tabular-nums">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpanded((prev) => ({
+                                ...prev,
+                                [c.id]: !prev[c.id],
+                              }))
+                            }
+                            className="inline-flex items-center gap-1 hover:text-foreground"
+                          >
+                            {isOpen ? (
+                              <CaretDownIcon className="size-3" />
+                            ) : (
+                              <CaretRightIcon className="size-3" />
+                            )}
+                            {c.student_count}
+                            {c.detained_count > 0 && (
+                              <span className="text-[11px]">
+                                ({c.detained_count} detained)
+                              </span>
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {canGraduate ? (
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                aria-pressed={!isGraduate}
+                                onClick={() =>
+                                  patch(c.id, (r) => ({
+                                    ...r,
+                                    action: "promote",
+                                    target: r.target ?? {
+                                      grade: c.grade + 1,
+                                      section: c.section,
+                                      academic_year: toYear,
+                                    },
+                                  }))
+                                }
+                                className={cn(
+                                  "rounded-md border px-2 py-1 text-xs transition-colors",
+                                  !isGraduate
+                                    ? "border-primary bg-primary/10 text-foreground"
+                                    : "border-border text-muted-foreground hover:bg-muted"
+                                )}
+                              >
+                                Promote
+                              </button>
+                              <button
+                                type="button"
+                                aria-pressed={isGraduate}
+                                onClick={() =>
+                                  patch(c.id, (r) => ({
+                                    ...r,
+                                    action: "graduate",
+                                    target: undefined,
+                                  }))
+                                }
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
+                                  isGraduate
+                                    ? "border-primary bg-primary/10 text-foreground"
+                                    : "border-border text-muted-foreground hover:bg-muted"
+                                )}
+                              >
+                                <GraduationCapIcon className="size-3" />
+                                Graduate
+                              </button>
+                            </div>
+                          ) : (
+                            // A Grade 6 class has exactly one valid action — no
+                            // choice to make, so no button pretending there is one.
                             <span className="text-xs text-muted-foreground">
-                              Grade {row.target?.grade}
+                              Promotes
                             </span>
-                            <Input
-                              value={row.target?.section ?? ""}
-                              onChange={(e) =>
-                                patch(c.id, (r) => ({
-                                  ...r,
-                                  target: {
-                                    grade: r.target?.grade ?? c.grade + 1,
-                                    section: e.target.value
-                                      .toUpperCase()
-                                      .slice(0, 2),
-                                    academic_year: toYear,
-                                  },
-                                }))
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {isGraduate ? (
+                            <span className="text-xs text-muted-foreground">
+                              Leaves the school
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">
+                                Grade {row.target?.grade}
+                              </span>
+                              <Input
+                                value={row.target?.section ?? ""}
+                                onChange={(e) =>
+                                  patch(c.id, (r) => ({
+                                    ...r,
+                                    target: {
+                                      grade: r.target?.grade ?? c.grade + 1,
+                                      section: e.target.value
+                                        .toUpperCase()
+                                        .slice(0, 2),
+                                      academic_year: toYear,
+                                    },
+                                  }))
+                                }
+                                className="h-8 w-16 text-center text-sm"
+                              />
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr>
+                          <td colSpan={4} className="bg-muted/20 p-0">
+                            <ClassIdentifyPanel
+                              sourceClassId={c.id}
+                              onDetainedCountChange={(count) =>
+                                setDetainedCount(c.id, count)
                               }
-                              className="h-8 w-16 text-center text-sm"
                             />
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   )
                 })
             )}

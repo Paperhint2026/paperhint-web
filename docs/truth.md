@@ -324,3 +324,31 @@ subjects paste-list flow. One shared import component, not one per module.
   pointed at a specific reference style: connected arrow-shaped tabs, each
   holding a bold title plus a lighter supporting line stacked inside the
   segment. Done = dark solid fill, current = tinted, upcoming = plain.
+
+## Rollover: what each step actually owns (2026-09-14, founder)
+
+- **Grade promotion decides who, not just where.** Founder: "the promotion is
+  basically not just moving the classes to the next section, but also to
+  identify who's getting promoted." A class opens straight to its student
+  list only when it has someone already detained — in practice that's the
+  senior grades (10-12, where results can fail a student); a junior class
+  with nobody detained is one click, nothing to review. This is a default
+  driven by the class's own detained count, never a hardcoded grade number —
+  a class with detained students always exists to open by hand regardless.
+- **Reshuffling is section-only, and can create a section that doesn't exist
+  yet.** Founder: "I could also create a new section and then promote all
+  the students to next year... in reshuffling I'll be able to create a new
+  section if I need to, and move people there — if I have a list I can drop
+  that too." Promote/Detain is already decided in step 1; this step only
+  places promoted (and repeating) students into sections, with an explicit
+  "New section" action (`POST /api/classes`) alongside the existing
+  reshuffle-by-list paste.
+- **Review is an itemized table, not just stat tiles.** Founder: "a complete
+  table produced in a format of all the grades, all the sections, all the
+  students." `POST /rollover/preview` now returns a `students` array (every
+  student in the plan, their result, and exact destination) built by a
+  read-only mirror of the execute engine's resolution
+  (`buildItemizedPreview` in rollover.controller.js) — deliberately
+  duplicated rather than reusing `executePlanCore`, since that function's
+  `ensureTarget()` inserts classes as a side effect of resolving a target id
+  and preview must never write anything.

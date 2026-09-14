@@ -123,3 +123,26 @@ preview and then submit" — three distinct steps, not two. Split back apart:
 connected chevron/arrow-shaped segments (not numbered circles), each holding
 a bold title plus a lighter supporting line stacked inside — done filled dark
 solid, current tinted, upcoming plain.
+
+## Step scopes sharpened (truth.md, 2026-09-14)
+
+- **Grade promotion** (`PlanStep` + new `ClassIdentifyPanel`): a class with
+  nobody currently detained is a single Promote/Graduate click, nothing else
+  shown. A class with any detained student opens straight to a compact
+  Student + Promote/Detain list (`GET /rollover/plan/roster`, `PATCH
+  /batches/annual-result` — same real toggle as before, just surfaced here
+  too); any class can be opened by hand via the row's expand toggle. No
+  section field here — that moved entirely to Reshuffling.
+- **Reshuffling** (`ClassRosterPanel`): dropped its Promote/Detain switch
+  (decided in step 1 now) in favor of a read-only Promoted/Detained badge,
+  and gained a "New section" dialog that calls `POST /api/classes` directly
+  — the same endpoint Setup > Classes uses — so a section exists as a real
+  class immediately, before execute, and can be typed into any section
+  field right away.
+- **Review** (`ReviewStep`): replaced the three stat tiles with a per-student
+  table — class, student, result, exact destination, a "new section" tag
+  where one will be created. Backed by a new `students` array on `POST
+  /rollover/preview`, computed by `buildItemizedPreview()` in
+  rollover.controller.js: a read-only duplicate of `executePlanCore`'s
+  resolution logic (never call the real engine for a preview — its
+  `ensureTarget()` writes classes as a side effect of resolving an id).
