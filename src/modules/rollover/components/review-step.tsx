@@ -1,24 +1,16 @@
-import { useEffect, useState } from "react"
-import {
-  CheckCircleIcon,
-  CircleNotchIcon,
-  WarningIcon,
-} from "@phosphor-icons/react"
+import { CheckCircleIcon, WarningIcon } from "@phosphor-icons/react"
 
-import { apiClient } from "@/lib/api-client"
-import { showError } from "@/lib/show-error"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Sticker } from "@/components/shared/sticker"
 
-type Preview = {
+export type Preview = {
   to_year: string
   classes: number
   students_with_exceptions: number
   missing_target: string[]
   ready: boolean
 }
-type ExecuteResult = {
+export type ExecuteResult = {
   moved?: number
   graduated?: number
   detained?: number
@@ -27,44 +19,20 @@ type ExecuteResult = {
   classes_reused?: number
 }
 
-/** Step 4 and 5: what will happen, then the one atomic call that does it. */
+/**
+ * What will happen — read-only. The footer's "Run the rollover" drives the
+ * actual execute call, so this step is purely the review: stats, a warning if
+ * something is missing, a way to re-check after fixing it in Plan.
+ */
 export function ReviewStep({
-  planId,
-  onExecuted,
+  preview,
+  error,
+  onRetry,
 }: {
-  planId: string
-  onExecuted: (result: ExecuteResult) => void
+  preview: Preview | null
+  error: string
+  onRetry: () => void
 }) {
-  const [preview, setPreview] = useState<Preview | null>(null)
-  const [error, setError] = useState("")
-  const [executing, setExecuting] = useState(false)
-
-  const load = () => {
-    setPreview(null)
-    apiClient
-      .post<Preview>("/api/rollover/preview", {})
-      .then(setPreview)
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "Could not build the preview")
-      )
-  }
-  useEffect(load, [planId])
-
-  const execute = async () => {
-    setExecuting(true)
-    try {
-      const r = await apiClient.post<{ result: ExecuteResult }>(
-        "/api/rollover/execute",
-        {}
-      )
-      onExecuted(r.result)
-    } catch (e) {
-      showError(e)
-    } finally {
-      setExecuting(false)
-    }
-  }
-
   if (error) return <p className="text-sm text-destructive">{error}</p>
   if (!preview) return <Skeleton className="h-48 w-full rounded-xl" />
 
@@ -86,7 +54,7 @@ export function ReviewStep({
             {preview.missing_target.length} class
             {preview.missing_target.length === 1 ? "" : "es"} in the plan{" "}
             {preview.missing_target.length === 1 ? "has" : "have"} no target
-            section. Go back to the class plan step and set one.
+            section. Go back to the plan step and set one.
           </span>
         </div>
       ) : (
@@ -96,20 +64,9 @@ export function ReviewStep({
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button onClick={execute} disabled={!preview.ready || executing}>
-          {executing && <CircleNotchIcon className="size-4 animate-spin" />}
-          Run the rollover
-        </Button>
-        <Button variant="outline" onClick={load}>
-          Re-check
-        </Button>
-      </div>
-      <p className="flex items-start gap-2 text-xs text-muted-foreground">
-        <Sticker name="point" size={28} />
-        This is one action. Every class and student moves together, or nothing
-        does.
-      </p>
+      <Button variant="outline" onClick={onRetry} className="self-start">
+        Re-check
+      </Button>
     </div>
   )
 }

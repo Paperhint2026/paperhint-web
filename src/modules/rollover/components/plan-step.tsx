@@ -10,7 +10,6 @@ import {
 import { apiClient } from "@/lib/api-client"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ClassRosterPanel } from "@/modules/rollover/components/class-roster-panel"
@@ -37,12 +36,10 @@ export function PlanStep({
   toYear,
   plan,
   onSaved,
-  onContinue,
 }: {
   toYear: string
   plan: RolloverPlan
   onSaved: (plan: RolloverPlan) => void
-  onContinue: () => void
 }) {
   const [classes, setClasses] = useState<ContextClass[] | null>(null)
   const [error, setError] = useState("")
@@ -367,9 +364,6 @@ export function PlanStep({
           </tbody>
         </table>
       </div>
-      <Button onClick={onContinue} className="self-end">
-        Continue to review
-      </Button>
     </div>
   )
 }

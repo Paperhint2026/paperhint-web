@@ -6,6 +6,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { apiClient } from "@/lib/api-client"
+import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,11 +18,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import type { RolloverException, RosterRow } from "@/modules/rollover/lib/types"
@@ -89,6 +85,43 @@ export function ClassRosterPanel({
     void stamped
   }
 
+  /**
+   * Detain/Promote is a real switch, not a plan-time guess: it writes the
+   * student's annual_result (the same field a teacher sets from Results),
+   * because that is what "detained" means everywhere else in the app. Any
+   * section override on the row is cleared — a fresh detain defaults to
+   * staying put (truth.md), a fresh promote drops a stale detain-only choice.
+   */
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const toggleDetain = async (row: RosterRow) => {
+    const nextDetained = !row.detained
+    setTogglingId(row.student_id)
+    try {
+      await apiClient.patch("/api/batches/annual-result", {
+        updates: [
+          {
+            student_id: row.student_id,
+            annual_result: nextDetained ? "detained" : "pass",
+          },
+        ],
+      })
+      const next = (roster ?? []).map((r) =>
+        r.student_id === row.student_id
+          ? { ...r, detained: nextDetained, exception: null }
+          : r
+      )
+      setRoster(next)
+      onExceptions(
+        sourceClassId,
+        next.map((r) => r.exception).filter((e): e is RolloverException => !!e)
+      )
+    } catch (e) {
+      showError(e)
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
@@ -143,7 +176,10 @@ export function ClassRosterPanel({
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Student</th>
-                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="w-44 px-3 py-2 font-medium">Grade</th>
+                <th className="px-3 py-2 font-medium">
+                  Section &amp; other changes
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -151,14 +187,45 @@ export function ClassRosterPanel({
                 <tr key={row.student_id}>
                   <td className="px-3 py-2.5">
                     <span className="text-foreground">{row.full_name}</span>
-                    {row.detained && (
-                      <span className="ml-1.5 text-[11px] text-amber-600 dark:text-amber-400">
-                        detained
-                      </span>
-                    )}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        aria-pressed={!row.detained}
+                        disabled={togglingId === row.student_id}
+                        onClick={() => row.detained && toggleDetain(row)}
+                        className={cn(
+                          "rounded-md border px-2 py-1 text-xs transition-colors disabled:opacity-60",
+                          !row.detained
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        Promote
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={row.detained}
+                        disabled={togglingId === row.student_id}
+                        onClick={() => !row.detained && toggleDetain(row)}
+                        className={cn(
+                          "rounded-md border px-2 py-1 text-xs transition-colors disabled:opacity-60",
+                          row.detained
+                            ? "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                            : "border-border text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        Detain
+                      </button>
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     <StudentActionCell
+                      // Remount when the exception changes underneath this
+                      // row (e.g. cleared elsewhere) instead of an effect
+                      // resyncing local state — the React-recommended fix.
+                      key={`${row.exception?.kind ?? "none"}:${row.exception?.target_section ?? ""}`}
                       row={row}
                       classAction={classAction}
                       onChange={(ex) => setException(row, ex)}
@@ -183,7 +250,6 @@ function StudentActionCell({
   classAction: "promote" | "graduate"
   onChange: (ex: RolloverException | null) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [section, setSection] = useState(row.exception?.target_section ?? "")
 
   if (row.exception?.kind === "withdraw") {
@@ -200,163 +266,61 @@ function StudentActionCell({
       </div>
     )
   }
-  if (row.exception?.kind === "move_section") {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-foreground">
-          Section {row.exception.target_section}
-        </span>
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          Undo
-        </button>
-      </div>
-    )
-  }
-  if (row.exception?.kind === "detain_promote") {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-foreground">Promoted anyway</span>
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          Undo
-        </button>
-      </div>
-    )
-  }
-  if (row.exception?.kind === "detain_move") {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-foreground">
-          Stays, section {row.exception.target_section}
-        </span>
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          Undo
-        </button>
-      </div>
-    )
+
+  const commitSection = (value: string) => {
+    const v = value.trim().toUpperCase()
+    if (!v) {
+      onChange(null)
+      return
+    }
+    onChange({
+      student_id: row.student_id,
+      source_class_id: "",
+      kind: row.detained ? "detain_move" : "move_section",
+      target_section: v,
+    })
   }
 
-  const defaultLabel =
-    classAction === "graduate"
-      ? row.detained
-        ? "Held back — needs a section"
-        : "Graduates"
-      : row.detained
-        ? "Stays in the same section"
-        : "Promoted with the class"
+  if (classAction === "graduate" && !row.detained) {
+    // Nothing to move — a graduating student who is not detained just leaves.
+    return (
+      <span className="text-xs text-muted-foreground">Leaves the school</span>
+    )
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "text-xs underline decoration-dotted underline-offset-2",
-            row.detained
-              ? "text-amber-700 dark:text-amber-400"
-              : "text-muted-foreground"
-          )}
-        >
-          {defaultLabel}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2">
-        <div className="flex flex-col gap-1">
-          {classAction === "promote" && !row.detained && (
-            <div className="flex items-center gap-1.5 px-1 py-1">
-              <Input
-                value={section}
-                onChange={(e) => setSection(e.target.value.toUpperCase())}
-                placeholder="Section"
-                className="h-8 w-20 text-sm"
-              />
-              <Button
-                size="sm"
-                onClick={() => {
-                  onChange({
-                    student_id: row.student_id,
-                    source_class_id: "",
-                    kind: "move_section",
-                    target_section: section,
-                  })
-                  setOpen(false)
-                }}
-                disabled={!section.trim()}
-              >
-                Move
-              </Button>
-            </div>
-          )}
-          {row.detained && (
-            <>
-              <div className="flex items-center gap-1.5 px-1 py-1">
-                <Input
-                  value={section}
-                  onChange={(e) => setSection(e.target.value.toUpperCase())}
-                  placeholder="Section"
-                  className="h-8 w-20 text-sm"
-                />
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    onChange({
-                      student_id: row.student_id,
-                      source_class_id: "",
-                      kind: "detain_move",
-                      target_section: section,
-                    })
-                    setOpen(false)
-                  }}
-                  disabled={!section.trim()}
-                >
-                  Different section
-                </Button>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onChange({
-                    student_id: row.student_id,
-                    source_class_id: "",
-                    kind: "detain_promote",
-                  })
-                  setOpen(false)
-                }}
-                className="rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-              >
-                Promote despite detention
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              onChange({
-                student_id: row.student_id,
-                source_class_id: "",
-                kind: "withdraw",
-              })
-              setOpen(false)
-            }}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
-          >
-            <UserMinusIcon className="size-3.5" />
-            Withdraw
-          </button>
-        </div>
-      </PopoverContent>
-    </Popover>
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground">Section</span>
+      <Input
+        value={section}
+        onChange={(e) => setSection(e.target.value.toUpperCase())}
+        onBlur={(e) => commitSection(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commitSection(section)
+        }}
+        placeholder={row.detained ? "same" : "same as class"}
+        className="h-8 w-20 text-sm"
+      />
+      {row.detained && !section && (
+        <span className="text-[11px] text-muted-foreground">
+          stays in this section
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() =>
+          onChange({
+            student_id: row.student_id,
+            source_class_id: "",
+            kind: "withdraw",
+          })
+        }
+        className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+      >
+        <UserMinusIcon className="size-3.5" />
+        Withdraw
+      </button>
+    </div>
   )
 }
 

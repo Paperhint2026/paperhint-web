@@ -286,3 +286,19 @@ subjects paste-list flow. One shared import component, not one per module.
   then I correct what's needed, then I click another button that does the
   job." The plan arrives pre-built (promote, same section, next grade); a
   person only touches what needs to change.
+
+## Rollover: real detain switch, visual stepper, constant footer (2026-09-14, founder)
+
+- **Detain is a real toggle, not a plan-time guess.** Promote/Detain per student
+  in the roster panel writes `annual_result` directly (the same field a
+  teacher sets from Results) — because that is what "detained" means
+  everywhere else in the app, not a rollover-only concept.
+- **Section is a visible field, not a hidden popover.** Every student row
+  shows its target section as an always-editable input; Withdraw is a small
+  link beside it. Nothing needs a click-to-reveal step first.
+- **The wizard shows its shape at a glance**: a numbered, connected stepper
+  (done = check, current = ringed number, ahead = plain number) above the
+  content, not a tab strip.
+- **One constant footer** drives both steps: "Continue to review" on Plan,
+  "Run the rollover" on Review — never a button buried inside a step's own
+  content that scrolls out of view.

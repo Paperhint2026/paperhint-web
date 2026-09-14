@@ -89,3 +89,13 @@ existing grade graduates — never a hardcoded 12), where opening a row shows
 that class's roster inline for detain / reshuffle / withdraw. Review & run is
 the second and last step. `ClassRosterPanel` carries the per-student UI,
 reused from the deleted `StudentsStep`; `PlanStep` replaces `ClassPlanStep`.
+
+## Detain switch, stepper, footer (truth.md, 2026-09-14)
+
+Promote/Detain per student writes PATCH /api/batches/annual-result directly —
+a real toggle, not a plan-only guess — and clears any stale section exception
+when it flips. Section is an always-visible input per row; Withdraw is a small
+link, not a popover option. RolloverStepper renders the two steps as a
+numbered, connected path (check / ringed number / plain number); a sticky
+footer in RolloverPage carries "Continue to review" and "Run the rollover" —
+PlanStep and ReviewStep no longer own their own advance/execute buttons.

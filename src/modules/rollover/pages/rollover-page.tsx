@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CaretRightIcon,
+  CircleNotchIcon,
   UsersThreeIcon,
   XCircleIcon,
 } from "@phosphor-icons/react"
@@ -27,23 +28,31 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
 import { PlanStep } from "@/modules/rollover/components/plan-step"
-import { ReviewStep } from "@/modules/rollover/components/review-step"
+import {
+  ReviewStep,
+  type Preview,
+} from "@/modules/rollover/components/review-step"
+import {
+  RolloverStepper,
+  type StepperStep,
+} from "@/modules/rollover/components/rollover-stepper"
 import type { RolloverPlan } from "@/modules/rollover/lib/types"
 
-const STEPS = [
-  { key: "plan", label: "Plan" },
-  { key: "review", label: "Review & run" },
-] as const
-type StepKey = (typeof STEPS)[number]["key"]
+const STEPS: StepperStep[] = [
+  { key: "plan", label: "Plan", hint: "Classes & students" },
+  { key: "review", label: "Review & run", hint: "Preview, then submit" },
+]
+type StepKey = "plan" | "review"
 
 type YearRow = { id: string; label: string; status: "open" | "closed" }
 
 /**
  * The rollover wizard (module 06). Every step is a tool the plan is built
  * through — a person and, later, an assistant edit the same saved draft
- * (docs/truth.md, founder 2026-09-13). Reached from Batches' "Start new
- * academic year"; it will move under Setup once the founder has seen the
- * class-and-student mock for that move.
+ * (docs/truth.md, founder 2026-09-13). One screen sorts the plan out on its
+ * own; a person only touches what needs correcting, then one footer action
+ * carries them to the next step and, on the last one, runs it (founder,
+ * 2026-09-14).
  */
 export function RolloverPage() {
   const { user } = useAuth()
@@ -56,6 +65,12 @@ export function RolloverPage() {
   const [done, setDone] = useState<Record<string, unknown> | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+
+  // Review's data lives here so the footer — not a button buried in the step
+  // — can drive both "see the preview" and "run it".
+  const [preview, setPreview] = useState<Preview | null>(null)
+  const [previewError, setPreviewError] = useState("")
+  const [executing, setExecuting] = useState(false)
 
   const cancelRollover = async () => {
     setCancelling(true)
@@ -83,6 +98,38 @@ export function RolloverPage() {
       )
   }
   useEffect(load, [])
+
+  const loadPreview = () => {
+    setPreview(null)
+    setPreviewError("")
+    apiClient
+      .post<Preview>("/api/rollover/preview", {})
+      .then(setPreview)
+      .catch((e) =>
+        setPreviewError(
+          e instanceof Error ? e.message : "Could not build the preview"
+        )
+      )
+  }
+  useEffect(() => {
+    if (step === "review" && plan) loadPreview()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, plan?.id])
+
+  const execute = async () => {
+    setExecuting(true)
+    try {
+      const r = await apiClient.post<{ result: Record<string, unknown> }>(
+        "/api/rollover/execute",
+        {}
+      )
+      setDone(r.result)
+    } catch (e) {
+      showError(e)
+    } finally {
+      setExecuting(false)
+    }
+  }
 
   const startDraft = async () => {
     try {
@@ -126,125 +173,149 @@ export function RolloverPage() {
     )
   }
 
+  const showFooter = plan && !done
+
   return (
-    <div
-      className={cn(
-        PAGE_GUTTER,
-        PAGE_TOP,
-        "flex min-h-full flex-col gap-5 pb-12"
-      )}
-    >
-      <nav
-        aria-label="Breadcrumb"
-        className="flex items-center gap-1 text-sm text-muted-foreground"
+    <div className="flex min-h-full flex-col">
+      <div
+        className={cn(
+          PAGE_GUTTER,
+          PAGE_TOP,
+          "flex flex-1 flex-col gap-5",
+          showFooter ? "pb-24" : "pb-12"
+        )}
       >
-        <Link
-          to="/batches"
-          className="inline-flex items-center gap-1 rounded px-1 py-0.5 hover:text-foreground"
+        <nav
+          aria-label="Breadcrumb"
+          className="flex items-center gap-1 text-sm text-muted-foreground"
         >
-          <ArrowLeftIcon className="size-3.5" />
-          Batches
-        </Link>
-        <CaretRightIcon className="size-3" aria-hidden />
-        <span className="truncate text-foreground">Year rollover</span>
-      </nav>
+          <Link
+            to="/batches"
+            className="inline-flex items-center gap-1 rounded px-1 py-0.5 hover:text-foreground"
+          >
+            <ArrowLeftIcon className="size-3.5" />
+            Batches
+          </Link>
+          <CaretRightIcon className="size-3" aria-hidden />
+          <span className="truncate text-foreground">Year rollover</span>
+        </nav>
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Year rollover
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Promote, detain and graduate whole classes, with a place for every
-          exception. Nothing moves until the last step.
-        </p>
-      </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      {plan === undefined ? (
-        <Skeleton className="h-64 w-full rounded-xl" />
-      ) : done ? (
-        <div className="flex flex-col items-center gap-4 rounded-xl border border-primary/30 bg-primary/5 px-5 py-10 text-center">
-          <Sticker name="excited" size={96} />
-          <div className="flex max-w-md flex-col gap-1">
-            <p className="text-base font-medium text-foreground">
-              Rollover completed
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Year rollover
+            </h1>
             <p className="text-sm text-muted-foreground">
-              {String(done.moved ?? 0)} moved · {String(done.graduated ?? 0)}{" "}
-              graduated · {String(done.classes_created ?? 0)} classes created ·{" "}
-              {String(done.classes_reused ?? 0)} classes reused
+              Promote, detain and graduate whole classes, with a place for every
+              exception. Nothing moves until the last step.
             </p>
           </div>
-          <Button onClick={() => navigate("/batches")}>Back to Batches</Button>
-        </div>
-      ) : !plan ? (
-        <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-background px-5 py-10 text-center">
-          <Sticker name="point" size={96} />
-          <div className="flex max-w-md flex-col gap-1">
-            <p className="text-base font-medium text-secondary-foreground">
-              No rollover in progress
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Start one once the next academic year is open.
-            </p>
-          </div>
-          <Button onClick={startDraft}>Start the rollover</Button>
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-between gap-3 border-b border-border">
-            <nav
-              aria-label="Rollover steps"
-              className="-mb-px flex shrink-0 gap-1 overflow-x-auto"
-            >
-              {STEPS.map((s) => (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => setStep(s.key)}
-                  aria-current={step === s.key ? "page" : undefined}
-                  className={cn(
-                    "flex shrink-0 items-center gap-2 border-b-2 px-3 pb-2.5 text-sm whitespace-nowrap transition-colors",
-                    step === s.key
-                      ? "border-primary font-medium text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </nav>
+          {plan && !done && (
             <button
               type="button"
               onClick={() => setConfirmCancel(true)}
-              className="mb-2 flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+              className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
             >
               <XCircleIcon className="size-3.5" />
               Cancel rollover
             </button>
+          )}
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {plan === undefined ? (
+          <Skeleton className="h-64 w-full rounded-xl" />
+        ) : done ? (
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-primary/30 bg-primary/5 px-5 py-10 text-center">
+            <Sticker name="excited" size={96} />
+            <div className="flex max-w-md flex-col gap-1">
+              <p className="text-base font-medium text-foreground">
+                Rollover completed
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {String(done.moved ?? 0)} moved · {String(done.graduated ?? 0)}{" "}
+                graduated · {String(done.classes_created ?? 0)} classes created
+                · {String(done.classes_reused ?? 0)} classes reused
+              </p>
+            </div>
+            <Button onClick={() => navigate("/batches")}>
+              Back to Batches
+            </Button>
           </div>
+        ) : !plan ? (
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-background px-5 py-10 text-center">
+            <Sticker name="point" size={96} />
+            <div className="flex max-w-md flex-col gap-1">
+              <p className="text-base font-medium text-secondary-foreground">
+                No rollover in progress
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Start one once the next academic year is open.
+              </p>
+            </div>
+            <Button onClick={startDraft}>Start the rollover</Button>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-xl border border-border bg-background px-6 py-5">
+              <RolloverStepper
+                steps={STEPS}
+                activeKey={step}
+                onSelect={(key) => setStep(key as StepKey)}
+              />
+            </div>
 
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <UsersThreeIcon className="size-3.5" />
-            {plan.from_year} → {plan.to_year}
-          </p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <UsersThreeIcon className="size-3.5" />
+              {plan.from_year} → {plan.to_year}
+            </p>
 
-          {step === "plan" && (
-            <PlanStep
-              toYear={plan.to_year}
-              plan={plan}
-              onSaved={setPlan}
-              onContinue={() => setStep("review")}
-            />
-          )}
-          {step === "review" && (
-            <ReviewStep
-              planId={plan.id}
-              onExecuted={(result) => setDone(result)}
-            />
-          )}
-        </>
+            {step === "plan" && (
+              <PlanStep toYear={plan.to_year} plan={plan} onSaved={setPlan} />
+            )}
+            {step === "review" && (
+              <ReviewStep
+                preview={preview}
+                error={previewError}
+                onRetry={loadPreview}
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      {/* One constant place to move forward, whatever step you're on. */}
+      {showFooter && (
+        <div className="sticky bottom-0 border-t border-border bg-background/95 backdrop-blur-sm">
+          <div
+            className={cn(
+              PAGE_GUTTER,
+              "flex items-center justify-between gap-3 py-3"
+            )}
+          >
+            <Button
+              variant="ghost"
+              disabled={step === "plan"}
+              onClick={() => setStep("plan")}
+              className={step === "plan" ? "invisible" : undefined}
+            >
+              Back
+            </Button>
+            {step === "plan" ? (
+              <Button onClick={() => setStep("review")}>
+                Continue to review
+              </Button>
+            ) : (
+              <Button onClick={execute} disabled={!preview?.ready || executing}>
+                {executing && (
+                  <CircleNotchIcon className="size-4 animate-spin" />
+                )}
+                Run the rollover
+              </Button>
+            )}
+          </div>
+        </div>
       )}
 
       <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
