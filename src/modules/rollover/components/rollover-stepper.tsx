@@ -1,5 +1,3 @@
-import { CheckIcon } from "@phosphor-icons/react"
-
 import { cn } from "@/lib/utils"
 
 export type StepStatus = "done" | "current" | "upcoming"
@@ -10,11 +8,13 @@ export type StepperStep = {
   hint: string
 }
 
+const NOTCH = 22
+
 /**
- * A numbered, connected stepper: a filled check for a finished step, a ringed
- * number for the one you're on, a plain number for what's ahead — with the
- * label and its one-line hint under each, and a line running between them
- * that fills in as you go. The wizard's whole shape at a glance.
+ * A row of connected, arrow-shaped tab segments — a finished step filled dark
+ * solid, the current step tinted, everything ahead plain — each carrying a
+ * bold title and a lighter supporting line stacked inside the segment itself
+ * (founder's reference, style "01"; not numbered circles — 2026-09-14).
  */
 export function RolloverStepper({
   steps,
@@ -28,64 +28,57 @@ export function RolloverStepper({
   const activeIndex = steps.findIndex((s) => s.key === activeKey)
 
   return (
-    <ol className="flex items-start">
+    <ol className="flex w-full">
       {steps.map((step, i) => {
         const status: StepStatus =
           i < activeIndex ? "done" : i === activeIndex ? "current" : "upcoming"
         const reachable = i <= activeIndex
+        const isFirst = i === 0
+        const isLast = i === steps.length - 1
+
+        const clipPath = isLast
+          ? `polygon(0 0, 100% 0, 100% 100%, 0 100%, ${NOTCH}px 50%)`
+          : isFirst
+            ? `polygon(0 0, calc(100% - ${NOTCH}px) 0, 100% 50%, calc(100% - ${NOTCH}px) 100%, 0 100%)`
+            : `polygon(0 0, calc(100% - ${NOTCH}px) 0, 100% 50%, calc(100% - ${NOTCH}px) 100%, 0 100%, ${NOTCH}px 50%)`
+
         return (
           <li
             key={step.key}
-            className={cn("flex items-start", i < steps.length - 1 && "flex-1")}
+            className="flex-1"
+            style={{ marginLeft: isFirst ? 0 : -NOTCH }}
           >
-            <div className="flex flex-col items-center">
-              <button
-                type="button"
-                disabled={!reachable}
-                onClick={() => reachable && onSelect(step.key)}
-                aria-current={status === "current" ? "step" : undefined}
+            <button
+              type="button"
+              disabled={!reachable}
+              onClick={() => reachable && onSelect(step.key)}
+              aria-current={status === "current" ? "step" : undefined}
+              style={{ clipPath, paddingLeft: isFirst ? 16 : NOTCH + 10 }}
+              className={cn(
+                "flex h-16 w-full flex-col justify-center gap-0.5 border py-2 pr-6 text-left transition-colors",
+                status === "done" &&
+                  "border-primary bg-primary text-primary-foreground",
+                status === "current" &&
+                  "border-primary bg-primary/10 text-foreground",
+                status === "upcoming" &&
+                  "border-border bg-background text-muted-foreground",
+                reachable && status !== "current" && "cursor-pointer"
+              )}
+            >
+              <span className="truncate text-sm font-semibold">
+                {step.label}
+              </span>
+              <span
                 className={cn(
-                  "grid size-8 shrink-0 place-items-center rounded-full border-2 text-sm font-medium transition-colors",
-                  status === "done" &&
-                    "border-primary bg-primary text-primary-foreground",
-                  status === "current" &&
-                    "border-primary bg-background text-primary",
-                  status === "upcoming" &&
-                    "border-border bg-background text-muted-foreground",
-                  reachable && status !== "current" && "cursor-pointer"
+                  "truncate text-xs",
+                  status === "done"
+                    ? "text-primary-foreground/80"
+                    : "text-muted-foreground"
                 )}
               >
-                {status === "done" ? (
-                  <CheckIcon weight="bold" className="size-4" />
-                ) : (
-                  i + 1
-                )}
-              </button>
-              <div className="mt-2 flex flex-col items-center text-center">
-                <span
-                  className={cn(
-                    "text-sm",
-                    status === "upcoming"
-                      ? "text-muted-foreground"
-                      : "font-medium text-foreground"
-                  )}
-                >
-                  {step.label}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {step.hint}
-                </span>
-              </div>
-            </div>
-            {i < steps.length - 1 && (
-              <div
-                aria-hidden
-                className={cn(
-                  "mt-4 h-0.5 flex-1 rounded-full",
-                  i < activeIndex ? "bg-primary" : "bg-border"
-                )}
-              />
-            )}
+                {step.hint}
+              </span>
+            </button>
           </li>
         )
       })}

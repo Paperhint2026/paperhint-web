@@ -28,6 +28,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
 import { PlanStep } from "@/modules/rollover/components/plan-step"
+import { ReshuffleStep } from "@/modules/rollover/components/reshuffle-step"
 import {
   ReviewStep,
   type Preview,
@@ -39,10 +40,20 @@ import {
 import type { RolloverPlan } from "@/modules/rollover/lib/types"
 
 const STEPS: StepperStep[] = [
-  { key: "plan", label: "Plan", hint: "Classes & students" },
+  {
+    key: "plan",
+    label: "Grade promotion",
+    hint: "Promote or graduate each class",
+  },
+  {
+    key: "reshuffle",
+    label: "Reshuffling",
+    hint: "Move, detain or withdraw a student",
+  },
   { key: "review", label: "Review & run", hint: "Preview, then submit" },
 ]
-type StepKey = "plan" | "review"
+type StepKey = "plan" | "reshuffle" | "review"
+const STEP_ORDER: StepKey[] = ["plan", "reshuffle", "review"]
 
 type YearRow = { id: string; label: string; status: "open" | "closed" }
 
@@ -274,6 +285,9 @@ export function RolloverPage() {
             {step === "plan" && (
               <PlanStep toYear={plan.to_year} plan={plan} onSaved={setPlan} />
             )}
+            {step === "reshuffle" && (
+              <ReshuffleStep plan={plan} onSaved={setPlan} />
+            )}
             {step === "review" && (
               <ReviewStep
                 preview={preview}
@@ -297,21 +311,29 @@ export function RolloverPage() {
             <Button
               variant="ghost"
               disabled={step === "plan"}
-              onClick={() => setStep("plan")}
+              onClick={() =>
+                setStep(STEP_ORDER[STEP_ORDER.indexOf(step) - 1] ?? "plan")
+              }
               className={step === "plan" ? "invisible" : undefined}
             >
               Back
             </Button>
-            {step === "plan" ? (
-              <Button onClick={() => setStep("review")}>
-                Continue to review
-              </Button>
-            ) : (
+            {step === "review" ? (
               <Button onClick={execute} disabled={!preview?.ready || executing}>
                 {executing && (
                   <CircleNotchIcon className="size-4 animate-spin" />
                 )}
                 Run the rollover
+              </Button>
+            ) : (
+              <Button
+                onClick={() =>
+                  setStep(STEP_ORDER[STEP_ORDER.indexOf(step) + 1])
+                }
+              >
+                {step === "plan"
+                  ? "Continue to reshuffling"
+                  : "Continue to review"}
               </Button>
             )}
           </div>

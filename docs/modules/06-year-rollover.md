@@ -95,7 +95,31 @@ reused from the deleted `StudentsStep`; `PlanStep` replaces `ClassPlanStep`.
 Promote/Detain per student writes PATCH /api/batches/annual-result directly —
 a real toggle, not a plan-only guess — and clears any stale section exception
 when it flips. Section is an always-visible input per row; Withdraw is a small
-link, not a popover option. RolloverStepper renders the two steps as a
-numbered, connected path (check / ringed number / plain number); a sticky
-footer in RolloverPage carries "Continue to review" and "Run the rollover" —
-PlanStep and ReviewStep no longer own their own advance/execute buttons.
+link, not a popover option. A sticky footer in RolloverPage carries the step's
+advance action — PlanStep and ReviewStep no longer own their own
+advance/execute buttons.
+
+## Corrected to three steps (truth.md, 2026-09-14)
+
+The two-step collapse above over-merged: founder's actual ask is "step one
+grade promotion, then reshuffling if needed, then last step is summary and
+preview and then submit" — three distinct steps, not two. Split back apart:
+
+1. **Grade promotion** (`PlanStep`) — class table only, no roster expansion.
+   Every class is pre-filled (promote to next grade, same section); the
+   Promote/Graduate choice only appears on a class at the school's own
+   derived terminal grade (`max(existing grades, 12)` — never hardcoded).
+   Every other grade just states its target, no button pretending there's a
+   choice to make.
+2. **Reshuffling** (`ReshuffleStep`, new) — a class list on the left, that
+   class's roster on the right (`ClassRosterPanel`, unchanged): the real
+   Promote/Detain switch, an always-visible section field, Withdraw. Same
+   master/detail shape used everywhere else in the product, one level below
+   the stepper.
+3. **Review & run** (`ReviewStep`, unchanged) — preview stats, warnings, the
+   footer's "Run the rollover".
+
+`RolloverStepper` rebuilt to the founder's referenced style: a row of
+connected chevron/arrow-shaped segments (not numbered circles), each holding
+a bold title plus a lighter supporting line stacked inside — done filled dark
+solid, current tinted, upcoming plain.

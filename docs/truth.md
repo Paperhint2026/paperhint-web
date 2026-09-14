@@ -302,3 +302,25 @@ subjects paste-list flow. One shared import component, not one per module.
 - **One constant footer** drives both steps: "Continue to review" on Plan,
   "Run the rollover" on Review — never a button buried inside a step's own
   content that scrolls out of view.
+
+## Rollover: three steps, not two (2026-09-14, founder — corrects the entry above)
+
+- The "one screen, not three" collapse went too far. Founder's actual words:
+  "step one grade promotion, then reshuffling if needed, then last step is
+  summary and preview and then submit" — **three** distinct steps, with
+  reshuffling as its own step, not inlined into the class table via row
+  expansion.
+- **Grade promotion** (step 1) is class-level only — no roster shown here.
+  Promote/Graduate is only offered as a choice on a class at the school's own
+  terminal grade; every other class just states its target, no button
+  pretending there's a decision to make (founder: "it still shows graduate as
+  an option in first step" — Graduate must not appear as a choice below the
+  terminal grade at all, not just default away from it).
+- **Reshuffling** (step 2) is a dedicated screen: pick a class from a list,
+  work its roster (`ClassRosterPanel` — real detain switch, visible section
+  field, Withdraw) on the right. Same master/detail shape as the rest of the
+  product.
+- **The stepper is chevron/arrow segments, not numbered circles** — founder
+  pointed at a specific reference style: connected arrow-shaped tabs, each
+  holding a bold title plus a lighter supporting line stacked inside the
+  segment. Done = dark solid fill, current = tinted, upcoming = plain.
