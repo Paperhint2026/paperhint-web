@@ -513,3 +513,13 @@ subjects paste-list flow. One shared import component, not one per module.
   the way `migrations/README.md` prescribes, and there is no staging
   database, so it needs the founder's own go-ahead before running. Until
   it runs, `PUT /auth/teacher/:id/subjects` and `.../grades` will 500.
+- **The capability fields narrow the live assignment picker below them,
+  not sit beside it disconnected.** Founder: "we need to have the module
+  linkage seamless... in teacher the fields still show as grade 5-A [for
+  every class]" — the "Classes & Subjects" section's Class dropdown was
+  still listing every class in the school regardless of what was just
+  picked above. Now: the Class list only shows classes whose grade is in
+  `teachableGrades` (unfiltered when none are picked yet — nothing to
+  narrow by), and once a class is chosen, its Subject list only shows
+  subjects in `subjectIds`. The two sections read as one form now, not
+  two unrelated ones stacked in the same drawer.

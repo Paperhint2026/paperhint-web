@@ -223,11 +223,6 @@ export function TeachersPage() {
     departmentIds: s.departments.map((d) => d.id),
   }))
 
-  const classOptions = classes.map((c) => ({
-    value: c.id,
-    label: `Grade ${c.grade} – ${c.section}`,
-  }))
-
   const fetchTeachers = useCallback(async () => {
     setIsLoading(true)
     setError("")
@@ -740,7 +735,7 @@ export function TeachersPage() {
           teacherId={editTeacherId}
           subjects={subjectOptions}
           departmentNameById={departmentNameById}
-          classes={classOptions}
+          classes={classes}
           fetchSubjectsForClass={fetchSubjectsForClass}
           isSaving={isSaving}
           editData={editData}

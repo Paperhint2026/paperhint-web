@@ -123,7 +123,7 @@ export interface AddTeacherDrawerProps {
   teacherId?: string | null
   subjects: TeachableSubjectOption[]
   departmentNameById: Record<string, string>
-  classes: { value: string; label: string }[]
+  classes: { id: string; grade: number; section: string }[]
   fetchSubjectsForClass: (classId: string) => Promise<ClassSubjectOption[]>
   isSaving?: boolean
   editData?: TeacherFormData | null
@@ -237,6 +237,23 @@ export function AddTeacherDrawer({
     () => new Map(subjects.map((s) => [s.id, s])),
     [subjects]
   )
+
+  // Assignment picks a specific class-subject for the timetable — the
+  // capability picked above should narrow it, not sit beside it as an
+  // unrelated list (founder, 2026-09-15: "we need the module linkage
+  // seamless"). No grades picked yet means nothing to narrow by, so show
+  // everything rather than an empty dropdown.
+  const classOptions = classes
+    .filter(
+      (c) =>
+        form.teachableGrades.length === 0 ||
+        form.teachableGrades.includes(c.grade)
+    )
+    .sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section))
+    .map((c) => ({
+      value: c.id,
+      label: `Grade ${c.grade} – ${c.section}`,
+    }))
 
   const addSubject = (subjectId: string) => {
     setForm((prev) => ({
@@ -890,9 +907,15 @@ export function AddTeacherDrawer({
 
             <div className="flex flex-col gap-3">
               {form.classSubjects.map((entry, index) => {
-                const availableSubjects = entry.classId
-                  ? (subjectsByClass[entry.classId] ?? [])
-                  : []
+                // Only what this teacher is actually qualified for — the
+                // class already narrowed to their grades above.
+                const availableSubjects = (
+                  entry.classId ? (subjectsByClass[entry.classId] ?? []) : []
+                ).filter(
+                  (sub) =>
+                    form.subjectIds.length === 0 ||
+                    form.subjectIds.includes(sub.subjectId)
+                )
                 const isLoadingSubs = entry.classId
                   ? (loadingSubjects[entry.classId] ?? false)
                   : false
@@ -910,7 +933,7 @@ export function AddTeacherDrawer({
                           <SelectValue placeholder="Select class" />
                         </SelectTrigger>
                         <SelectContent>
-                          {classes.map((c) => (
+                          {classOptions.map((c) => (
                             <SelectItem key={c.value} value={c.value}>
                               {c.label}
                             </SelectItem>
