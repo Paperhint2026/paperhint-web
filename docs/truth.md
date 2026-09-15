@@ -724,3 +724,54 @@ of each teacher's subjects and grades — the thing previously parked as a
   grades its owned subjects run in — and `GET /departments` already
   computes it this way. `department_grades` is written by create/update
   and **never read**: it is dead weight and should be dropped.
+
+## Department composition — the five rules (2026-09-15, founder)
+
+Triggered by Art and Culture showing up owning Chemistry, Physics,
+Mathematics, English, Hindi and Tamil. Founder: "can arts and culture
+have other subjects added in it?!" — and then: "those are some logics we
+have to define."
+
+**Cause:** `PUT /departments/:id/subjects` used `replaceSet`, which only
+touches rows for the department being edited. Adding Chemistry inserted
+`(Art and Culture, Chemistry)` and left `(Science, Chemistry)` in place,
+so the subject sat in both. Migration 035's unique index would have made
+that same click fail outright, so the write path had to change with it.
+
+1. **A subject has exactly one department.** Enforced by 035.
+2. **Adding a subject to a department is a MOVE, not a copy.** The write
+   deletes the subject's row in every other department first.
+3. **A subject removed from a department falls back to General.** It can
+   never be orphaned, because rule 1 says it must live somewhere.
+4. **A department groups ONE family of subjects.** Founder: "subjects are
+   what create a department... non core subjects like computer science or
+   even art or music is usually a common group like arts and cultural" —
+   and, decisively, "English can never be part of mathematics
+   department." Nothing in the data can know that, so the families are
+   **hard-coded** at the founder's direction ("we can hard code this if
+   needed") in `src/config/subjectFamilies.js`. A Science department may
+   hold Physics and Chemistry; Art and Culture may hold Art, Music and
+   Dance; neither may hold the other's. **Unknown names always pass** —
+   the rule only refuses a known-vs-known disagreement, so a school with
+   a subject we have never heard of is never trapped.
+5. **Deleting a department stays blocked until it is empty.** Cascading a
+   delete into General is a bigger, quieter action than a school wants
+   from a Delete button.
+
+### Moving a subject moves its teachers
+
+Founder's call, with the wording they asked for: "we need to create a
+confirmation dialogue saying adding subject English to this department
+could mean you are moving teachers who are teaching that subject as well
+here — are you sure to making this change — should [be] captured so the
+users are aware of their change."
+
+- A teacher's department follows their PRIMARY subject. So when a subject
+  moves department, every teacher holding it as primary moves with it —
+  otherwise they sit in a department their own primary subject no longer
+  belongs to, and "a teacher is in one department, set by their primary
+  subject" quietly stops being true.
+- `PUT /departments/:id/subjects` returns `moved_teachers` so the UI can
+  report what actually happened.
+- **The confirm must name the consequence before it happens**, counting
+  the teachers affected. Never a silent cascade.
