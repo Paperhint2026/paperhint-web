@@ -394,19 +394,25 @@ subjects paste-list flow. One shared import component, not one per module.
   panel... adding [a subject] could be a lookup, a nested form for
   selection, and back to original form" — `EditDepartmentDrawer`
   (`src/modules/departments/components/edit-department-drawer.tsx`), opened
-  by a new "Edit" button next to "Delete." One Sheet, three internal views
-  (`main` / `add-subject` / `set-grades`), navigated with a back arrow —
-  never a route change.
+  by a new "Edit" button next to "Delete." One Sheet, four internal views
+  (`main` / `add-teacher` / `add-subject` / `set-grades`), navigated with a
+  back arrow — never a route change.
 - **Grades stay derived from subjects, confirmed explicitly** (founder,
   answering directly): "grade selection" in the drawer is per-subject —
   picking which grades a newly-added subject with no grades yet runs in
   (`PUT /api/subjects/:id/grades`), shown only when that subject needs it.
   There is still no department-level grades field to set; `dept.grades` is
   read-only, same as before.
-- **Teachers are deliberately not addable here.** A teacher joins a
-  department from their own profile
-  (docs/modules/02-departments-and-subjects.md) — the drawer only edits the
-  department's name and its subjects, not its members.
+- **Teachers ARE addable here after all** — founder corrected an earlier
+  read of "a teacher joins a department from their own profile": "I said
+  we can nest the drawer... to select subjects and teachers for the
+  department." The drawer's `add-teacher` view reuses the existing
+  `PUT /api/auth/teacher/:id` endpoint with a `{ department_id }`-only body
+  (no other teacher fields required) to move a teacher in or out. Moving a
+  teacher already in another department is allowed and labeled as a move,
+  not a copy — a teacher has exactly one department. Joining from a
+  teacher's own profile still works too; this is an additional path, not a
+  replacement.
 
 ## Custom route error screen (2026-09-15, founder)
 

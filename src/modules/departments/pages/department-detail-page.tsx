@@ -305,11 +305,22 @@ export function DepartmentDetailPage() {
             <EmptyNote
               icon={UsersThreeIcon}
               title="No teachers here yet"
-              hint="A teacher joins a department from their own profile."
+              hint="Add one from Edit, or a teacher can join from their own profile."
               action={
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/teachers">Open Teachers</Link>
-                </Button>
+                isAdmin ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditOpen(true)}
+                  >
+                    <PencilIcon className="size-3.5" />
+                    Edit
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/teachers">Open Teachers</Link>
+                  </Button>
+                )
               }
             />
           ) : (
@@ -449,7 +460,9 @@ export function DepartmentDetailPage() {
         open={editOpen}
         onOpenChange={setEditOpen}
         dept={dept}
+        members={members}
         allSubjects={subjects}
+        allTeachers={teachers}
         onRemoveSubject={toggleSubject}
         onChanged={load}
       />

@@ -21,31 +21,40 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import type { Department, SubjectOption } from "@/modules/departments/lib/types"
+import type {
+  Department,
+  SubjectOption,
+  Teacher,
+} from "@/modules/departments/lib/types"
 
-type View = "main" | "add-subject" | "set-grades"
+type View = "main" | "add-subject" | "set-grades" | "add-teacher"
 
 /**
  * Editing a department in one drawer, not a page navigation per field
- * (founder, 2026-09-15): renaming stays inline, but adding a subject — and,
- * when that subject has no grades yet, setting them — opens as its own
- * screen inside the same drawer with a back arrow, never a separate route.
- * Teachers aren't added here: a teacher joins a department from their own
- * profile (docs/modules/02-departments-and-subjects.md), so that stays
- * unchanged.
+ * (founder, 2026-09-15): renaming stays inline; adding a subject or a
+ * teacher — and, when a newly-added subject has no grades yet, setting
+ * them — opens as its own screen inside the same drawer with a back arrow,
+ * never a separate route ("nest the drawer with a back button providing a
+ * lookup to select subjects and teachers for the department").
  */
 export function EditDepartmentDrawer({
   open,
   onOpenChange,
   dept,
+  members,
   allSubjects,
+  allTeachers,
   onRemoveSubject,
   onChanged,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   dept: Department
+  /** Teachers currently in this department. */
+  members: Teacher[]
   allSubjects: SubjectOption[]
+  /** Every teacher in the school, for the add-teacher lookup. */
+  allTeachers: Teacher[]
   onRemoveSubject: (s: SubjectOption) => void
   /** Refetch from the server after a write this drawer made directly. */
   onChanged: () => void
@@ -59,6 +68,7 @@ export function EditDepartmentDrawer({
   )
   const [pendingGrades, setPendingGrades] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
+  const [movingTeacherId, setMovingTeacherId] = useState<string | null>(null)
 
   const reset = () => {
     setView("main")
@@ -66,6 +76,27 @@ export function EditDepartmentDrawer({
     setQuery("")
     setPendingSubject(null)
     setPendingGrades([])
+  }
+
+  const setTeacherDepartment = async (
+    teacherId: string,
+    departmentId: string | null
+  ) => {
+    setMovingTeacherId(teacherId)
+    try {
+      await apiClient.put(`/api/auth/teacher/${teacherId}`, {
+        department_id: departmentId,
+      })
+      onChanged()
+      if (departmentId) {
+        setView("main")
+        setQuery("")
+      }
+    } catch (e) {
+      showError(e)
+    } finally {
+      setMovingTeacherId(null)
+    }
   }
 
   const saveName = async () => {
@@ -136,6 +167,14 @@ export function EditDepartmentDrawer({
         : true
     )
 
+  const availableTeachers = allTeachers
+    .filter((t) => t.department_id !== dept.id)
+    .filter((t) =>
+      query.trim()
+        ? t.full_name.toLowerCase().includes(query.trim().toLowerCase())
+        : true
+    )
+
   return (
     <Sheet
       open={open}
@@ -150,7 +189,7 @@ export function EditDepartmentDrawer({
             <SheetHeader>
               <SheetTitle>Edit {dept.name}</SheetTitle>
               <SheetDescription>
-                Rename it or change which subjects it owns.
+                Rename it, or change which teachers and subjects it owns.
               </SheetDescription>
             </SheetHeader>
 
@@ -173,6 +212,49 @@ export function EditDepartmentDrawer({
                   {savingName && (
                     <CircleNotchIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
                   )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs">Teachers</Label>
+                <div className="overflow-hidden rounded-lg border border-border">
+                  {members.length === 0 ? (
+                    <p className="p-3 text-xs text-muted-foreground">
+                      No teachers yet.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-border">
+                      {members.map((t) => (
+                        <li
+                          key={t.id}
+                          className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                        >
+                          <span className="truncate text-foreground">
+                            {t.full_name}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={movingTeacherId === t.id}
+                            onClick={() => setTeacherDepartment(t.id, null)}
+                            className="shrink-0 text-xs text-muted-foreground hover:text-destructive disabled:opacity-60"
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setView("add-teacher")}
+                    className="flex w-full items-center justify-between gap-2 border-t border-border px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <PlusIcon className="size-3.5" />
+                      Add a teacher
+                    </span>
+                    <CaretRightIcon className="size-3.5" />
+                  </button>
                 </div>
               </div>
 
@@ -272,6 +354,63 @@ export function EditDepartmentDrawer({
                       <span className="truncate">{s.subject_name}</span>
                       <span className="shrink-0 text-[11px] text-muted-foreground">
                         {describeGrades(s.grades, "No grades yet")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {view === "add-teacher" && (
+          <>
+            <SheetHeader className="flex-row items-center gap-2 space-y-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setView("main")
+                  setQuery("")
+                }}
+                aria-label="Back"
+                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <ArrowLeftIcon className="size-4" />
+              </button>
+              <SheetTitle>Add a teacher</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col gap-2 overflow-y-auto px-4 pb-4">
+              <div className="relative">
+                <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search teachers"
+                  className="pl-8"
+                />
+              </div>
+              {availableTeachers.length === 0 ? (
+                <p className="px-1 py-4 text-sm text-muted-foreground">
+                  {allTeachers.length === members.length
+                    ? "Every teacher is already here."
+                    : "No match."}
+                </p>
+              ) : (
+                <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                  {availableTeachers.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      disabled={movingTeacherId === t.id}
+                      onClick={() => setTeacherDepartment(t.id, dept.id)}
+                      className="flex items-center justify-between gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-60"
+                    >
+                      <span className="truncate">{t.full_name}</span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {t.department_id
+                          ? "Moves from another department"
+                          : "Unassigned"}
                       </span>
                     </button>
                   ))}
