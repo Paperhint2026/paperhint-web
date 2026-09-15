@@ -19,7 +19,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import type { SubjectOption, Teacher } from "@/modules/departments/lib/types"
+import type { SubjectLite, Teacher } from "@/modules/departments/lib/types"
 
 /**
  * A teacher's allotment, edited from inside the department they sit in
@@ -27,14 +27,23 @@ import type { SubjectOption, Teacher } from "@/modules/departments/lib/types"
  * user can either do it at teacher level edit or, more through natural
  * instinct, during the department level").
  *
- * The primary subject is what holds them in this department, so it has no
- * remove button: you move the star instead. Starring a subject owned by
- * another department moves the teacher there, which takes them out of the
- * list you are standing in — that gets a confirm, never a silent jump.
+ * Only a MULTI-SUBJECT department shows a subject choice at all. A teacher is
+ * in this department because of the subject they were given when they were
+ * created, so in an English department there is no alternative to pick and
+ * the row would just repeat the department's own name on every teacher
+ * (founder: "why would an English department teacher have to choose another
+ * alternative subject"). Where the choice is real — Art & Culture holding
+ * Art, Music and Dance — this is how you say who takes which.
+ *
+ * The picker therefore offers only THIS department's subjects. The primary
+ * subject has no remove button: it is what holds them here, so you move the
+ * star instead. A teacher may still hold a subject from elsewhere (given in
+ * their own form); starring that one moves them out of the list you are
+ * standing in, which asks first.
  */
 export function TeacherAllotment({
   teacher,
-  subjects,
+  departmentSubjects,
   deptId,
   departmentIdBySubject,
   departmentNameById,
@@ -42,7 +51,7 @@ export function TeacherAllotment({
   onSetGrades,
 }: {
   teacher: Teacher
-  subjects: SubjectOption[]
+  departmentSubjects: SubjectLite[]
   deptId: string
   departmentIdBySubject: Record<string, string>
   departmentNameById: Record<string, string>
@@ -55,6 +64,8 @@ export function TeacherAllotment({
   const [moving, setMoving] = useState<{ id: string; to: string } | null>(null)
 
   const ids = held.map((s) => s.id)
+  // Nothing to say unless there is a real choice to represent.
+  const showSubjects = departmentSubjects.length > 1 || held.length > 1
   const setPrimary = (id: string) => onSetSubjects(ids, id)
 
   const star = (id: string) => {
@@ -88,51 +99,53 @@ export function TeacherAllotment({
 
   return (
     <div className="flex flex-col gap-2">
-      <Row label="Subjects">
-        {held.map((s) => {
-          const isPrimary = s.is_primary
-          return (
-            <span
-              key={s.id}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs",
-                isPrimary
-                  ? "bg-primary/10 text-primary"
-                  : "bg-muted text-foreground"
-              )}
-            >
-              {!isPrimary && (
-                <button
-                  type="button"
-                  onClick={() => star(s.id)}
-                  aria-label={`Make ${s.subject_name} the primary subject`}
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  <StarIcon className="size-3" />
-                </button>
-              )}
-              {isPrimary && <StarIcon className="size-3" weight="fill" />}
-              {s.subject_name}
-              {isPrimary ? (
-                <span className="px-1" />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => drop(s.id)}
-                  aria-label={`Remove ${s.subject_name}`}
-                  className="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
-                >
-                  <XIcon className="size-3" />
-                </button>
-              )}
-            </span>
-          )
-        })}
-        <SubjectPicker
-          options={subjects.filter((s) => !ids.includes(s.id))}
-          onPick={add}
-        />
-      </Row>
+      {showSubjects && (
+        <Row label="Subjects">
+          {held.map((s) => {
+            const isPrimary = s.is_primary
+            return (
+              <span
+                key={s.id}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full py-1 pr-1 pl-2.5 text-xs",
+                  isPrimary
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted text-foreground"
+                )}
+              >
+                {!isPrimary && (
+                  <button
+                    type="button"
+                    onClick={() => star(s.id)}
+                    aria-label={`Make ${s.subject_name} the primary subject`}
+                    className="text-muted-foreground hover:text-primary"
+                  >
+                    <StarIcon className="size-3" />
+                  </button>
+                )}
+                {isPrimary && <StarIcon className="size-3" weight="fill" />}
+                {s.subject_name}
+                {isPrimary ? (
+                  <span className="px-1" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => drop(s.id)}
+                    aria-label={`Remove ${s.subject_name}`}
+                    className="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                  >
+                    <XIcon className="size-3" />
+                  </button>
+                )}
+              </span>
+            )
+          })}
+          <SubjectPicker
+            options={departmentSubjects.filter((s) => !ids.includes(s.id))}
+            onPick={add}
+          />
+        </Row>
+      )}
 
       <Row label="Grades">
         {grades.map((g) => (
@@ -233,7 +246,7 @@ function SubjectPicker({
   options,
   onPick,
 }: {
-  options: SubjectOption[]
+  options: SubjectLite[]
   onPick: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)

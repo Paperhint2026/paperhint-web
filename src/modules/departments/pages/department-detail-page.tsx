@@ -341,67 +341,80 @@ export function DepartmentDetailPage() {
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-1 border-b border-border">
-          {(
-            [
-              {
-                key: "teachers",
-                label: "Teachers",
-                icon: UsersThreeIcon,
-                count: members.length,
-              },
-              {
-                key: "subjects",
-                label: "Subjects",
-                icon: StackIcon,
-                count: dept.subjects.length,
-              },
-            ] as const
-          ).map((t) => {
-            const on = tab === t.key
-            return (
-              <button
-                key={t.key}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                onClick={() => setTab(t.key)}
-                className={cn(
-                  "relative flex items-center gap-1.5 px-3 py-2.5 text-sm transition-colors outline-none focus-visible:text-foreground",
-                  on
-                    ? "font-medium text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <t.icon className="size-4" />
-                {t.label}
-                <span
+        <div className="flex items-center justify-between gap-3 border-b border-border">
+          <div className="flex items-center gap-1">
+            {(
+              [
+                {
+                  key: "teachers",
+                  label: "Teachers",
+                  icon: UsersThreeIcon,
+                  count: members.length,
+                },
+                {
+                  key: "subjects",
+                  label: "Subjects",
+                  icon: StackIcon,
+                  count: dept.subjects.length,
+                },
+              ] as const
+            ).map((t) => {
+              const on = tab === t.key
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setTab(t.key)}
                   className={cn(
-                    "text-xs tabular-nums",
-                    on ? "text-foreground/70" : "text-muted-foreground"
+                    "relative flex items-center gap-1.5 px-3 py-2.5 text-sm transition-colors outline-none focus-visible:text-foreground",
+                    on
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {t.count}
-                </span>
-                {on && (
-                  <motion.span
-                    layoutId="department-tab"
-                    transition={
-                      reduceMotion
-                        ? { duration: 0 }
-                        : {
-                            type: "spring",
-                            stiffness: 480,
-                            damping: 40,
-                            mass: 0.8,
-                          }
-                    }
-                    className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-foreground"
-                  />
-                )}
-              </button>
-            )
-          })}
+                  <t.icon className="size-4" />
+                  {t.label}
+                  <span
+                    className={cn(
+                      "text-xs tabular-nums",
+                      on ? "text-foreground/70" : "text-muted-foreground"
+                    )}
+                  >
+                    {t.count}
+                  </span>
+                  {on && (
+                    <motion.span
+                      layoutId="department-tab"
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : {
+                              type: "spring",
+                              stiffness: 480,
+                              damping: 40,
+                              mass: 0.8,
+                            }
+                      }
+                      className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-foreground"
+                    />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          {/* Only the subject catalog is worth leaving for — a teacher is in
+              this department because of the subject they were given, so there
+              is nothing to "manage" elsewhere. */}
+          {tab === "subjects" && (
+            <Link
+              to="/subjects"
+              className="shrink-0 pr-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              All subjects →
+            </Link>
+          )}
         </div>
 
         <AnimatePresence mode="wait" initial={false}>
@@ -414,14 +427,6 @@ export function DepartmentDetailPage() {
           >
             {tab === "teachers" ? (
               <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
-                <div className="flex items-center justify-end gap-3">
-                  <Link
-                    to="/teachers"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Manage in Teachers →
-                  </Link>
-                </div>
                 {members.length === 0 ? (
                   <EmptyNote
                     icon={UsersThreeIcon}
@@ -449,8 +454,11 @@ export function DepartmentDetailPage() {
                     {members.map((t) => {
                       const isHead = dept.heads.some((h) => h.id === t.id)
                       return (
-                        <li key={t.id} className="flex flex-col gap-2 py-3">
-                          <div className="flex items-center justify-between gap-3">
+                        <li
+                          key={t.id}
+                          className="flex flex-col gap-2 py-3 @2xl:flex-row @2xl:items-start @2xl:gap-6"
+                        >
+                          <div className="flex min-w-0 items-center gap-2 @2xl:w-56 @2xl:shrink-0">
                             <span className="min-w-0">
                               <span className="block truncate text-sm text-foreground">
                                 {t.full_name}
@@ -468,17 +476,19 @@ export function DepartmentDetailPage() {
                             )}
                           </div>
                           {isAdmin && (
-                            <TeacherAllotment
-                              teacher={t}
-                              subjects={subjects}
-                              deptId={id}
-                              departmentIdBySubject={departmentIdBySubject}
-                              departmentNameById={departmentNameById}
-                              onSetSubjects={(sids, pid) =>
-                                setTeacherSubjects(t, sids, pid)
-                              }
-                              onSetGrades={(g) => setTeacherGrades(t, g)}
-                            />
+                            <div className="min-w-0 flex-1">
+                              <TeacherAllotment
+                                teacher={t}
+                                departmentSubjects={dept.subjects}
+                                deptId={id}
+                                departmentIdBySubject={departmentIdBySubject}
+                                departmentNameById={departmentNameById}
+                                onSetSubjects={(sids, pid) =>
+                                  setTeacherSubjects(t, sids, pid)
+                                }
+                                onSetGrades={(g) => setTeacherGrades(t, g)}
+                              />
+                            </div>
                           )}
                         </li>
                       )
