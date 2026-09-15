@@ -13,6 +13,16 @@ import { apiClient } from "@/lib/api-client"
 import { describeGrades, GRADES, gradeLabel } from "@/lib/grades"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -128,6 +138,7 @@ export function EditDepartmentDrawer({
   const [pendingGrades, setPendingGrades] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   const [movingTeacherId, setMovingTeacherId] = useState<string | null>(null)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
 
   const { Icon, palette } = lookFor(dept.name)
   const head: Head | null = dept.heads[0] ?? null
@@ -250,14 +261,20 @@ export function EditDepartmentDrawer({
         : true
     )
 
+  const requestClose = (v: boolean) => {
+    // A subject with no grades can't run anywhere — closing here would
+    // silently drop it, so ask first rather than discard without saying so
+    // (founder, 2026-09-15: this must be mandatory or the add is thrown away).
+    if (!v && view === "set-grades" && pendingSubject) {
+      setConfirmDiscard(true)
+      return
+    }
+    onOpenChange(v)
+    if (!v) reset()
+  }
+
   return (
-    <Sheet
-      open={open}
-      onOpenChange={(v) => {
-        onOpenChange(v)
-        if (!v) reset()
-      }}
-    >
+    <Sheet open={open} onOpenChange={requestClose}>
       <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md">
         {view === "main" && (
           <>
@@ -680,6 +697,33 @@ export function EditDepartmentDrawer({
           </>
         )}
       </SheetContent>
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Discard {pendingSubject?.subject_name}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              It needs at least one grade before it can run anywhere. Closing
+              now won't add it to this department — you'd need to pick it again
+              from the start.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmDiscard(false)
+                onOpenChange(false)
+                reset()
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   )
 }

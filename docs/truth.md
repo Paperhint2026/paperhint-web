@@ -459,11 +459,21 @@ subjects paste-list flow. One shared import component, not one per module.
 - Removed the redundant counts next to "Teachers"/"Subjects" section
   labels (founder: "we dont need counters against all the header like
   teachers 1") — the hero stat line already carries those numbers.
-- **Open question, not yet resolved**: founder said "we need to have grade
-  selection as well over here," which reads as either (a) an "edit grades"
-  action on every subject chip in the main view, not just the nested
-  set-grades step for a brand-new zero-grade subject, or (b) reopening the
-  earlier "grades stay derived" call in favor of a real department-level
-  grades field (the backend's `PUT /departments/:id/grades` exists but is
-  currently unused by any UI). Asked which; answer was "understood" with
-  no option picked — still open, nothing built yet.
+- **Resolved**: grades stay derived from subjects — no department-level
+  grades field (`PUT /departments/:id/grades` stays unused). Founder: "we
+  can have free flowing department association to grades, we can use
+  subjects to aid in filling the grades for us by default but if they need
+  they can add them eventually" — subjects aiding the department's grade
+  range is the existing derivation, not a new mechanism, and per-chip grade
+  editing beyond initial add is explicitly deprioritized ("eventually",
+  via the Subjects page, not a new affordance in this drawer right now).
+- **Mandatory grades on a brand-new subject, enforced at the exit, not just
+  the button.** Founder: "if new subject like accounting is added, its
+  mandatory [to] save grading before moving out, or else the subject
+  getting added will be discarded." The "Add with these grades" button was
+  already disabled at zero grades, but closing the whole drawer mid-step
+  silently dropped the pending add with no explanation. `requestClose()`
+  now intercepts a close attempt while `view === "set-grades"` and a
+  `pendingSubject` is in flight, and an `AlertDialog` ("Discard Accounting?
+  ... Closing now won't add it") requires an explicit choice — "Keep
+  editing" or "Discard" — before the drawer actually closes.
