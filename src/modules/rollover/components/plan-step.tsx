@@ -9,7 +9,6 @@ import {
 import { apiClient } from "@/lib/api-client"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
-import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ClassIdentifyPanel } from "@/modules/rollover/components/class-identify-panel"
 import type {
@@ -35,8 +34,10 @@ import type {
  * a hard grade cutoff, since a school's own results decide it, not a number
  * in the code.
  *
- * Reshuffling sections — including creating a new one — is its own step,
- * right after this one.
+ * The target section is always "same letter, next grade" here and cannot be
+ * edited on this screen — section is entirely Reshuffling's job, including
+ * moving a whole class elsewhere (founder, 2026-09-15: this step kept
+ * re-doing reshuffling's job by letting the section be changed here too).
  */
 export function PlanStep({
   toYear,
@@ -177,7 +178,7 @@ export function PlanStep({
                 Students
               </th>
               <th className="w-40 px-3 py-2 font-medium">Action</th>
-              <th className="px-3 py-2 font-medium">Target section</th>
+              <th className="px-3 py-2 font-medium">Default target</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -282,27 +283,10 @@ export function PlanStep({
                               Leaves the school
                             </span>
                           ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground">
-                                Grade {row.target?.grade}
-                              </span>
-                              <Input
-                                value={row.target?.section ?? ""}
-                                onChange={(e) =>
-                                  patch(c.id, (r) => ({
-                                    ...r,
-                                    target: {
-                                      grade: r.target?.grade ?? c.grade + 1,
-                                      section: e.target.value
-                                        .toUpperCase()
-                                        .slice(0, 2),
-                                      academic_year: toYear,
-                                    },
-                                  }))
-                                }
-                                className="h-8 w-16 text-center text-sm"
-                              />
-                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              Grade {row.target?.grade}
+                              {row.target?.section} — change in Reshuffling
+                            </span>
                           )}
                         </td>
                       </tr>

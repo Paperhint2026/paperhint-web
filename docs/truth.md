@@ -343,6 +343,11 @@ subjects paste-list flow. One shared import component, not one per module.
   places promoted (and repeating) students into sections, with an explicit
   "New section" action (`POST /api/classes`) alongside the existing
   reshuffle-by-list paste.
+- **Grade promotion never edits a section.** The class's target section
+  shown in step 1 is always "same letter, next grade," read-only — founder
+  (2026-09-15, third time flagging it): the step kept re-doing reshuffling's
+  own job by letting the section be changed there too. Any section change,
+  for a whole class or one student, happens only in Reshuffling.
 - **Review is an itemized table, not just stat tiles.** Founder: "a complete
   table produced in a format of all the grades, all the sections, all the
   students." `POST /rollover/preview` now returns a `students` array (every

@@ -131,8 +131,11 @@ solid, current tinted, upcoming plain.
   shown. A class with any detained student opens straight to a compact
   Student + Promote/Detain list (`GET /rollover/plan/roster`, `PATCH
   /batches/annual-result` — same real toggle as before, just surfaced here
-  too); any class can be opened by hand via the row's expand toggle. No
-  section field here — that moved entirely to Reshuffling.
+  too); any class can be opened by hand via the row's expand toggle. The
+  target section shown per class is always "same letter, next grade," fixed
+  and non-editable here — no `Input`, just text (founder, 2026-09-15: this
+  screen kept re-doing reshuffling's own job). Every section change happens
+  only in Reshuffling.
 - **Reshuffling** (`ClassRosterPanel`): dropped its Promote/Detain switch
   (decided in step 1 now) in favor of a read-only Promoted/Detained badge,
   and gained a "New section" dialog that calls `POST /api/classes` directly
