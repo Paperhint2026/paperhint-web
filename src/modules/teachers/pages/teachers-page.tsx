@@ -54,8 +54,6 @@ import {
 import { TeacherDetailDrawer } from "@/modules/teachers/components/teacher-detail-drawer"
 import {
   AddTeacherDrawer,
-  type ClassSubjectOption,
-  type ExistingAssignment,
   type TeachableSubjectOption,
   type TeacherFormData,
 } from "@/modules/teachers/components/add-teacher-drawer"
@@ -110,24 +108,6 @@ interface SubjectDetail {
   departments: { id: string; name: string }[]
 }
 
-interface ClassItem {
-  id: string
-  grade: number
-  section: string
-  academic_year: string
-}
-
-interface ClassByIdSubject {
-  class_subject_id: string
-  id: string
-  subject_name: string
-}
-
-interface ClassByIdResponse {
-  class: ClassItem
-  subjects: ClassByIdSubject[]
-}
-
 export function TeachersPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
@@ -139,7 +119,6 @@ export function TeachersPage() {
 
   // Form data (only fetched for admins, in background)
   const [departments, setDepartments] = useState<Department[]>([])
-  const [classes, setClasses] = useState<ClassItem[]>([])
   const [subjectDetails, setSubjectDetails] = useState<SubjectDetail[]>([])
   const [isFormDataReady, setIsFormDataReady] = useState(false)
 
@@ -244,21 +223,14 @@ export function TeachersPage() {
 
   const fetchFormData = useCallback(async () => {
     try {
-      const [deptRes, classRes, subjectRes] = await Promise.all([
+      const [deptRes, subjectRes] = await Promise.all([
         apiClient.get<{ departments: Department[] }>(
           "/api/schools/departments"
         ),
-        apiClient.get<{ classes: ClassItem[] }>("/api/classes"),
         apiClient.get<{ subjects: SubjectDetail[] }>("/api/subjects/detail"),
       ])
       setDepartments(deptRes.departments ?? [])
       setSubjectDetails(subjectRes.subjects ?? [])
-      const items = classRes.classes ?? []
-      items.sort((a, b) => {
-        if (a.grade !== b.grade) return a.grade - b.grade
-        return a.section.localeCompare(b.section)
-      })
-      setClasses(items)
       setIsFormDataReady(true)
     } catch (err) {
       console.error("Failed to fetch form data:", err)
@@ -288,19 +260,6 @@ export function TeachersPage() {
     return () => setHeaderActions(null)
   }, [isAdmin, isFormDataReady, setHeaderActions])
 
-  const fetchSubjectsForClass = async (
-    classId: string
-  ): Promise<ClassSubjectOption[]> => {
-    const res = await apiClient.get<ClassByIdResponse>(
-      `/api/classes/${classId}`
-    )
-    return (res.subjects ?? []).map((s) => ({
-      subjectId: s.id,
-      subjectName: s.subject_name,
-      classSubjectId: s.class_subject_id,
-    }))
-  }
-
   const handleEditTeacher = async (teacherId: string) => {
     try {
       const res = await apiClient.get<{
@@ -315,22 +274,10 @@ export function TeachersPage() {
           custom_fields?: Record<string, string | number> | null
           teachable_subjects?: { id: string; is_primary: boolean }[]
           teachable_grades?: number[]
-          assignments?: {
-            class_subject_id: string
-            class: { id: string; grade: number | string; section: string }
-            subject: { id: string; subject_name: string }
-          }[]
         }
       }>(`/api/auth/teacher/${teacherId}/overview`)
 
       const t = res.teacher
-
-      const existingAssignments: ExistingAssignment[] =
-        t.assignments?.map((a) => ({
-          classSubjectId: a.class_subject_id,
-          className: `Grade ${a.class?.grade} – ${a.class?.section}`,
-          subjectName: a.subject?.subject_name ?? "",
-        })) ?? []
 
       setEditTeacherId(teacherId)
       setEditData({
@@ -346,8 +293,6 @@ export function TeachersPage() {
         primarySubjectId:
           (t.teachable_subjects ?? []).find((s) => s.is_primary)?.id ?? "",
         teachableGrades: t.teachable_grades ?? [],
-        classSubjects: [{ classId: "", classSubjectId: "" }],
-        existingAssignments,
         customFields:
           (t.custom_fields as Record<string, string | number>) ?? {},
       })
@@ -355,13 +300,6 @@ export function TeachersPage() {
     } catch (err) {
       console.error("Failed to fetch teacher details:", err)
     }
-  }
-
-  const handleDisassociate = async (tId: string, classSubjectId: string) => {
-    await apiClient.post("/api/teacher-assignments/unassign", {
-      teacher_id: tId,
-      class_subject_id: classSubjectId,
-    })
   }
 
   const handleConfirmDelete = async () => {
@@ -443,21 +381,6 @@ export function TeachersPage() {
       await apiClient.put(`/api/auth/teacher/${teacherId}/grades`, {
         grades: data.teachableGrades,
       })
-
-      const newAssignments = data.classSubjects.filter(
-        (entry) => entry.classId && entry.classSubjectId
-      )
-
-      if (newAssignments.length > 0) {
-        await Promise.all(
-          newAssignments.map((entry) =>
-            apiClient.post("/api/teacher-assignments", {
-              teacher_id: teacherId,
-              class_subject_id: entry.classSubjectId,
-            })
-          )
-        )
-      }
 
       setDrawerOpen(false)
       setEditData(null)
@@ -655,7 +578,7 @@ export function TeachersPage() {
               </p>
               <p className="text-sm text-muted-foreground">
                 {isAdmin
-                  ? "Add your first teacher and they'll show up here, ready to be assigned classes and subjects."
+                  ? "Add your first teacher and they'll show up here."
                   : "No teachers have joined your school yet. Check back once your admin adds them."}
               </p>
             </div>
@@ -733,12 +656,9 @@ export function TeachersPage() {
             }
           }}
           onSave={handleSaveTeacher}
-          onDisassociate={handleDisassociate}
           teacherId={editTeacherId}
           subjects={subjectOptions}
           departmentNameById={departmentNameById}
-          classes={classes}
-          fetchSubjectsForClass={fetchSubjectsForClass}
           isSaving={isSaving}
           editData={editData}
         />

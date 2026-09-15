@@ -549,3 +549,30 @@ subjects paste-list flow. One shared import component, not one per module.
   `CurlyDivider` for one consistent grouping device ("use the curly
   divider to do this grouping properly") — before Additional Details and
   before Classes & Subjects.
+
+## "Classes & Subjects" removed from the teacher form entirely (2026-09-15, founder)
+
+- Founder: "grade selection is already done... class... can be auto
+  assigned from timetable... when configured... we don't need subject
+  over here at all after that... class doesn't make any sense — classes
+  and subjects, it's two repetitive fields selection happening." The
+  live class/section assignment picker (pick a class, pick its subject,
+  "Add More", existing-assignment chips, the disassociate confirm) was
+  doing the same selection the new Grade → Subjects capability fields
+  already do, just a second time with different UI.
+- Removed entirely from `AddTeacherDrawer`: `classSubjects`/
+  `existingAssignments` off `TeacherFormData`; the `classes`/
+  `fetchSubjectsForClass`/`onDisassociate` props; all of the row-picker
+  state and handlers (`handleClassChange`, `handleSubjectChange`,
+  `addClassSubjectRow`, `removeClassSubjectRow`, `classOptions`,
+  `subjectsByClass`, `confirmDisassociate`); the whole "Classes &
+  Subjects" JSX section. `teachers-page.tsx` lost `handleDisassociate`,
+  `fetchSubjectsForClass`, the `classes`/`ClassItem` fetch (nothing else
+  on the page needed it), and the `newAssignments` POST loop in
+  `handleSaveTeacher`.
+- Which specific class/section a teacher actually teaches is the
+  timetable's job now, not this form's — `class_subjects`/
+  `teacher_assignments` and their endpoints
+  (`POST /api/teacher-assignments`, `.../unassign`) are untouched; they
+  just have no caller in this form anymore. A future timetable-side flow
+  is where "auto assigned from timetable... when configured" would live.

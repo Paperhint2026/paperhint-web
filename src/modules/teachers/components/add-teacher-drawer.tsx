@@ -5,7 +5,6 @@ import {
   CameraIcon,
   CaretRightIcon,
   CircleNotchIcon,
-  LinkIcon,
   EnvelopeIcon,
   MagnifyingGlassIcon,
   PencilIcon,
@@ -28,20 +27,6 @@ import {
   type CustomFieldValues,
 } from "@/components/shared/custom-fields"
 
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -61,30 +46,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-
-export interface ClassSubjectOption {
-  subjectId: string
-  subjectName: string
-  classSubjectId: string
-}
-
-export interface ClassSubjectEntry {
-  classId: string
-  classSubjectId: string
-}
-
-export interface ExistingAssignment {
-  classSubjectId: string
-  className: string
-  subjectName: string
-}
 
 /** A subject this teacher could teach: the grades it runs in (to filter it
  * by the grade picked first) and the department(s) it belongs to — a
@@ -103,16 +64,16 @@ export interface TeacherFormData {
   profileUrl: string
   designation: string
   dateOfJoining: Date | undefined
-  /** What this teacher can teach — mandatory, independent of the live
-   * class_subjects rows below. The department is derived server-side from
-   * whichever of these is primary. */
+  /** What this teacher can teach — mandatory. The department is derived
+   * server-side from whichever of these is primary. Which specific
+   * class/section they're assigned to is the timetable's job, not this
+   * form's (founder, 2026-09-15: "class... can be auto assigned from
+   * timetable... when configured" — picking it here too was two
+   * repetitive fields doing the same selection). */
   subjectIds: string[]
   primarySubjectId: string
-  /** Grades this teacher can teach — a capability, not a timetable slot;
-   * sections come later, from Classes & Subjects or the timetable itself. */
+  /** Grades this teacher can teach — a capability, not a timetable slot. */
   teachableGrades: number[]
-  classSubjects: ClassSubjectEntry[]
-  existingAssignments: ExistingAssignment[]
   pendingProfileFile?: File
   customFields?: CustomFieldValues
 }
@@ -121,12 +82,9 @@ export interface AddTeacherDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (data: TeacherFormData) => void
-  onDisassociate?: (teacherId: string, classSubjectId: string) => Promise<void>
   teacherId?: string | null
   subjects: TeachableSubjectOption[]
   departmentNameById: Record<string, string>
-  classes: { id: string; grade: number; section: string }[]
-  fetchSubjectsForClass: (classId: string) => Promise<ClassSubjectOption[]>
   isSaving?: boolean
   editData?: TeacherFormData | null
 }
@@ -141,8 +99,6 @@ const emptyForm: TeacherFormData = {
   subjectIds: [],
   primarySubjectId: "",
   teachableGrades: [],
-  classSubjects: [{ classId: "", classSubjectId: "" }],
-  existingAssignments: [],
   customFields: {},
 }
 
@@ -155,12 +111,9 @@ export function AddTeacherDrawer({
   open,
   onOpenChange,
   onSave,
-  onDisassociate,
   teacherId,
   subjects,
   departmentNameById,
-  classes,
-  fetchSubjectsForClass,
   isSaving = false,
   editData = null,
 }: AddTeacherDrawerProps) {
@@ -170,16 +123,6 @@ export function AddTeacherDrawer({
   const [previewSrc, setPreviewSrc] = useState("")
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const bodyScrollRef = useRef<HTMLDivElement>(null)
-  const [subjectsByClass, setSubjectsByClass] = useState<
-    Record<string, ClassSubjectOption[]>
-  >({})
-  const [loadingSubjects, setLoadingSubjects] = useState<
-    Record<string, boolean>
-  >({})
-  const [confirmDisassociate, setConfirmDisassociate] =
-    useState<ExistingAssignment | null>(null)
-  const [isDisassociating, setIsDisassociating] = useState(false)
   const [subjectPickerOpen, setSubjectPickerOpen] = useState(false)
   const [subjectQuery, setSubjectQuery] = useState("")
 
@@ -187,46 +130,11 @@ export function AddTeacherDrawer({
     if (open && editData) {
       setForm({ ...editData })
       setPreviewSrc(editData.profileUrl || "")
-      const classIds = editData.classSubjects
-        .map((cs) => cs.classId)
-        .filter(Boolean)
-      const uniqueClassIds = [...new Set(classIds)]
-      uniqueClassIds.forEach(async (classId) => {
-        if (subjectsByClass[classId]) return
-        setLoadingSubjects((prev) => ({ ...prev, [classId]: true }))
-        try {
-          const subjects = await fetchSubjectsForClass(classId)
-          setSubjectsByClass((prev) => ({ ...prev, [classId]: subjects }))
-        } catch {
-          setSubjectsByClass((prev) => ({ ...prev, [classId]: [] }))
-        } finally {
-          setLoadingSubjects((prev) => ({ ...prev, [classId]: false }))
-        }
-      })
     } else if (open && !editData) {
       setForm({ ...emptyForm })
       setPreviewSrc("")
     }
   }, [open, editData])
-
-  const handleDisassociate = async () => {
-    if (!confirmDisassociate || !teacherId || !onDisassociate) return
-    setIsDisassociating(true)
-    try {
-      await onDisassociate(teacherId, confirmDisassociate.classSubjectId)
-      setForm((prev) => ({
-        ...prev,
-        existingAssignments: prev.existingAssignments.filter(
-          (a) => a.classSubjectId !== confirmDisassociate.classSubjectId
-        ),
-      }))
-    } catch (err) {
-      console.error("Failed to disassociate:", err)
-    } finally {
-      setIsDisassociating(false)
-      setConfirmDisassociate(null)
-    }
-  }
 
   const updateField = <K extends keyof TeacherFormData>(
     key: K,
@@ -239,23 +147,6 @@ export function AddTeacherDrawer({
     () => new Map(subjects.map((s) => [s.id, s])),
     [subjects]
   )
-
-  // Assignment picks a specific class-subject for the timetable — the
-  // capability picked above should narrow it, not sit beside it as an
-  // unrelated list (founder, 2026-09-15: "we need the module linkage
-  // seamless"). No grades picked yet means nothing to narrow by, so show
-  // everything rather than an empty dropdown.
-  const classOptions = classes
-    .filter(
-      (c) =>
-        form.teachableGrades.length === 0 ||
-        form.teachableGrades.includes(c.grade)
-    )
-    .sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section))
-    .map((c) => ({
-      value: c.id,
-      label: `Grade ${c.grade} – ${c.section}`,
-    }))
 
   const addSubject = (subjectId: string) => {
     setForm((prev) => ({
@@ -351,57 +242,6 @@ export function AddTeacherDrawer({
     }
   }
 
-  const handleClassChange = async (index: number, classId: string) => {
-    setForm((prev) => {
-      const updated = [...prev.classSubjects]
-      updated[index] = { classId, classSubjectId: "" }
-      return { ...prev, classSubjects: updated }
-    })
-
-    if (subjectsByClass[classId]) return
-
-    setLoadingSubjects((prev) => ({ ...prev, [classId]: true }))
-    try {
-      const subjects = await fetchSubjectsForClass(classId)
-      setSubjectsByClass((prev) => ({ ...prev, [classId]: subjects }))
-    } catch {
-      setSubjectsByClass((prev) => ({ ...prev, [classId]: [] }))
-    } finally {
-      setLoadingSubjects((prev) => ({ ...prev, [classId]: false }))
-    }
-  }
-
-  const handleSubjectChange = (index: number, classSubjectId: string) => {
-    setForm((prev) => {
-      const updated = [...prev.classSubjects]
-      updated[index] = { ...updated[index], classSubjectId }
-      return { ...prev, classSubjects: updated }
-    })
-  }
-
-  const removeClassSubjectRow = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      classSubjects: prev.classSubjects.filter((_, i) => i !== index),
-    }))
-  }
-
-  const addClassSubjectRow = () => {
-    setForm((prev) => ({
-      ...prev,
-      classSubjects: [
-        ...prev.classSubjects,
-        { classId: "", classSubjectId: "" },
-      ],
-    }))
-    requestAnimationFrame(() => {
-      const el = bodyScrollRef.current
-      if (el) {
-        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
-      }
-    })
-  }
-
   const customDefs = useCustomFieldDefs("teacher")
   const customSection = (section: string) => {
     const defs = defsForSection(customDefs, section)
@@ -444,7 +284,6 @@ export function AddTeacherDrawer({
     onOpenChange(false)
     setForm({ ...emptyForm })
     setPreviewSrc("")
-    setConfirmDisassociate(null)
   }
 
   return (
@@ -567,10 +406,7 @@ export function AddTeacherDrawer({
         </div>
 
         {/* Body */}
-        <div
-          ref={bodyScrollRef}
-          className="no-scrollbar flex-1 overflow-y-auto"
-        >
+        <div className="no-scrollbar flex-1 overflow-y-auto">
           <div className="flex flex-col gap-6 px-4 pt-4 pb-5 sm:px-6">
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">
@@ -816,200 +652,6 @@ export function AddTeacherDrawer({
                 {customSection("additional")}
               </>
             )}
-
-            <CurlyDivider id="teacher-curly-assignments" />
-
-            {/* Classes & Subjects */}
-            <p className="text-xs font-medium text-muted-foreground">
-              Classes & Subjects
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {isEditMode
-                ? "Manage class-subject assignments for this teacher."
-                : "Optional — skip this for common-period staff (PT, Art, Music, Library…); they're picked directly in the timetable's custom classes."}
-            </p>
-
-            {/* Existing assignments (edit mode) */}
-            {isEditMode && form.existingAssignments.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs text-muted-foreground">
-                  Current Assignments
-                </Label>
-                <div className="flex flex-wrap gap-2">
-                  {form.existingAssignments.map((a) => (
-                    <div
-                      key={a.classSubjectId}
-                      className="inline-flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-xs"
-                    >
-                      <LinkIcon className="size-3 shrink-0 text-muted-foreground" />
-                      <span className="font-medium text-secondary-foreground">
-                        {a.className}
-                      </span>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="text-muted-foreground">
-                        {a.subjectName}
-                      </span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="ml-1 flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => setConfirmDisassociate(a)}
-                            aria-label="Disassociate"
-                          >
-                            <XIcon className="size-3" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>Disassociate</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Confirm disassociate modal */}
-            <AlertDialog
-              open={!!confirmDisassociate}
-              onOpenChange={(open) => {
-                if (!open) setConfirmDisassociate(null)
-              }}
-            >
-              <AlertDialogContent className="max-w-sm">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Disassociate Assignment</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This teacher is assigned to{" "}
-                    <span className="font-semibold text-secondary-foreground">
-                      {confirmDisassociate?.className}
-                    </span>{" "}
-                    for{" "}
-                    <span className="font-semibold text-secondary-foreground">
-                      {confirmDisassociate?.subjectName}
-                    </span>
-                    . Do you want to disassociate?
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <Button
-                    variant="destructive"
-                    disabled={isDisassociating}
-                    onClick={handleDisassociate}
-                  >
-                    {isDisassociating && (
-                      <CircleNotchIcon className="size-3 animate-spin" />
-                    )}
-                    Yes, Disassociate
-                  </Button>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            {/* New assignments */}
-            {isEditMode && (
-              <Label className="text-xs text-muted-foreground">
-                Add New Assignment
-              </Label>
-            )}
-
-            <div className="flex flex-col gap-3">
-              {form.classSubjects.map((entry, index) => {
-                // Only what this teacher is actually qualified for — the
-                // class already narrowed to their grades above.
-                const availableSubjects = (
-                  entry.classId ? (subjectsByClass[entry.classId] ?? []) : []
-                ).filter(
-                  (sub) =>
-                    form.subjectIds.length === 0 ||
-                    form.subjectIds.includes(sub.subjectId)
-                )
-                const isLoadingSubs = entry.classId
-                  ? (loadingSubjects[entry.classId] ?? false)
-                  : false
-
-                const isFirst = index === 0
-                return (
-                  <div key={index} className="flex items-end gap-2">
-                    <div className="flex flex-1 flex-col gap-2">
-                      {isFirst && <Label className="text-xs">Class</Label>}
-                      <Select
-                        value={entry.classId}
-                        onValueChange={(v) => handleClassChange(index, v)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select class" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {classOptions.map((c) => (
-                            <SelectItem key={c.value} value={c.value}>
-                              {c.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex flex-1 flex-col gap-2">
-                      {isFirst && <Label className="text-xs">Subject</Label>}
-                      {isLoadingSubs ? (
-                        <div className="h-9 animate-pulse rounded-4xl bg-muted" />
-                      ) : (
-                        <Select
-                          disabled={
-                            !entry.classId || availableSubjects.length === 0
-                          }
-                          value={entry.classSubjectId}
-                          onValueChange={(v) => handleSubjectChange(index, v)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue
-                              placeholder={
-                                !entry.classId
-                                  ? "Select class first"
-                                  : availableSubjects.length === 0
-                                    ? "No subjects"
-                                    : "Select subject"
-                              }
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableSubjects.map((sub) => (
-                              <SelectItem
-                                key={sub.classSubjectId}
-                                value={sub.classSubjectId}
-                              >
-                                {sub.subjectName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                      onClick={() => removeClassSubjectRow(index)}
-                      disabled={form.classSubjects.length === 1}
-                      aria-label="Remove row"
-                    >
-                      <TrashIcon className="size-4" />
-                    </Button>
-                  </div>
-                )
-              })}
-              <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addClassSubjectRow}
-                >
-                  <PlusIcon className="size-4" />
-                  Add More
-                </Button>
-              </div>
-            </div>
           </div>
         </div>
 
