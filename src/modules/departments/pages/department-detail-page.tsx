@@ -2,14 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
-  BookmarkSimpleIcon,
   GraduationCapIcon,
+  CaretDownIcon,
   CaretRightIcon,
   PlusIcon,
   StackIcon,
   TrashIcon,
   UsersThreeIcon,
-  XIcon,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
@@ -19,6 +18,7 @@ import { describeGrades, gradeLabel } from "@/lib/grades"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -100,11 +100,10 @@ export function DepartmentDetailPage() {
       (prev) => prev?.map((d) => (d.id === id ? fn(d) : d)) ?? prev
     )
 
-  const toggleHead = (t: Teacher) => {
+  // One head per department — picking a new one replaces whoever held it.
+  const setHead = (t: Teacher | null) => {
     if (!dept) return
-    const heads = dept.heads.some((h) => h.id === t.id)
-      ? dept.heads.filter((h) => h.id !== t.id)
-      : [...dept.heads, { id: t.id, full_name: t.full_name }]
+    const heads = t ? [{ id: t.id, full_name: t.full_name }] : []
     patch((x) => ({ ...x, heads }))
     send(() =>
       apiClient.put(`/api/departments/${id}/heads`, {
@@ -225,9 +224,17 @@ export function DepartmentDetailPage() {
             <Icon className="size-6" weight="fill" aria-hidden />
           </span>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {dept.name}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                {dept.name}
+              </h1>
+              <HeadTag
+                head={dept.heads[0] ?? null}
+                members={members}
+                isAdmin={isAdmin}
+                onPick={setHead}
+              />
+            </div>
             <p className="text-sm text-muted-foreground">
               {dept.member_count}{" "}
               {dept.member_count === 1 ? "teacher" : "teachers"}
@@ -317,72 +324,6 @@ export function DepartmentDetailPage() {
                 )
               })}
             </ul>
-          )}
-        </section>
-
-        {/* Heads */}
-        <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
-          <h2 className="text-sm font-semibold text-foreground">
-            Heads of department
-          </h2>
-          {dept.heads.length > 0 && (
-            <div className="-mr-2 flex max-h-40 flex-wrap items-start gap-1.5 overflow-y-auto pr-2">
-              {dept.heads.map((h) => (
-                <span
-                  key={h.id}
-                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-foreground"
-                >
-                  {h.full_name}
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      aria-label={`Remove ${h.full_name} as head`}
-                      onClick={() =>
-                        toggleHead({ id: h.id, full_name: h.full_name })
-                      }
-                      className="grid size-3.5 place-items-center rounded-full text-muted-foreground hover:bg-background hover:text-destructive"
-                    >
-                      <XIcon className="size-2.5" />
-                    </button>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
-          {isAdmin && members.length > 0 && (
-            <div className="flex">
-              <Picker
-                label="Add head"
-                empty={
-                  members.length === 0
-                    ? "Nobody is in this department yet."
-                    : "Everyone here is already a head."
-                }
-                /* A head leads the department, so they have to be in it. */
-                options={members
-                  .filter((t) => !dept.heads.some((h) => h.id === t.id))
-                  .map((t) => ({
-                    id: t.id,
-                    label: t.full_name,
-                    note: t.designation ?? undefined,
-                  }))}
-                onPick={(pid) => {
-                  const t = members.find((x) => x.id === pid)
-                  if (t) toggleHead(t)
-                }}
-              />
-            </div>
-          )}
-          {dept.heads.length === 0 && (
-            <EmptyNote
-              icon={BookmarkSimpleIcon}
-              title="No head yet"
-              hint={
-                members.length === 0
-                  ? "Add a teacher to this department first."
-                  : "A head sees their department's work and approves inside it."
-              }
-            />
           )}
         </section>
 
@@ -488,6 +429,168 @@ export function DepartmentDetailPage() {
         </section>
       </div>
     </div>
+  )
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
+}
+
+/**
+ * The head, right next to the department's name — a tag, not a widget of
+ * its own (founder, 2026-09-15: "add head of department as a tag like
+ * dropdown to select from teachers rather than a widget"). One head per
+ * department: picking someone else replaces whoever held it, so this is a
+ * single current-head row plus a search list, never a multi-select (founder,
+ * 2026-09-15: "there can only be one HOD for a department"). Sized to stay
+ * inside the viewport at any width.
+ */
+function HeadTag({
+  head,
+  members,
+  isAdmin,
+  onPick,
+}: {
+  head: { id: string; full_name: string } | null
+  members: Teacher[]
+  isAdmin: boolean
+  onPick: (t: Teacher | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const q = query.trim().toLowerCase()
+  const options = members
+    .filter((t) => t.id !== head?.id)
+    .filter((t) => (q ? t.full_name.toLowerCase().includes(q) : true))
+
+  const label = head?.full_name ?? "Head of department"
+
+  if (!isAdmin) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted py-1 pr-2.5 pl-1 text-xs text-muted-foreground">
+        {head && (
+          <Avatar className="size-4">
+            <AvatarFallback className="text-[9px]">
+              {initials(head.full_name)}
+            </AvatarFallback>
+          </Avatar>
+        )}
+        {label}
+      </span>
+    )
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) setQuery("")
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border py-1 pr-2 text-xs transition-colors",
+            head
+              ? "border-transparent bg-muted pl-1 text-foreground hover:bg-muted/70"
+              : "border-dashed border-border pl-2.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
+        >
+          {head && (
+            <Avatar className="size-4">
+              <AvatarFallback className="text-[9px]">
+                {initials(head.full_name)}
+              </AvatarFallback>
+            </Avatar>
+          )}
+          {label}
+          <CaretDownIcon className="size-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        collisionPadding={16}
+        className="w-72 max-w-[calc(100vw-2rem)] p-0"
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-border p-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Avatar className="size-7">
+              <AvatarFallback className="text-xs">
+                {head ? initials(head.full_name) : "—"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-foreground">
+                {head?.full_name ?? "No head yet"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Head of department
+              </p>
+            </div>
+          </div>
+          {head && (
+            <button
+              type="button"
+              onClick={() => {
+                onPick(null)
+                setOpen(false)
+              }}
+              className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+        <div className="border-b border-border p-2">
+          <Input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={head ? "Change to another teacher" : "Search teachers"}
+            className="h-8 text-sm"
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto p-1">
+          {options.length === 0 ? (
+            <p className="px-2 py-3 text-xs text-muted-foreground">
+              {members.length === 0
+                ? "Add a teacher to this department first."
+                : q
+                  ? "No match."
+                  : "No other teacher in this department."}
+            </p>
+          ) : (
+            options.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  onPick(t)
+                  setOpen(false)
+                  setQuery("")
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+              >
+                <Avatar className="size-6 shrink-0">
+                  <AvatarFallback className="text-[10px]">
+                    {initials(t.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 flex-1 truncate">{t.full_name}</span>
+                {t.designation && (
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {t.designation}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

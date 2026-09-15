@@ -9,7 +9,6 @@ import {
 import { apiClient } from "@/lib/api-client"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ClassIdentifyPanel } from "@/modules/rollover/components/class-identify-panel"
 import type {
@@ -30,7 +29,9 @@ import type {
  * A class list on the left, that class's own action on the right — the same
  * shape as Reshuffling, one class at a time (founder, 2026-09-15: "grade
  * promotion can also be like reshuffle, with a side panel and properties to
- * alter on the right").
+ * alter on the right"). The identify list is always expanded for whichever
+ * class is selected — no accordion, no "review students" click needed;
+ * selecting the class from the list is the action.
  *
  * The target section is always "same letter, next grade" here and cannot be
  * edited on this screen — section is entirely Reshuffling's job, including
@@ -52,7 +53,6 @@ export function PlanStep({
   const [terminalGrade, setTerminalGrade] = useState(12)
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
-  const [reviewing, setReviewing] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     apiClient
@@ -205,10 +205,6 @@ export function PlanStep({
               canGraduate={current.grade >= terminalGrade}
               fromYear={plan.from_year}
               toYear={toYear}
-              reviewing={!!reviewing[current.id] || current.detained_count > 0}
-              onReview={() =>
-                setReviewing((prev) => ({ ...prev, [current.id]: true }))
-              }
               onPatch={(fn) => patch(current.id, fn)}
               onDetainedCountChange={(count) =>
                 setDetainedCount(current.id, count)
@@ -231,8 +227,6 @@ function ClassDetail({
   canGraduate,
   fromYear,
   toYear,
-  reviewing,
-  onReview,
   onPatch,
   onDetainedCountChange,
 }: {
@@ -241,8 +235,6 @@ function ClassDetail({
   canGraduate: boolean
   fromYear: string
   toYear: string
-  reviewing: boolean
-  onReview: () => void
   onPatch: (fn: (r: RolloverPlanClass) => RolloverPlanClass) => void
   onDetainedCountChange: (count: number) => void
 }) {
@@ -337,21 +329,10 @@ function ClassDetail({
       </div>
 
       <div className="rounded-lg border border-border">
-        {reviewing ? (
-          <ClassIdentifyPanel
-            sourceClassId={cls.id}
-            onDetainedCountChange={onDetainedCountChange}
-          />
-        ) : (
-          <div className="flex items-center justify-between gap-3 p-3">
-            <p className="text-xs text-muted-foreground">
-              Nobody detained here — everyone follows the class.
-            </p>
-            <Button variant="outline" size="sm" onClick={onReview}>
-              Review students
-            </Button>
-          </div>
-        )}
+        <ClassIdentifyPanel
+          sourceClassId={cls.id}
+          onDetainedCountChange={onDetainedCountChange}
+        />
       </div>
     </div>
   )

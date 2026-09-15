@@ -372,3 +372,18 @@ subjects paste-list flow. One shared import component, not one per module.
   duplicated rather than reusing `executePlanCore`, since that function's
   `ensureTarget()` inserts classes as a side effect of resolving a target id
   and preview must never write anything.
+
+## Department head is a single tag, not a widget (2026-09-15, founder)
+
+- "Add head of department as a tag like dropdown to select from teachers
+  rather than a widget" — the standalone "Heads of department" section on
+  the department detail page is gone; a `HeadTag` pill sits next to the
+  department name instead (`department-detail-page.tsx`), opening a
+  Popover to search and pick.
+- **One head per department.** Founder: "there can only be one HOD for a
+  department." Picking a teacher replaces whoever held it — no multi-add
+  chip list. The backend endpoint (`PUT /api/departments/:id/heads`, body
+  `user_ids: string[]`) still technically accepts more than one; the
+  frontend is what enforces "one" by always sending a 0-or-1-length array
+  (`setHead()` in department-detail-page.tsx). Revisit the endpoint itself
+  only if a real need for co-heads shows up.
