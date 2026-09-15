@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyNote } from "@/components/shared/empty-note"
 import { Sticker } from "@/components/shared/sticker"
 import { EditDepartmentDrawer } from "@/modules/departments/components/edit-department-drawer"
+import { TeacherAllotment } from "@/modules/departments/components/teacher-allotment"
 import { lookFor } from "@/modules/departments/lib/department-look"
 import type {
   Department,
@@ -88,6 +89,19 @@ export function DepartmentDetailPage() {
     () => teachers.filter((t) => t.department_id === id),
     [teachers, id]
   )
+  // Which department owns each subject — a subject sits in exactly one
+  // (founder's bucket model), so this is a plain lookup, not a best guess.
+  const departmentIdBySubject = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const d of departments ?? [])
+      for (const s of d.subjects) m[s.id] = d.id
+    return m
+  }, [departments])
+  const departmentNameById = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const d of departments ?? []) m[d.id] = d.name
+    return m
+  }, [departments])
 
   // Writes land locally first and go out one at a time.
   const chain = useRef<Promise<unknown>>(Promise.resolve())
@@ -131,6 +145,48 @@ export function DepartmentDetailPage() {
       })
     )
   }
+  // A teacher's allotment, edited from the department's own Teachers tab —
+  // the same rows the teacher's own form writes, reached by the other door.
+  const patchTeacher = (tid: string, fn: (t: Teacher) => Teacher) =>
+    setTeachers((prev) => prev.map((t) => (t.id === tid ? fn(t) : t)))
+
+  const setTeacherSubjects = (
+    t: Teacher,
+    subjectIds: string[],
+    primaryId: string
+  ) => {
+    const byId = new Map(subjects.map((s) => [s.id, s]))
+    patchTeacher(t.id, (x) => ({
+      ...x,
+      teachable_subjects: subjectIds
+        .map((sid) => ({
+          id: sid,
+          subject_name: byId.get(sid)?.subject_name ?? "",
+          is_primary: sid === primaryId,
+        }))
+        .sort(
+          (a, b) =>
+            Number(b.is_primary) - Number(a.is_primary) ||
+            a.subject_name.localeCompare(b.subject_name)
+        ),
+    }))
+    send(async () => {
+      await apiClient.put(`/api/auth/teacher/${t.id}/subjects`, {
+        subject_ids: subjectIds,
+        primary_subject_id: primaryId,
+      })
+      // The primary subject decides the department, so a change here can move
+      // the teacher out of this page's list entirely — reload rather than
+      // guess where they landed.
+      return load()
+    })
+  }
+
+  const setTeacherGrades = (t: Teacher, grades: number[]) => {
+    patchTeacher(t.id, (x) => ({ ...x, teachable_grades: grades }))
+    send(() => apiClient.put(`/api/auth/teacher/${t.id}/grades`, { grades }))
+  }
+
   const remove = async () => {
     if (!dept) return
     setBusy("del")
@@ -389,28 +445,40 @@ export function DepartmentDetailPage() {
                     }
                   />
                 ) : (
-                  <ul className="-mr-2 flex max-h-96 flex-col divide-y divide-border overflow-y-auto pr-2">
+                  <ul className="-mr-2 flex max-h-[32rem] flex-col divide-y divide-border overflow-y-auto pr-2">
                     {members.map((t) => {
                       const isHead = dept.heads.some((h) => h.id === t.id)
                       return (
-                        <li
-                          key={t.id}
-                          className="flex items-center justify-between gap-3 py-2"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm text-foreground">
-                              {t.full_name}
+                        <li key={t.id} className="flex flex-col gap-2 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm text-foreground">
+                                {t.full_name}
+                              </span>
+                              {t.designation && (
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  {t.designation}
+                                </span>
+                              )}
                             </span>
-                            {t.designation && (
-                              <span className="block truncate text-xs text-muted-foreground">
-                                {t.designation}
+                            {isHead && (
+                              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+                                Head
                               </span>
                             )}
-                          </span>
-                          {isHead && (
-                            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
-                              Head
-                            </span>
+                          </div>
+                          {isAdmin && (
+                            <TeacherAllotment
+                              teacher={t}
+                              subjects={subjects}
+                              deptId={id}
+                              departmentIdBySubject={departmentIdBySubject}
+                              departmentNameById={departmentNameById}
+                              onSetSubjects={(sids, pid) =>
+                                setTeacherSubjects(t, sids, pid)
+                              }
+                              onSetGrades={(g) => setTeacherGrades(t, g)}
+                            />
                           )}
                         </li>
                       )

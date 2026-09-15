@@ -11,10 +11,16 @@ export type Department = {
   member_count: number
 }
 
+export type TeachableSubject = SubjectLite & { is_primary: boolean }
+
 export type Teacher = {
   id: string
   full_name: string
   email?: string
   designation?: string | null
   department_id?: string | null
+  /** What this teacher can teach. The primary subject is what puts them in a
+   *  department; the rest are capability and do not move them. */
+  teachable_subjects?: TeachableSubject[]
+  teachable_grades?: number[]
 }
