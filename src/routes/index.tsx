@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom"
 
 import { AppLayout } from "@/components/layout/app-layout"
 import { ProtectedRoute } from "@/components/layout/protected-route"
+import { RouteErrorPage } from "@/components/shared/route-error-page"
 import { LoginPage } from "@/modules/auth/pages/login-page"
 import { ForgotPasswordPage } from "@/modules/auth/pages/forgot-password-page"
 import { ResetPasswordPage } from "@/modules/auth/pages/reset-password-page"
@@ -43,12 +44,29 @@ import { DepartmentDetailPage } from "@/modules/departments/pages/department-det
 import { SubjectsPage } from "@/modules/subjects/pages/subjects-page"
 
 export const router = createBrowserRouter([
-  { path: "login", element: <LoginPage /> },
-  { path: "forgot-password", element: <ForgotPasswordPage /> },
-  { path: "reset-password", element: <ResetPasswordPage /> },
-  { path: "set-password", element: <SetPasswordPage /> },
+  {
+    path: "login",
+    element: <LoginPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    path: "forgot-password",
+    element: <ForgotPasswordPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    path: "reset-password",
+    element: <ResetPasswordPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    path: "set-password",
+    element: <SetPasswordPage />,
+    errorElement: <RouteErrorPage />,
+  },
   {
     element: <ProtectedRoute />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         element: <AppLayout />,

@@ -1,5 +1,6 @@
 export type Head = { id: string; full_name: string }
 export type SubjectLite = { id: string; subject_name: string }
+export type SubjectOption = SubjectLite & { grades: number[] }
 
 export type Department = {
   id: string

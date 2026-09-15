@@ -387,3 +387,33 @@ subjects paste-list flow. One shared import component, not one per module.
   frontend is what enforces "one" by always sending a 0-or-1-length array
   (`setHead()` in department-detail-page.tsx). Revisit the endpoint itself
   only if a real need for co-heads shows up.
+
+## Edit department in one drawer (2026-09-15, founder)
+
+- "There should be an option to edit department which opens as a side
+  panel... adding [a subject] could be a lookup, a nested form for
+  selection, and back to original form" — `EditDepartmentDrawer`
+  (`src/modules/departments/components/edit-department-drawer.tsx`), opened
+  by a new "Edit" button next to "Delete." One Sheet, three internal views
+  (`main` / `add-subject` / `set-grades`), navigated with a back arrow —
+  never a route change.
+- **Grades stay derived from subjects, confirmed explicitly** (founder,
+  answering directly): "grade selection" in the drawer is per-subject —
+  picking which grades a newly-added subject with no grades yet runs in
+  (`PUT /api/subjects/:id/grades`), shown only when that subject needs it.
+  There is still no department-level grades field to set; `dept.grades` is
+  read-only, same as before.
+- **Teachers are deliberately not addable here.** A teacher joins a
+  department from their own profile
+  (docs/modules/02-departments-and-subjects.md) — the drawer only edits the
+  department's name and its subjects, not its members.
+
+## Custom route error screen (2026-09-15, founder)
+
+- React Router's default crash page (a raw stack trace, "Unexpected
+  Application Error!") is replaced by `RouteErrorPage`
+  (`src/components/shared/route-error-page.tsx`), wired as `errorElement`
+  on every top-level route in `src/routes/index.tsx`. Matches the
+  Sticker-based empty-state convention used elsewhere (`worried`), with a
+  Reload / Go home / Copy error action set — no 404 route was added, this
+  covers only a route that actually throws.

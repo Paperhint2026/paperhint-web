@@ -5,6 +5,7 @@ import {
   GraduationCapIcon,
   CaretDownIcon,
   CaretRightIcon,
+  PencilIcon,
   PlusIcon,
   StackIcon,
   TrashIcon,
@@ -29,10 +30,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyNote } from "@/components/shared/empty-note"
 import { Sticker } from "@/components/shared/sticker"
+import { EditDepartmentDrawer } from "@/modules/departments/components/edit-department-drawer"
 import { lookFor } from "@/modules/departments/lib/department-look"
 import type {
   Department,
   SubjectLite,
+  SubjectOption,
   Teacher,
 } from "@/modules/departments/lib/types"
 
@@ -47,16 +50,17 @@ export function DepartmentDetailPage() {
   const navigate = useNavigate()
 
   const [departments, setDepartments] = useState<Department[] | null>(null)
-  const [subjects, setSubjects] = useState<SubjectLite[]>([])
+  const [subjects, setSubjects] = useState<SubjectOption[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [error, setError] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
       const [d, s, t] = await Promise.all([
         apiClient.get<{ departments: Department[] }>("/api/departments"),
-        apiClient.get<{ subjects: SubjectLite[] }>("/api/subjects"),
+        apiClient.get<{ subjects: SubjectOption[] }>("/api/subjects"),
         apiClient
           .get<{ teachers: Teacher[] }>("/api/auth/teachers")
           .catch(() => ({ teachers: [] })),
@@ -246,18 +250,30 @@ export function DepartmentDetailPage() {
             </p>
           </div>
         </div>
-        {isAdmin && !isGeneral && (
+        {isAdmin && (
           <div className="flex flex-col items-end gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={remove}
-              disabled={busy === "del" || blocked}
-            >
-              <TrashIcon className="size-4" />
-              Delete
-            </Button>
-            {blocked && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditOpen(true)}
+              >
+                <PencilIcon className="size-4" />
+                Edit
+              </Button>
+              {!isGeneral && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={remove}
+                  disabled={busy === "del" || blocked}
+                >
+                  <TrashIcon className="size-4" />
+                  Delete
+                </Button>
+              )}
+            </div>
+            {blocked && !isGeneral && (
               <span className="text-[11px] text-muted-foreground">
                 Move its teachers and subjects out first
               </span>
@@ -428,6 +444,15 @@ export function DepartmentDetailPage() {
           )}
         </section>
       </div>
+
+      <EditDepartmentDrawer
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        dept={dept}
+        allSubjects={subjects}
+        onRemoveSubject={toggleSubject}
+        onChanged={load}
+      />
     </div>
   )
 }
