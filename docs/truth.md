@@ -348,6 +348,12 @@ subjects paste-list flow. One shared import component, not one per module.
   (2026-09-15, third time flagging it): the step kept re-doing reshuffling's
   own job by letting the section be changed there too. Any section change,
   for a whole class or one student, happens only in Reshuffling.
+- **Grade promotion is a class list + detail panel, same shape as
+  Reshuffling.** Founder (2026-09-15): "grade promotion can also be like
+  reshuffle, with a side panel and properties to alter on the right" — one
+  class selected at a time instead of a single giant table; the identify
+  list only shows automatically for a class with someone detained, with a
+  "Review students" button as the manual escape hatch for any other class.
 - **Review is an itemized table, not just stat tiles.** Founder: "a complete
   table produced in a format of all the grades, all the sections, all the
   students." `POST /rollover/preview` now returns a `students` array (every

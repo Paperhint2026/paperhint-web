@@ -1,6 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
-  CaretDownIcon,
   CaretRightIcon,
   CircleNotchIcon,
   GraduationCapIcon,
@@ -9,6 +8,7 @@ import {
 import { apiClient } from "@/lib/api-client"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ClassIdentifyPanel } from "@/modules/rollover/components/class-identify-panel"
 import type {
@@ -26,13 +26,10 @@ import type {
  * structure is its own). Everything below that just states its target;
  * "Graduate" is not an option a Grade 6 class could ever need.
  *
- * A class with no one detained is a single click — nothing to review. A
- * class that already has someone detained opens straight to that list
- * (founder, 2026-09-14: "until eighth or ninth grade there's no detaining —
- * we just click promote; tenth to twelfth is where you identify who's
- * promoted"). Any class can still be opened by hand — this is a default, not
- * a hard grade cutoff, since a school's own results decide it, not a number
- * in the code.
+ * A class list on the left, that class's own action on the right — the same
+ * shape as Reshuffling, one class at a time (founder, 2026-09-15: "grade
+ * promotion can also be like reshuffle, with a side panel and properties to
+ * alter on the right").
  *
  * The target section is always "same letter, next grade" here and cannot be
  * edited on this screen — section is entirely Reshuffling's job, including
@@ -53,7 +50,8 @@ export function PlanStep({
   const [rows, setRows] = useState<Record<string, RolloverPlanClass>>({})
   const [terminalGrade, setTerminalGrade] = useState(12)
   const [saving, setSaving] = useState(false)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [selected, setSelected] = useState<string | null>(null)
+  const [reviewing, setReviewing] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     apiClient
@@ -64,6 +62,7 @@ export function PlanStep({
         // pending = still in the old year, waiting to move — the ones this plans for
         const active = r.classes.filter((c) => c.is_pending_promotion)
         setClasses(active)
+        setSelected((prev) => prev ?? active[0]?.id ?? null)
 
         const terminal =
           active.length > 0 ? Math.max(...active.map((c) => c.grade), 12) : 12
@@ -88,15 +87,6 @@ export function PlanStep({
           }
         }
         setRows(initial)
-        // A class with anyone already detained opens straight to that list;
-        // everything else stays a one-click Promote until asked to open.
-        setExpanded((prev) => {
-          const next = { ...prev }
-          for (const c of active) {
-            if (c.detained_count > 0 && !(c.id in next)) next[c.id] = true
-          }
-          return next
-        })
       })
       .catch((e) =>
         setError(e instanceof Error ? e.message : "Could not load classes")
@@ -155,6 +145,9 @@ export function PlanStep({
   }
   const grades = [...byGrade.keys()].sort((a, b) => a - b)
 
+  const current = classes.find((c) => c.id === selected) ?? null
+  const currentRow = current ? rows[current.id] : null
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
@@ -169,145 +162,182 @@ export function PlanStep({
           </span>
         )}
       </div>
-      <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="w-28 px-3 py-2 font-medium">Class</th>
-              <th className="w-28 px-3 py-2 text-right font-medium">
-                Students
-              </th>
-              <th className="w-40 px-3 py-2 font-medium">Action</th>
-              <th className="px-3 py-2 font-medium">Default target</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {grades.map((g) =>
-              (byGrade.get(g) ?? [])
-                .sort((a, b) => a.section.localeCompare(b.section))
-                .map((c) => {
-                  const row = rows[c.id]
-                  if (!row) return null
-                  const isGraduate = row.action === "graduate"
-                  const canGraduate = c.grade >= terminalGrade
-                  const isOpen = !!expanded[c.id]
-                  return (
-                    <Fragment key={c.id}>
-                      <tr>
-                        <td className="px-3 py-2.5 font-medium text-foreground">
-                          {c.grade}
-                          {c.section}
-                        </td>
-                        <td className="px-3 py-2.5 text-right text-muted-foreground tabular-nums">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpanded((prev) => ({
-                                ...prev,
-                                [c.id]: !prev[c.id],
-                              }))
-                            }
-                            className="inline-flex items-center gap-1 hover:text-foreground"
-                          >
-                            {isOpen ? (
-                              <CaretDownIcon className="size-3" />
-                            ) : (
-                              <CaretRightIcon className="size-3" />
-                            )}
-                            {c.student_count}
-                            {c.detained_count > 0 && (
-                              <span className="text-[11px]">
-                                ({c.detained_count} detained)
-                              </span>
-                            )}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {canGraduate ? (
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                aria-pressed={!isGraduate}
-                                onClick={() =>
-                                  patch(c.id, (r) => ({
-                                    ...r,
-                                    action: "promote",
-                                    target: r.target ?? {
-                                      grade: c.grade + 1,
-                                      section: c.section,
-                                      academic_year: toYear,
-                                    },
-                                  }))
-                                }
-                                className={cn(
-                                  "rounded-md border px-2 py-1 text-xs transition-colors",
-                                  !isGraduate
-                                    ? "border-primary bg-primary/10 text-foreground"
-                                    : "border-border text-muted-foreground hover:bg-muted"
-                                )}
-                              >
-                                Promote
-                              </button>
-                              <button
-                                type="button"
-                                aria-pressed={isGraduate}
-                                onClick={() =>
-                                  patch(c.id, (r) => ({
-                                    ...r,
-                                    action: "graduate",
-                                    target: undefined,
-                                  }))
-                                }
-                                className={cn(
-                                  "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
-                                  isGraduate
-                                    ? "border-primary bg-primary/10 text-foreground"
-                                    : "border-border text-muted-foreground hover:bg-muted"
-                                )}
-                              >
-                                <GraduationCapIcon className="size-3" />
-                                Graduate
-                              </button>
-                            </div>
-                          ) : (
-                            // A Grade 6 class has exactly one valid action — no
-                            // choice to make, so no button pretending there is one.
-                            <span className="text-xs text-muted-foreground">
-                              Promotes
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {isGraduate ? (
-                            <span className="text-xs text-muted-foreground">
-                              Leaves the school
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Grade {row.target?.grade}
-                              {row.target?.section} — change in Reshuffling
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                      {isOpen && (
-                        <tr>
-                          <td colSpan={4} className="bg-muted/20 p-0">
-                            <ClassIdentifyPanel
-                              sourceClassId={c.id}
-                              onDetainedCountChange={(count) =>
-                                setDetainedCount(c.id, count)
-                              }
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })
-            )}
-          </tbody>
-        </table>
+
+      <div className="grid gap-0 overflow-hidden rounded-xl border border-border bg-background sm:grid-cols-[112px_1fr]">
+        <div className="max-h-[32rem] overflow-y-auto border-b border-border sm:border-r sm:border-b-0">
+          {grades.map((g) =>
+            (byGrade.get(g) ?? [])
+              .sort((a, b) => a.section.localeCompare(b.section))
+              .map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSelected(c.id)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-1 border-b border-border px-3 py-2.5 text-left text-sm last:border-b-0",
+                    selected === c.id
+                      ? "bg-primary/10 text-foreground"
+                      : "text-secondary-foreground hover:bg-muted"
+                  )}
+                >
+                  <span className="flex items-center gap-1 font-medium">
+                    {c.grade}
+                    {c.section}
+                    {c.detained_count > 0 && (
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        {c.detained_count}
+                      </span>
+                    )}
+                  </span>
+                  <CaretRightIcon className="size-3 shrink-0 text-muted-foreground" />
+                </button>
+              ))
+          )}
+        </div>
+
+        <div className="min-w-0">
+          {current && currentRow ? (
+            <ClassDetail
+              key={current.id}
+              cls={current}
+              row={currentRow}
+              canGraduate={current.grade >= terminalGrade}
+              toYear={toYear}
+              reviewing={!!reviewing[current.id] || current.detained_count > 0}
+              onReview={() =>
+                setReviewing((prev) => ({ ...prev, [current.id]: true }))
+              }
+              onPatch={(fn) => patch(current.id, fn)}
+              onDetainedCountChange={(count) =>
+                setDetainedCount(current.id, count)
+              }
+            />
+          ) : (
+            <p className="p-4 text-sm text-muted-foreground">
+              No classes to promote.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ClassDetail({
+  cls,
+  row,
+  canGraduate,
+  toYear,
+  reviewing,
+  onReview,
+  onPatch,
+  onDetainedCountChange,
+}: {
+  cls: ContextClass
+  row: RolloverPlanClass
+  canGraduate: boolean
+  toYear: string
+  reviewing: boolean
+  onReview: () => void
+  onPatch: (fn: (r: RolloverPlanClass) => RolloverPlanClass) => void
+  onDetainedCountChange: (count: number) => void
+}) {
+  const isGraduate = row.action === "graduate"
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            Grade {cls.grade}
+            {cls.section}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {cls.student_count} students
+            {cls.detained_count > 0 && ` · ${cls.detained_count} detained`}
+          </p>
+        </div>
+
+        {canGraduate ? (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              aria-pressed={!isGraduate}
+              onClick={() =>
+                onPatch((r) => ({
+                  ...r,
+                  action: "promote",
+                  target: r.target ?? {
+                    grade: cls.grade + 1,
+                    section: cls.section,
+                    academic_year: toYear,
+                  },
+                }))
+              }
+              className={cn(
+                "rounded-md border px-2 py-1 text-xs transition-colors",
+                !isGraduate
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              )}
+            >
+              Promote
+            </button>
+            <button
+              type="button"
+              aria-pressed={isGraduate}
+              onClick={() =>
+                onPatch((r) => ({
+                  ...r,
+                  action: "graduate",
+                  target: undefined,
+                }))
+              }
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
+                isGraduate
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              )}
+            >
+              <GraduationCapIcon className="size-3" />
+              Graduate
+            </button>
+          </div>
+        ) : (
+          // A Grade 6 class has exactly one valid action — no choice to
+          // make, so no button pretending there is one.
+          <span className="text-xs text-muted-foreground">Promotes</span>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        {isGraduate ? (
+          "Leaves the school"
+        ) : (
+          <>
+            Grade {row.target?.grade}
+            {row.target?.section} — change in Reshuffling
+          </>
+        )}
+      </p>
+
+      <div className="rounded-lg border border-border">
+        {reviewing ? (
+          <ClassIdentifyPanel
+            sourceClassId={cls.id}
+            onDetainedCountChange={onDetainedCountChange}
+          />
+        ) : (
+          <div className="flex items-center justify-between gap-3 p-3">
+            <p className="text-xs text-muted-foreground">
+              Nobody detained here — everyone follows the class.
+            </p>
+            <Button variant="outline" size="sm" onClick={onReview}>
+              Review students
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -126,14 +126,16 @@ solid, current tinted, upcoming plain.
 
 ## Step scopes sharpened (truth.md, 2026-09-14)
 
-- **Grade promotion** (`PlanStep` + new `ClassIdentifyPanel`): a class with
-  nobody currently detained is a single Promote/Graduate click, nothing else
-  shown. A class with any detained student opens straight to a compact
-  Student + Promote/Detain list (`GET /rollover/plan/roster`, `PATCH
-  /batches/annual-result` — same real toggle as before, just surfaced here
-  too); any class can be opened by hand via the row's expand toggle. The
-  target section shown per class is always "same letter, next grade," fixed
-  and non-editable here — no `Input`, just text (founder, 2026-09-15: this
+- **Grade promotion** (`PlanStep` + new `ClassIdentifyPanel`): rebuilt as a
+  class list + detail panel, the same shape as Reshuffling (founder,
+  2026-09-15) — one class selected at a time instead of a single giant
+  table. The detail panel holds the Promote/Graduate toggle and, for a class
+  with anyone currently detained, opens straight to a compact Student +
+  Promote/Detain list (`GET /rollover/plan/roster`, `PATCH
+  /batches/annual-result` — same real toggle as before); any other class
+  reaches the same list through a "Review students" button. The target
+  section shown per class is always "same letter, next grade," fixed and
+  non-editable here — no `Input`, just text (founder, 2026-09-15: this
   screen kept re-doing reshuffling's own job). Every section change happens
   only in Reshuffling.
 - **Reshuffling** (`ClassRosterPanel`): dropped its Promote/Detain switch

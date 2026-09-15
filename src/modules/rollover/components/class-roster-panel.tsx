@@ -9,6 +9,7 @@ import {
 import { apiClient } from "@/lib/api-client"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -160,16 +161,22 @@ export function ClassRosterPanel({
                     <span className="text-foreground">{row.full_name}</span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span
+                    <Badge
+                      variant={row.detained ? "secondary" : "outline"}
                       className={cn(
-                        "rounded-md border px-2 py-1 text-xs",
-                        row.detained
-                          ? "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                          : "border-border text-muted-foreground"
+                        "rounded-full",
+                        row.detained &&
+                          "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
                       )}
                     >
+                      <span
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          row.detained ? "bg-amber-500" : "bg-primary"
+                        )}
+                      />
                       {row.detained ? "Detained" : "Promoted"}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-3 py-2.5">
                     <StudentActionCell

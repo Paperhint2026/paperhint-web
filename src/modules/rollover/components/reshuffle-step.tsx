@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotchIcon } from "@phosphor-icons/react"
+import { CaretRightIcon, CircleNotchIcon } from "@phosphor-icons/react"
 
 import { apiClient } from "@/lib/api-client"
 import { showError } from "@/lib/show-error"
@@ -93,7 +93,7 @@ export function ReshuffleStep({
           </span>
         )}
       </div>
-      <div className="grid gap-0 overflow-hidden rounded-xl border border-border bg-background sm:grid-cols-[220px_1fr]">
+      <div className="grid gap-0 overflow-hidden rounded-xl border border-border bg-background sm:grid-cols-[112px_1fr]">
         <div className="max-h-[32rem] overflow-y-auto border-b border-border sm:border-r sm:border-b-0">
           {classes.map((c) => {
             const count = exceptionCountByClass.get(c.id) ?? 0
@@ -103,21 +103,22 @@ export function ReshuffleStep({
                 type="button"
                 onClick={() => setSelected(c.id)}
                 className={cn(
-                  "flex w-full items-center justify-between gap-2 border-b border-border px-3 py-2.5 text-left text-sm last:border-b-0",
+                  "flex w-full items-center justify-between gap-1 border-b border-border px-3 py-2.5 text-left text-sm last:border-b-0",
                   selected === c.id
                     ? "bg-primary/10 text-foreground"
                     : "text-secondary-foreground hover:bg-muted"
                 )}
               >
-                <span className="font-medium">
+                <span className="flex items-center gap-1 font-medium">
                   {c.grade}
                   {c.section}
+                  {count > 0 && (
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                      {count}
+                    </span>
+                  )}
                 </span>
-                {count > 0 && (
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                    {count}
-                  </span>
-                )}
+                <CaretRightIcon className="size-3 shrink-0 text-muted-foreground" />
               </button>
             )
           })}

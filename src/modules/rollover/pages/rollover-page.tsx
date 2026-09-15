@@ -43,14 +43,18 @@ const STEPS: StepperStep[] = [
   {
     key: "plan",
     label: "Grade promotion",
-    hint: "Promote or graduate each class",
+    hint: "Promote, graduate, or detain a student",
   },
   {
     key: "reshuffle",
     label: "Reshuffling",
-    hint: "Move, detain or withdraw a student",
+    hint: "Move a student, or create a section",
   },
-  { key: "review", label: "Review & run", hint: "Preview, then submit" },
+  {
+    key: "review",
+    label: "Review & run",
+    hint: "Every student, then submit",
+  },
 ]
 type StepKey = "plan" | "reshuffle" | "review"
 const STEP_ORDER: StepKey[] = ["plan", "reshuffle", "review"]
@@ -269,7 +273,7 @@ export function RolloverPage() {
           </div>
         ) : (
           <>
-            <div className="rounded-xl border border-border bg-background px-6 py-5">
+            <div>
               <RolloverStepper
                 steps={STEPS}
                 activeKey={step}
