@@ -523,17 +523,13 @@ export function AddTeacherDrawer({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">
-                  Subjects they can teach{" "}
-                  <span className="text-destructive">*</span>
-                </Label>
-                {derivedDepartmentName && (
-                  <span className="text-xs text-muted-foreground">
-                    Maps to {derivedDepartmentName}
-                  </span>
-                )}
-              </div>
+              <Label className="text-sm">
+                Subjects they can teach{" "}
+                <span className="text-destructive">*</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Only subjects offered in the grade picked above show up here.
+              </p>
               <div className="overflow-hidden rounded-lg border border-border">
                 {form.subjectIds.length === 0 ? (
                   <p className="p-3 text-xs text-muted-foreground">
@@ -638,6 +634,18 @@ export function AddTeacherDrawer({
                   </PopoverContent>
                 </Popover>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Department</Label>
+              <div className="flex h-9 items-center rounded-md border border-border bg-muted/40 px-3 text-sm text-muted-foreground">
+                {derivedDepartmentName ?? "Auto-fills once a subject is picked"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Set from the primary subject — change it later from that
+                department's own page if a school assigns the department first
+                and the subject after.
+              </p>
             </div>
 
             {customSection("professional")}

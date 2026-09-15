@@ -576,3 +576,28 @@ subjects paste-list flow. One shared import component, not one per module.
   (`POST /api/teacher-assignments`, `.../unassign`) are untouched; they
   just have no caller in this form anymore. A future timetable-side flow
   is where "auto assigned from timetable... when configured" would live.
+
+## Department is a visible read-only field, not a caption (2026-09-15, founder)
+
+- The "Maps to Commerce" caption next to the Subjects label was too easy
+  to miss. Replaced with a real "Department" field — same visual weight
+  as Designation/Phone (labeled, bordered box) — sitting right after
+  Subjects in the derivation chain: Grade → Subjects → Department.
+- **The auto-derivation direction is confirmed as the default, not the
+  only one.** Founder: "sometimes a school would allot a teacher to a
+  department and decide which class they can teach later too — for now
+  we can make it auto populated and we can reverse this later when
+  assigning them." Nothing built for the reverse (department-first) flow
+  yet; the field's caption says to use that department's own page to
+  override, which already works today via the department edit drawer's
+  own teacher-adding flow.
+- **Noted future direction, not yet built**: "this means in departments
+  we will have a teacher tab where the teacher's subject and grade
+  allotment will also be changed or assigned — tightly integrated."
+  Today, `EditDepartmentDrawer`'s Teachers section can only add/remove a
+  teacher from the department (via `PUT /auth/teacher/:id` department_id
+  — actually via the subjects/department derivation path). Editing a
+  teacher's `teachable_subjects`/`teachable_grades` FROM inside the
+  department drawer (rather than only from the teacher's own form) is
+  the follow-up this points at — ask before building, since it's a real
+  scope addition to that drawer, not a small fix.
