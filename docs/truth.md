@@ -523,3 +523,29 @@ subjects paste-list flow. One shared import component, not one per module.
   narrow by), and once a class is chosen, its Subject list only shows
   subjects in `subjectIds`. The two sections read as one form now, not
   two unrelated ones stacked in the same drawer.
+
+## Teacher form: field order is a real filter chain (2026-09-15, founder)
+
+- **Grade now comes before Subjects, and filters it.** Founder: "first the
+  teacher should be selected [a] Class — no section yet — based on grade
+  selected... subjects will be filtered... department can be auto
+  picked... each item selected will be subset filtering the next." The
+  order is now Grade → Subjects (only ones that run in a selected grade,
+  via `TeachableSubjectOption.grades` from `/api/subjects/detail`) →
+  Department (unchanged, derived server-side from the primary subject).
+  Picking no grade yet shows every subject — nothing to narrow by.
+- **Designation and Date of Joining moved up**, right after Phone, so the
+  order reads: name → email → phone → designation → date of joining →
+  [divider] → grade → subjects → department. Founder: "moved... to the
+  top under work email and contact."
+- **The header is a real header again, not scrolling hero content.**
+  Founder: "a full header with divider, body containing the fields and
+  footer with saving action" — the avatar/inline-name/stat-line hero now
+  lives inside an actual `SheetHeader` (fixed, not part of the scrolling
+  body), the name is set at title size (`text-xl`), and a `CurlyDivider`
+  sits between the header and the scrollable body. Footer (Save/Close)
+  was never touched — it already matched this.
+- Every remaining plain `<Separator />` in this form was replaced with
+  `CurlyDivider` for one consistent grouping device ("use the curly
+  divider to do this grouping properly") — before Additional Details and
+  before Classes & Subjects.

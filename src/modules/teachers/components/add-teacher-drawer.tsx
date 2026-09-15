@@ -50,6 +50,7 @@ import {
   SheetClose,
   SheetContent,
   SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
 import { CurlyDivider } from "@/components/shared/curly-divider"
@@ -67,7 +68,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 
 export interface ClassSubjectOption {
   subjectId: string
@@ -86,11 +86,13 @@ export interface ExistingAssignment {
   subjectName: string
 }
 
-/** A subject this teacher could teach, and the department(s) it belongs to
- * — a subject can legitimately have more than one (docs/truth.md). */
+/** A subject this teacher could teach: the grades it runs in (to filter it
+ * by the grade picked first) and the department(s) it belongs to — a
+ * subject can legitimately have more than one (docs/truth.md). */
 export interface TeachableSubjectOption {
   id: string
   subjectName: string
+  grades: number[]
   departmentIds: string[]
 }
 
@@ -291,6 +293,14 @@ export function AddTeacherDrawer({
 
   const availableSubjects = subjects
     .filter((s) => !form.subjectIds.includes(s.id))
+    // The grade picked above narrows this — nothing picked yet means
+    // nothing to narrow by (founder, 2026-09-15: "each item selected will
+    // be subset filtering the next").
+    .filter(
+      (s) =>
+        form.teachableGrades.length === 0 ||
+        s.grades.some((g) => form.teachableGrades.includes(g))
+    )
     .filter((s) =>
       subjectQuery.trim()
         ? s.subjectName
@@ -445,119 +455,123 @@ export function AddTeacherDrawer({
         showCloseButton={false}
         className="flex h-full w-full flex-col p-0"
       >
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-3 sm:px-6">
-          <span className="text-xs font-medium text-muted-foreground">
-            {isEditMode ? "Edit teacher" : "Add teacher"}
-          </span>
-          <SheetClose asChild>
-            <button
-              className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Close"
+        {/* Header — a real header, not a scrolling hero: eyebrow + close,
+            photo + editable name at title size, a stat line under it, then
+            a divider before the body (founder, 2026-09-15: "a full header
+            with divider, body containing the fields, footer with saving
+            action"). */}
+        <SheetHeader className="shrink-0 gap-3 px-4 pt-4 pb-0 sm:px-6">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              {isEditMode ? "Edit teacher" : "Add teacher"}
+            </span>
+            <SheetClose asChild>
+              <button
+                className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+              >
+                <XIcon className="size-5" />
+              </button>
+            </SheetClose>
+          </div>
+
+          <div className="flex items-center gap-3.5">
+            <div
+              className="group/avatar relative flex size-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-muted-foreground/50"
+              onClick={() => !previewSrc && fileInputRef.current?.click()}
             >
-              <XIcon className="size-5" />
-            </button>
-          </SheetClose>
+              {previewSrc ? (
+                <img
+                  src={previewSrc}
+                  alt="Preview"
+                  className="size-full object-cover"
+                />
+              ) : (
+                <Avatar className="size-full rounded-2xl">
+                  <AvatarFallback className="rounded-2xl text-base">
+                    {form.fullName ? (
+                      initials(form.fullName)
+                    ) : (
+                      <CameraIcon className="size-5 text-muted-foreground" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              {previewSrc && !isUploading && (
+                <div className="absolute inset-0 flex items-center justify-center gap-1 bg-background/60 opacity-0 transition-opacity group-hover/avatar:opacity-100 [@media(hover:none)]:opacity-100">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      fileInputRef.current?.click()
+                    }}
+                    className="flex size-6 items-center justify-center rounded-full bg-background text-foreground shadow hover:bg-muted"
+                    aria-label="Change photo"
+                  >
+                    <PencilIcon className="size-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPreviewSrc("")
+                      updateField("profileUrl", "")
+                    }}
+                    className="hover:text-destructive-foreground flex size-6 items-center justify-center rounded-full bg-background text-destructive shadow hover:bg-destructive"
+                    aria-label="Remove photo"
+                  >
+                    <TrashIcon className="size-3" />
+                  </button>
+                </div>
+              )}
+              {isUploading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                  <CircleNotchIcon className="size-4 animate-spin" />
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <input
+                value={form.fullName}
+                onChange={(e) => updateField("fullName", e.target.value)}
+                placeholder="Teacher's full name"
+                className="-mx-1 -my-0.5 rounded-md px-1 py-0.5 text-xl font-semibold text-foreground outline-none hover:bg-muted focus:bg-muted"
+              />
+              <SheetTitle className="sr-only">
+                {isEditMode ? "Edit teacher" : "Add teacher"}
+              </SheetTitle>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                <span>
+                  {describeGrades(form.teachableGrades, "No grades yet")}
+                </span>
+                <span>
+                  {form.subjectIds.length > 0
+                    ? `${form.subjectIds.length} ${form.subjectIds.length === 1 ? "subject" : "subjects"}`
+                    : "No subjects yet"}
+                </span>
+                {derivedDepartmentName && <span>{derivedDepartmentName}</span>}
+              </div>
+            </div>
+          </div>
+        </SheetHeader>
+
+        <div className="px-4 sm:px-6">
+          <CurlyDivider id="teacher-curly-header" />
         </div>
-        <SheetTitle className="sr-only">
-          {isEditMode ? "Edit teacher" : "Add teacher"}
-        </SheetTitle>
 
         {/* Body */}
         <div
           ref={bodyScrollRef}
           className="no-scrollbar flex-1 overflow-y-auto"
         >
-          <div className="flex flex-col gap-6 px-4 pb-5 sm:px-6">
-            {/* Hero — avatar, inline-editable name, a stat line derived from
-                what's picked below (department edit drawer, 2026-09-15). */}
-            <div className="flex items-center gap-3.5 pt-2">
-              <div
-                className="group/avatar relative flex size-13 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-muted-foreground/50"
-                onClick={() => !previewSrc && fileInputRef.current?.click()}
-              >
-                {previewSrc ? (
-                  <img
-                    src={previewSrc}
-                    alt="Preview"
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <Avatar className="size-full rounded-2xl">
-                    <AvatarFallback className="rounded-2xl text-base">
-                      {form.fullName ? (
-                        initials(form.fullName)
-                      ) : (
-                        <CameraIcon className="size-5 text-muted-foreground" />
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-                {previewSrc && !isUploading && (
-                  <div className="absolute inset-0 flex items-center justify-center gap-1 bg-background/60 opacity-0 transition-opacity group-hover/avatar:opacity-100 [@media(hover:none)]:opacity-100">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        fileInputRef.current?.click()
-                      }}
-                      className="flex size-6 items-center justify-center rounded-full bg-background text-foreground shadow hover:bg-muted"
-                      aria-label="Change photo"
-                    >
-                      <PencilIcon className="size-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setPreviewSrc("")
-                        updateField("profileUrl", "")
-                      }}
-                      className="hover:text-destructive-foreground flex size-6 items-center justify-center rounded-full bg-background text-destructive shadow hover:bg-destructive"
-                      aria-label="Remove photo"
-                    >
-                      <TrashIcon className="size-3" />
-                    </button>
-                  </div>
-                )}
-                {isUploading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                    <CircleNotchIcon className="size-4 animate-spin" />
-                  </div>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <input
-                  value={form.fullName}
-                  onChange={(e) => updateField("fullName", e.target.value)}
-                  placeholder="Teacher's full name"
-                  className="-mx-1 -my-0.5 rounded-md px-1 py-0.5 text-lg font-semibold text-foreground outline-none hover:bg-muted focus:bg-muted"
-                />
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                  <span>
-                    {form.subjectIds.length > 0
-                      ? `${form.subjectIds.length} ${form.subjectIds.length === 1 ? "subject" : "subjects"}`
-                      : "No subjects yet"}
-                  </span>
-                  <span>
-                    {describeGrades(form.teachableGrades, "No grades yet")}
-                  </span>
-                  {derivedDepartmentName && (
-                    <span>{derivedDepartmentName}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <CurlyDivider id="teacher-curly" />
-
+          <div className="flex flex-col gap-6 px-4 pt-4 pb-5 sm:px-6">
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">
                 Work Email Address <span className="text-destructive">*</span>
@@ -594,14 +608,83 @@ export function AddTeacherDrawer({
               </div>
             </div>
 
+            <div className="flex gap-3">
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label className="text-sm">Designation</Label>
+                <Input
+                  placeholder="e.g. Senior Teacher, Asst. Professor"
+                  value={form.designation}
+                  onChange={(e) => updateField("designation", e.target.value)}
+                />
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label className="text-sm">Date of Joining</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      data-empty={!form.dateOfJoining}
+                      className="w-full justify-start text-left font-normal data-[empty=true]:text-muted-foreground"
+                    >
+                      <CalendarIcon className="size-4" />
+                      {form.dateOfJoining ? (
+                        format(form.dateOfJoining, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={form.dateOfJoining}
+                      onSelect={(d) => updateField("dateOfJoining", d)}
+                      captionLayout="dropdown"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
             {customSection("basic")}
 
-            <Separator />
+            <CurlyDivider id="teacher-curly-professional" />
 
-            {/* Professional Details */}
-            <p className="text-xs font-medium text-muted-foreground">
-              Professional Details
-            </p>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Grade</Label>
+              <p className="text-xs text-muted-foreground">
+                Narrows which subjects can be picked below — pick this first.
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {GRADES.map((g) => {
+                  const on = form.teachableGrades.includes(g)
+                  return (
+                    <button
+                      key={g}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        updateField(
+                          "teachableGrades",
+                          (on
+                            ? form.teachableGrades.filter((x) => x !== g)
+                            : [...form.teachableGrades, g]
+                          ).sort((a, b) => a - b)
+                        )
+                      }
+                      className={cn(
+                        "min-w-8 rounded-md border px-2 py-1 text-xs tabular-nums transition-colors",
+                        on
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {gradeLabel(g)}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
@@ -721,86 +804,11 @@ export function AddTeacherDrawer({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-sm">Grades they can teach</Label>
-              <p className="text-xs text-muted-foreground">
-                A capability, not a live assignment — sections come later, from
-                Classes &amp; Subjects below or the timetable.
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {GRADES.map((g) => {
-                  const on = form.teachableGrades.includes(g)
-                  return (
-                    <button
-                      key={g}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() =>
-                        updateField(
-                          "teachableGrades",
-                          (on
-                            ? form.teachableGrades.filter((x) => x !== g)
-                            : [...form.teachableGrades, g]
-                          ).sort((a, b) => a - b)
-                        )
-                      }
-                      className={cn(
-                        "min-w-8 rounded-md border px-2 py-1 text-xs tabular-nums transition-colors",
-                        on
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {gradeLabel(g)}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <div className="flex flex-1 flex-col gap-1.5">
-                <Label className="text-sm">Designation</Label>
-                <Input
-                  placeholder="e.g. Senior Teacher, Asst. Professor"
-                  value={form.designation}
-                  onChange={(e) => updateField("designation", e.target.value)}
-                />
-              </div>
-              <div className="flex flex-1 flex-col gap-1.5">
-                <Label className="text-sm">Date of Joining</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      data-empty={!form.dateOfJoining}
-                      className="w-full justify-start text-left font-normal data-[empty=true]:text-muted-foreground"
-                    >
-                      <CalendarIcon className="size-4" />
-                      {form.dateOfJoining ? (
-                        format(form.dateOfJoining, "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={form.dateOfJoining}
-                      onSelect={(d) => updateField("dateOfJoining", d)}
-                      captionLayout="dropdown"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
             {customSection("professional")}
 
             {defsForSection(customDefs, "additional").length > 0 && (
               <>
-                <Separator />
+                <CurlyDivider id="teacher-curly-additional" />
                 {/* Additional details — school-defined custom fields (/setup) */}
                 <p className="text-xs font-medium text-muted-foreground">
                   Additional Details
@@ -809,7 +817,7 @@ export function AddTeacherDrawer({
               </>
             )}
 
-            <Separator />
+            <CurlyDivider id="teacher-curly-assignments" />
 
             {/* Classes & Subjects */}
             <p className="text-xs font-medium text-muted-foreground">

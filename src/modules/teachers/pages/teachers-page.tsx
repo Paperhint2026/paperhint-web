@@ -106,6 +106,7 @@ interface Department {
 interface SubjectDetail {
   id: string
   subject_name: string
+  grades: number[]
   departments: { id: string; name: string }[]
 }
 
@@ -220,6 +221,7 @@ export function TeachersPage() {
   const subjectOptions: TeachableSubjectOption[] = subjectDetails.map((s) => ({
     id: s.id,
     subjectName: s.subject_name,
+    grades: s.grades,
     departmentIds: s.departments.map((d) => d.id),
   }))
 
