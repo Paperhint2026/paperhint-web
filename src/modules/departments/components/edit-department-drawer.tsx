@@ -32,6 +32,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { CurlyDivider } from "@/components/shared/curly-divider"
 import { lookFor } from "@/modules/departments/lib/department-look"
 import type {
   Department,
@@ -45,56 +46,6 @@ type View = "main" | "add-subject" | "set-grades" | "add-teacher" | "pick-head"
 function initials(name: string) {
   const parts = name.trim().split(/\s+/)
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
-}
-
-/**
- * A hairline that trails off instead of stopping dead — a beat between the
- * department's own identity and the things it owns. Tiled at a fixed pixel
- * period (`patternUnits="userSpaceOnUse"`, no viewBox scaling) so the wave
- * looks the same at any drawer width instead of stretching or compressing
- * to fit; the fade is a separate opacity mask, not mixed into the stroke
- * color, so the line itself stays one consistent color.
- */
-function CurlyDivider() {
-  return (
-    <svg
-      width="100%"
-      height="12"
-      aria-hidden="true"
-      className="my-1 block text-border"
-    >
-      <defs>
-        <pattern
-          id="dept-curly-wave"
-          width="16"
-          height="12"
-          patternUnits="userSpaceOnUse"
-        >
-          <path
-            d="M0,6 Q4,1.5 8,6 T16,6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </pattern>
-        <linearGradient id="dept-curly-fade" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#fff" stopOpacity="1" />
-          <stop offset="60%" stopColor="#fff" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-        <mask id="dept-curly-mask">
-          <rect width="100%" height="12" fill="url(#dept-curly-fade)" />
-        </mask>
-      </defs>
-      <rect
-        width="100%"
-        height="12"
-        fill="url(#dept-curly-wave)"
-        mask="url(#dept-curly-mask)"
-      />
-    </svg>
-  )
 }
 
 /**
@@ -327,7 +278,7 @@ export function EditDepartmentDrawer({
                 </div>
               </div>
 
-              <CurlyDivider />
+              <CurlyDivider id="dept-curly" />
 
               <div className="flex flex-col gap-1.5 pt-3">
                 <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

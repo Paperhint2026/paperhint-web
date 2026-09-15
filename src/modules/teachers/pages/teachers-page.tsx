@@ -56,6 +56,7 @@ import {
   AddTeacherDrawer,
   type ClassSubjectOption,
   type ExistingAssignment,
+  type TeachableSubjectOption,
   type TeacherFormData,
 } from "@/modules/teachers/components/add-teacher-drawer"
 
@@ -102,6 +103,12 @@ interface Department {
   created_at?: string
 }
 
+interface SubjectDetail {
+  id: string
+  subject_name: string
+  departments: { id: string; name: string }[]
+}
+
 interface ClassItem {
   id: string
   grade: number
@@ -132,6 +139,7 @@ export function TeachersPage() {
   // Form data (only fetched for admins, in background)
   const [departments, setDepartments] = useState<Department[]>([])
   const [classes, setClasses] = useState<ClassItem[]>([])
+  const [subjectDetails, setSubjectDetails] = useState<SubjectDetail[]>([])
   const [isFormDataReady, setIsFormDataReady] = useState(false)
 
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -207,6 +215,14 @@ export function TeachersPage() {
     label: d.name,
   }))
 
+  const departmentNameById = Object.fromEntries(departmentMap)
+
+  const subjectOptions: TeachableSubjectOption[] = subjectDetails.map((s) => ({
+    id: s.id,
+    subjectName: s.subject_name,
+    departmentIds: s.departments.map((d) => d.id),
+  }))
+
   const classOptions = classes.map((c) => ({
     value: c.id,
     label: `Grade ${c.grade} – ${c.section}`,
@@ -231,13 +247,15 @@ export function TeachersPage() {
 
   const fetchFormData = useCallback(async () => {
     try {
-      const [deptRes, classRes] = await Promise.all([
+      const [deptRes, classRes, subjectRes] = await Promise.all([
         apiClient.get<{ departments: Department[] }>(
           "/api/schools/departments"
         ),
         apiClient.get<{ classes: ClassItem[] }>("/api/classes"),
+        apiClient.get<{ subjects: SubjectDetail[] }>("/api/subjects/detail"),
       ])
       setDepartments(deptRes.departments ?? [])
+      setSubjectDetails(subjectRes.subjects ?? [])
       const items = classRes.classes ?? []
       items.sort((a, b) => {
         if (a.grade !== b.grade) return a.grade - b.grade
@@ -294,11 +312,12 @@ export function TeachersPage() {
           full_name: string
           email: string
           profile_url?: string | null
-          department_id?: string | null
           designation?: string | null
           date_of_joining?: number | string | null
           phone_number?: string | null
           custom_fields?: Record<string, string | number> | null
+          teachable_subjects?: { id: string; is_primary: boolean }[]
+          teachable_grades?: number[]
           assignments?: {
             class_subject_id: string
             class: { id: string; grade: number | string; section: string }
@@ -322,11 +341,14 @@ export function TeachersPage() {
         email: t.email || "",
         phone: t.phone_number || "",
         profileUrl: t.profile_url || "",
-        departmentId: t.department_id || "",
         designation: t.designation || "",
         dateOfJoining: t.date_of_joining
           ? new Date(t.date_of_joining)
           : undefined,
+        subjectIds: (t.teachable_subjects ?? []).map((s) => s.id),
+        primarySubjectId:
+          (t.teachable_subjects ?? []).find((s) => s.is_primary)?.id ?? "",
+        teachableGrades: t.teachable_grades ?? [],
         classSubjects: [{ classId: "", classSubjectId: "" }],
         existingAssignments,
         customFields:
@@ -359,26 +381,6 @@ export function TeachersPage() {
     }
   }
 
-  /**
-   * A head is a marker on the department, not a field on the user, so it is a
-   * second call. It never blocks saving the teacher: if it fails the teacher
-   * still exists and the marker can be set on the department's own page.
-   */
-  const markAsHead = async (departmentId: string, teacherId: string) => {
-    try {
-      const r = await apiClient.get<{
-        departments: { id: string; heads: { id: string }[] }[]
-      }>("/api/departments")
-      const dep = r.departments.find((d) => d.id === departmentId)
-      if (!dep || dep.heads.some((h) => h.id === teacherId)) return
-      await apiClient.put(`/api/departments/${departmentId}/heads`, {
-        user_ids: [...dep.heads.map((h) => h.id), teacherId],
-      })
-    } catch (e) {
-      showError(e, "Saved, but could not mark them as head")
-    }
-  }
-
   const handleSaveTeacher = async (data: TeacherFormData) => {
     setIsSaving(true)
     try {
@@ -388,7 +390,6 @@ export function TeachersPage() {
         teacherId = editTeacherId
         await apiClient.put(`/api/auth/teacher/${teacherId}`, {
           full_name: data.fullName,
-          department_id: data.departmentId,
           designation: data.designation || undefined,
           date_of_joining: data.dateOfJoining
             ? dayjs(data.dateOfJoining).valueOf()
@@ -397,10 +398,6 @@ export function TeachersPage() {
           phone_number: data.phone || undefined,
           custom_fields: data.customFields ?? {},
         })
-
-        if (data.isDepartmentHead && data.departmentId && teacherId) {
-          await markAsHead(data.departmentId, teacherId)
-        }
       } else {
         const res = await apiClient.post<{
           message: string
@@ -408,7 +405,6 @@ export function TeachersPage() {
         }>("/api/auth/create-teacher", {
           email: data.email,
           full_name: data.fullName,
-          department_id: data.departmentId,
           designation: data.designation || undefined,
           date_of_joining: data.dateOfJoining
             ? dayjs(data.dateOfJoining).valueOf()
@@ -417,10 +413,6 @@ export function TeachersPage() {
           custom_fields: data.customFields ?? {},
         })
         teacherId = res.teacher.id
-
-        if (data.isDepartmentHead && data.departmentId) {
-          await markAsHead(data.departmentId, teacherId)
-        }
 
         if (data.pendingProfileFile) {
           try {
@@ -444,6 +436,16 @@ export function TeachersPage() {
           }
         }
       }
+
+      // What they can teach, mandatory — the department is derived
+      // server-side from whichever subject is primary.
+      await apiClient.put(`/api/auth/teacher/${teacherId}/subjects`, {
+        subject_ids: data.subjectIds,
+        primary_subject_id: data.primarySubjectId,
+      })
+      await apiClient.put(`/api/auth/teacher/${teacherId}/grades`, {
+        grades: data.teachableGrades,
+      })
 
       const newAssignments = data.classSubjects.filter(
         (entry) => entry.classId && entry.classSubjectId
@@ -736,7 +738,8 @@ export function TeachersPage() {
           onSave={handleSaveTeacher}
           onDisassociate={handleDisassociate}
           teacherId={editTeacherId}
-          departments={departmentOptions}
+          subjects={subjectOptions}
+          departmentNameById={departmentNameById}
           classes={classOptions}
           fetchSubjectsForClass={fetchSubjectsForClass}
           isSaving={isSaving}

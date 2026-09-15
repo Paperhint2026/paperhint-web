@@ -1,23 +1,25 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
   CalendarIcon,
   CameraIcon,
+  CaretRightIcon,
   CircleNotchIcon,
   LinkIcon,
   EnvelopeIcon,
+  MagnifyingGlassIcon,
   PencilIcon,
   PhoneIcon,
   PlusIcon,
+  StarIcon,
   TrashIcon,
   XIcon,
 } from "@phosphor-icons/react"
 import { format } from "date-fns"
 import { toast } from "sonner"
 
-import { showError } from "@/lib/show-error"
-
-import { apiClient } from "@/lib/api-client"
+import { describeGrades, GRADES, gradeLabel } from "@/lib/grades"
+import { cn } from "@/lib/utils"
 import {
   CustomFieldsInputs,
   defsForSection,
@@ -40,18 +42,17 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
   Sheet,
   SheetClose,
   SheetContent,
-  SheetDescription,
   SheetFooter,
-  SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Checkbox } from "@/components/ui/checkbox"
+import { CurlyDivider } from "@/components/shared/curly-divider"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -85,16 +86,29 @@ export interface ExistingAssignment {
   subjectName: string
 }
 
+/** A subject this teacher could teach, and the department(s) it belongs to
+ * — a subject can legitimately have more than one (docs/truth.md). */
+export interface TeachableSubjectOption {
+  id: string
+  subjectName: string
+  departmentIds: string[]
+}
+
 export interface TeacherFormData {
   fullName: string
   email: string
   phone: string
   profileUrl: string
-  departmentId: string
-  /** Mark this person as a head of the department they are joining. */
-  isDepartmentHead?: boolean
   designation: string
   dateOfJoining: Date | undefined
+  /** What this teacher can teach — mandatory, independent of the live
+   * class_subjects rows below. The department is derived server-side from
+   * whichever of these is primary. */
+  subjectIds: string[]
+  primarySubjectId: string
+  /** Grades this teacher can teach — a capability, not a timetable slot;
+   * sections come later, from Classes & Subjects or the timetable itself. */
+  teachableGrades: number[]
   classSubjects: ClassSubjectEntry[]
   existingAssignments: ExistingAssignment[]
   pendingProfileFile?: File
@@ -107,7 +121,8 @@ export interface AddTeacherDrawerProps {
   onSave: (data: TeacherFormData) => void
   onDisassociate?: (teacherId: string, classSubjectId: string) => Promise<void>
   teacherId?: string | null
-  departments: { value: string; label: string }[]
+  subjects: TeachableSubjectOption[]
+  departmentNameById: Record<string, string>
   classes: { value: string; label: string }[]
   fetchSubjectsForClass: (classId: string) => Promise<ClassSubjectOption[]>
   isSaving?: boolean
@@ -119,13 +134,19 @@ const emptyForm: TeacherFormData = {
   email: "",
   phone: "",
   profileUrl: "",
-  departmentId: "",
-  isDepartmentHead: false,
   designation: "",
   dateOfJoining: undefined,
+  subjectIds: [],
+  primarySubjectId: "",
+  teachableGrades: [],
   classSubjects: [{ classId: "", classSubjectId: "" }],
   existingAssignments: [],
   customFields: {},
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
 }
 
 export function AddTeacherDrawer({
@@ -134,7 +155,8 @@ export function AddTeacherDrawer({
   onSave,
   onDisassociate,
   teacherId,
-  departments,
+  subjects,
+  departmentNameById,
   classes,
   fetchSubjectsForClass,
   isSaving = false,
@@ -156,50 +178,8 @@ export function AddTeacherDrawer({
   const [confirmDisassociate, setConfirmDisassociate] =
     useState<ExistingAssignment | null>(null)
   const [isDisassociating, setIsDisassociating] = useState(false)
-
-  // Inline department creation — for staff outside the seeded academic
-  // departments (Physical Education, Art, Music…). Created rows are appended
-  // locally and selected immediately; the server dedupes by name.
-  const [extraDepartments, setExtraDepartments] = useState<
-    { value: string; label: string }[]
-  >([])
-  const [creatingDept, setCreatingDept] = useState(false)
-  const [newDeptName, setNewDeptName] = useState("")
-  const [isSavingDept, setIsSavingDept] = useState(false)
-  const allDepartments = [
-    ...departments,
-    ...extraDepartments.filter(
-      (x) => !departments.some((d) => d.value === x.value)
-    ),
-  ]
-
-  const createDepartment = async () => {
-    const name = newDeptName.trim()
-    if (!name) return
-    setIsSavingDept(true)
-    try {
-      const res = await apiClient.post<{
-        department: { id: string; name: string }
-        existed: boolean
-      }>("/api/schools/departments", { name })
-      const dep = { value: res.department.id, label: res.department.name }
-      setExtraDepartments((prev) =>
-        prev.some((x) => x.value === dep.value) ? prev : [...prev, dep]
-      )
-      setForm((prev) => ({ ...prev, departmentId: dep.value }))
-      setCreatingDept(false)
-      setNewDeptName("")
-      toast.success(
-        res.existed
-          ? `"${res.department.name}" already existed — selected it`
-          : `Department "${res.department.name}" created`
-      )
-    } catch (err) {
-      showError(err)
-    } finally {
-      setIsSavingDept(false)
-    }
-  }
+  const [subjectPickerOpen, setSubjectPickerOpen] = useState(false)
+  const [subjectQuery, setSubjectQuery] = useState("")
 
   useEffect(() => {
     if (open && editData) {
@@ -252,6 +232,55 @@ export function AddTeacherDrawer({
   ) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  const subjectById = useMemo(
+    () => new Map(subjects.map((s) => [s.id, s])),
+    [subjects]
+  )
+
+  const addSubject = (subjectId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      subjectIds: [...prev.subjectIds, subjectId],
+      // The first subject picked defaults to primary; picking more doesn't
+      // change it until the admin explicitly sets a different one.
+      primarySubjectId: prev.primarySubjectId || subjectId,
+    }))
+    setSubjectPickerOpen(false)
+    setSubjectQuery("")
+  }
+
+  const removeSubject = (subjectId: string) => {
+    setForm((prev) => {
+      const subjectIds = prev.subjectIds.filter((id) => id !== subjectId)
+      return {
+        ...prev,
+        subjectIds,
+        primarySubjectId:
+          prev.primarySubjectId === subjectId
+            ? (subjectIds[0] ?? "")
+            : prev.primarySubjectId,
+      }
+    })
+  }
+
+  // One of many possible departments when the primary subject itself
+  // belongs to several — same "first wins" rule the server applies.
+  const derivedDepartmentName = (() => {
+    const primary = subjectById.get(form.primarySubjectId)
+    const deptId = primary?.departmentIds[0]
+    return deptId ? (departmentNameById[deptId] ?? null) : null
+  })()
+
+  const availableSubjects = subjects
+    .filter((s) => !form.subjectIds.includes(s.id))
+    .filter((s) =>
+      subjectQuery.trim()
+        ? s.subjectName
+            .toLowerCase()
+            .includes(subjectQuery.trim().toLowerCase())
+        : true
+    )
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -364,7 +393,8 @@ export function AddTeacherDrawer({
   const isFormValid =
     form.fullName.trim() !== "" &&
     form.email.trim() !== "" &&
-    form.departmentId !== ""
+    form.subjectIds.length > 0 &&
+    form.primarySubjectId !== ""
 
   // Hand the form to the parent as-is. The parent owns the API call: on
   // success it closes the drawer; on failure it toasts and leaves the drawer
@@ -399,44 +429,34 @@ export function AddTeacherDrawer({
         className="flex h-full w-full flex-col p-0"
       >
         {/* Header */}
-        <SheetHeader className="border-b bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <SheetTitle className="text-base font-medium text-secondary-foreground">
-                {isEditMode ? "Edit Teacher" : "Add New Teacher"}
-              </SheetTitle>
-              <SheetDescription>
-                {isEditMode
-                  ? "Update the teacher's details."
-                  : "Fill in the details to add a new teacher."}
-              </SheetDescription>
-            </div>
-            <SheetClose asChild>
-              <button
-                className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Close"
-              >
-                <XIcon className="size-5" />
-              </button>
-            </SheetClose>
-          </div>
-        </SheetHeader>
+        <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-3 sm:px-6">
+          <span className="text-xs font-medium text-muted-foreground">
+            {isEditMode ? "Edit teacher" : "Add teacher"}
+          </span>
+          <SheetClose asChild>
+            <button
+              className="shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Close"
+            >
+              <XIcon className="size-5" />
+            </button>
+          </SheetClose>
+        </div>
+        <SheetTitle className="sr-only">
+          {isEditMode ? "Edit teacher" : "Add teacher"}
+        </SheetTitle>
 
         {/* Body */}
         <div
           ref={bodyScrollRef}
           className="no-scrollbar flex-1 overflow-y-auto"
         >
-          <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
-            {/* Basic Info */}
-            <p className="text-xs font-medium text-muted-foreground">
-              Basic Info
-            </p>
-
-            {/* Avatar + Full Name */}
-            <div className="flex items-end gap-4">
+          <div className="flex flex-col gap-6 px-4 pb-5 sm:px-6">
+            {/* Hero — avatar, inline-editable name, a stat line derived from
+                what's picked below (department edit drawer, 2026-09-15). */}
+            <div className="flex items-center gap-3.5 pt-2">
               <div
-                className="group/avatar relative flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-muted-foreground/50"
+                className="group/avatar relative flex size-13 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-muted transition-colors hover:border-muted-foreground/50"
                 onClick={() => !previewSrc && fileInputRef.current?.click()}
               >
                 {previewSrc ? (
@@ -446,7 +466,15 @@ export function AddTeacherDrawer({
                     className="size-full object-cover"
                   />
                 ) : (
-                  <CameraIcon className="size-5 text-muted-foreground" />
+                  <Avatar className="size-full rounded-2xl">
+                    <AvatarFallback className="rounded-2xl text-base">
+                      {form.fullName ? (
+                        initials(form.fullName)
+                      ) : (
+                        <CameraIcon className="size-5 text-muted-foreground" />
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
                 )}
                 {previewSrc && !isUploading && (
                   <div className="absolute inset-0 flex items-center justify-center gap-1 bg-background/60 opacity-0 transition-opacity group-hover/avatar:opacity-100 [@media(hover:none)]:opacity-100">
@@ -488,18 +516,30 @@ export function AddTeacherDrawer({
                 className="hidden"
                 onChange={handleFileChange}
               />
-              <div className="flex flex-1 flex-col gap-1.5">
-                <Label className="text-sm">
-                  Teacher&apos;s Full Name{" "}
-                  <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  placeholder="e.g. Sarah Johnson"
+              <div className="flex min-w-0 flex-1 flex-col">
+                <input
                   value={form.fullName}
                   onChange={(e) => updateField("fullName", e.target.value)}
+                  placeholder="Teacher's full name"
+                  className="-mx-1 -my-0.5 rounded-md px-1 py-0.5 text-lg font-semibold text-foreground outline-none hover:bg-muted focus:bg-muted"
                 />
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span>
+                    {form.subjectIds.length > 0
+                      ? `${form.subjectIds.length} ${form.subjectIds.length === 1 ? "subject" : "subjects"}`
+                      : "No subjects yet"}
+                  </span>
+                  <span>
+                    {describeGrades(form.teachableGrades, "No grades yet")}
+                  </span>
+                  {derivedDepartmentName && (
+                    <span>{derivedDepartmentName}</span>
+                  )}
+                </div>
               </div>
             </div>
+
+            <CurlyDivider id="teacher-curly" />
 
             <div className="flex flex-col gap-1.5">
               <Label className="text-sm">
@@ -547,87 +587,158 @@ export function AddTeacherDrawer({
             </p>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-sm">
-                Department <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={form.departmentId}
-                onValueChange={(v) => {
-                  if (v === "__create__") {
-                    setCreatingDept(true)
-                    return
-                  }
-                  updateField("departmentId", v)
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allDepartments.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                  <SelectItem
-                    value="__create__"
-                    className="font-medium text-primary"
-                  >
-                    ＋ New department…
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {creatingDept && (
-                <div className="flex items-center gap-2 pt-1">
-                  <Input
-                    autoFocus
-                    value={newDeptName}
-                    onChange={(e) => setNewDeptName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault()
-                        createDepartment()
-                      }
-                    }}
-                    placeholder="e.g. Physical Education, Art, Music"
-                    className="h-8 flex-1 text-xs"
-                  />
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={createDepartment}
-                    disabled={isSavingDept || !newDeptName.trim()}
-                  >
-                    {isSavingDept ? (
-                      <CircleNotchIcon className="size-3.5 animate-spin" />
-                    ) : (
-                      "Add"
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => {
-                      setCreatingDept(false)
-                      setNewDeptName("")
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  {form.departmentId && !creatingDept && (
-                    <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs text-muted-foreground">
-                      <Checkbox
-                        checked={!!form.isDepartmentHead}
-                        onCheckedChange={(v) =>
-                          updateField("isDepartmentHead", v === true)
-                        }
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">
+                  Subjects they can teach{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                {derivedDepartmentName && (
+                  <span className="text-xs text-muted-foreground">
+                    Maps to {derivedDepartmentName}
+                  </span>
+                )}
+              </div>
+              <div className="overflow-hidden rounded-lg border border-border">
+                {form.subjectIds.length === 0 ? (
+                  <p className="p-3 text-xs text-muted-foreground">
+                    Pick at least one subject.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {form.subjectIds.map((sid) => {
+                      const s = subjectById.get(sid)
+                      const isPrimary = sid === form.primarySubjectId
+                      return (
+                        <li
+                          key={sid}
+                          className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                        >
+                          <span className="flex min-w-0 items-center gap-1.5 truncate text-foreground">
+                            {s?.subjectName ?? sid}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateField("primarySubjectId", sid)
+                              }
+                              disabled={isPrimary}
+                              className={cn(
+                                "flex items-center gap-1 text-xs",
+                                isPrimary
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <StarIcon
+                                weight={isPrimary ? "fill" : "regular"}
+                                className="size-3.5"
+                              />
+                              {isPrimary ? "Primary" : "Set primary"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeSubject(sid)}
+                              className="text-xs text-muted-foreground hover:text-destructive"
+                            >
+                              Remove
+                            </button>
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+                <Popover
+                  open={subjectPickerOpen}
+                  onOpenChange={(v) => {
+                    setSubjectPickerOpen(v)
+                    if (!v) setSubjectQuery("")
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 border-t border-border px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <PlusIcon className="size-3.5" />
+                        Add a subject
+                      </span>
+                      <CaretRightIcon className="size-3.5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-72 p-0">
+                    <div className="relative border-b border-border p-2">
+                      <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-4.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        autoFocus
+                        value={subjectQuery}
+                        onChange={(e) => setSubjectQuery(e.target.value)}
+                        placeholder="Search subjects"
+                        className="h-8 pl-8 text-sm"
                       />
-                      Head of this department
-                    </label>
-                  )}
-                </div>
-              )}
+                    </div>
+                    <div className="max-h-64 overflow-y-auto p-1">
+                      {availableSubjects.length === 0 ? (
+                        <p className="px-2 py-3 text-xs text-muted-foreground">
+                          {subjects.length === form.subjectIds.length
+                            ? "Every subject is already picked."
+                            : "No match."}
+                        </p>
+                      ) : (
+                        availableSubjects.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => addSubject(s.id)}
+                            className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                          >
+                            {s.subjectName}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm">Grades they can teach</Label>
+              <p className="text-xs text-muted-foreground">
+                A capability, not a live assignment — sections come later, from
+                Classes &amp; Subjects below or the timetable.
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {GRADES.map((g) => {
+                  const on = form.teachableGrades.includes(g)
+                  return (
+                    <button
+                      key={g}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        updateField(
+                          "teachableGrades",
+                          (on
+                            ? form.teachableGrades.filter((x) => x !== g)
+                            : [...form.teachableGrades, g]
+                          ).sort((a, b) => a - b)
+                        )
+                      }
+                      className={cn(
+                        "min-w-8 rounded-md border px-2 py-1 text-xs tabular-nums transition-colors",
+                        on
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {gradeLabel(g)}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="flex gap-3">

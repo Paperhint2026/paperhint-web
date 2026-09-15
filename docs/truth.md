@@ -477,3 +477,39 @@ subjects paste-list flow. One shared import component, not one per module.
   `pendingSubject` is in flight, and an `AlertDialog` ("Discard Accounting?
   ... Closing now won't add it") requires an explicit choice — "Keep
   editing" or "Discard" — before the drawer actually closes.
+
+## Teacher capability: subjects and grades, department auto-derived (2026-09-15, founder)
+
+- A teacher's "what can they teach" is now a real, standalone capability —
+  `teacher_subjects` (with one `is_primary` per teacher, enforced by a
+  partial unique index) and `teacher_grades`
+  (`paperhint-service/migrations/034_teacher_subjects_grades.sql`) —
+  independent of `class_subjects`/`teacher_assignments`, which stay the
+  live, per-section timetable rows they always were. Founder: "grades...
+  will be associated in timetable selection for the respective section
+  later, so we keep it as [a] multi-select" capability, not a live slot.
+- **Subjects are mandatory, multi-select; one is primary.** The department
+  Select on the teacher form is gone — `PUT /auth/teacher/:id/subjects`
+  derives `users.department_id` server-side from the primary subject's
+  department every time it's called. Confirmed: since a subject can belong
+  to more than one department, when the primary subject itself has
+  several, **the first by `created_at` wins, automatically, no manual
+  tie-break UI** (founder's explicit choice among three options offered).
+- **The "mark as head while adding a teacher" checkbox is gone.**
+  `markAsHead()` in `teachers-page.tsx` called `PUT
+  /departments/:id/heads` with an appended array (`[...heads, teacherId]`)
+  — the OLD multi-head semantics from before the "one HOD" decision
+  earlier this session. Rather than patch it to fit the new single-head
+  model for one checkbox, it was dropped: marking a head now happens only
+  from the department's own HeadTag/edit-drawer, which already do this
+  correctly.
+- **Visual pass applied here too**: the same hero (avatar, inline-editable
+  name, a stat line) and `CurlyDivider` from the department edit drawer
+  now open the teacher form, replacing the old "Basic Info" labeled-section
+  header — extracted `CurlyDivider` to `src/components/shared/
+  curly-divider.tsx` since it's now used in two places.
+- **Not yet live**: migration 034 is written but NOT applied to
+  production — this environment has no local Postgres to pre-validate it
+  the way `migrations/README.md` prescribes, and there is no staging
+  database, so it needs the founder's own go-ahead before running. Until
+  it runs, `PUT /auth/teacher/:id/subjects` and `.../grades` will 500.
