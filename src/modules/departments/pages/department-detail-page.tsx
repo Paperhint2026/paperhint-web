@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import {
   ArrowLeftIcon,
   CaretDownIcon,
   CaretRightIcon,
+  CheckIcon,
+  CrownSimpleIcon,
   PencilIcon,
   PlusIcon,
-  StackIcon,
   TrashIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react"
@@ -56,8 +56,6 @@ export function DepartmentDetailPage() {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
-  const [tab, setTab] = useState<"teachers" | "subjects">("teachers")
-  const reduceMotion = useReducedMotion()
 
   const load = useCallback(async () => {
     try {
@@ -145,7 +143,7 @@ export function DepartmentDetailPage() {
       })
     )
   }
-  // A teacher's allotment, edited from the department's own Teachers tab —
+  // A teacher's allotment, edited from the department's own teachers widget —
   // the same rows the teacher's own form writes, reached by the other door.
   const patchTeacher = (tid: string, fn: (t: Teacher) => Teacher) =>
     setTeachers((prev) => prev.map((t) => (t.id === tid ? fn(t) : t)))
@@ -185,6 +183,41 @@ export function DepartmentDetailPage() {
   const setTeacherGrades = (t: Teacher, grades: number[]) => {
     patchTeacher(t.id, (x) => ({ ...x, teachable_grades: grades }))
     send(() => apiClient.put(`/api/auth/teacher/${t.id}/grades`, { grades }))
+  }
+
+  /**
+   * Put existing teachers in this department. When it owns exactly one
+   * subject there is nothing to choose, so they get it as their primary —
+   * which is itself what files them here. Otherwise set the department
+   * directly and let each row say which of its subjects they take.
+   */
+  const addTeachers = (picked: Teacher[]) => {
+    if (!picked.length || !dept) return
+    const only = dept.subjects.length === 1 ? dept.subjects[0] : null
+    for (const t of picked) {
+      patchTeacher(t.id, (x) => ({
+        ...x,
+        department_id: id,
+        teachable_subjects: only
+          ? [{ ...only, is_primary: true }]
+          : (x.teachable_subjects ?? []),
+      }))
+    }
+    send(async () => {
+      for (const t of picked) {
+        if (only) {
+          await apiClient.put(`/api/auth/teacher/${t.id}/subjects`, {
+            subject_ids: [only.id],
+            primary_subject_id: only.id,
+          })
+        } else {
+          await apiClient.put(`/api/auth/teacher/${t.id}`, {
+            department_id: id,
+          })
+        }
+      }
+      return load()
+    })
   }
 
   const remove = async () => {
@@ -322,12 +355,13 @@ export function DepartmentDetailPage() {
               {!isGeneral && (
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
+                  aria-label={`Delete ${dept.name}`}
                   onClick={remove}
                   disabled={busy === "del" || blocked}
+                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 >
                   <TrashIcon className="size-4" />
-                  Delete
                 </Button>
               )}
             </div>
@@ -340,264 +374,107 @@ export function DepartmentDetailPage() {
         )}
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3 border-b border-border">
-          <div className="flex items-center gap-1">
-            {(
-              [
-                {
-                  key: "teachers",
-                  label: "Teachers",
-                  icon: UsersThreeIcon,
-                  count: members.length,
-                },
-                {
-                  key: "subjects",
-                  label: "Subjects",
-                  icon: StackIcon,
-                  count: dept.subjects.length,
-                },
-              ] as const
-            ).map((t) => {
-              const on = tab === t.key
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "relative flex items-center gap-1.5 px-3 py-2.5 text-sm transition-colors outline-none focus-visible:text-foreground",
-                    on
-                      ? "font-medium text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <t.icon className="size-4" />
-                  {t.label}
-                  <span
-                    className={cn(
-                      "text-xs tabular-nums",
-                      on ? "text-foreground/70" : "text-muted-foreground"
-                    )}
-                  >
-                    {t.count}
-                  </span>
-                  {on && (
-                    <motion.span
-                      layoutId="department-tab"
-                      transition={
-                        reduceMotion
-                          ? { duration: 0 }
-                          : {
-                              type: "spring",
-                              stiffness: 480,
-                              damping: 40,
-                              mass: 0.8,
-                            }
-                      }
-                      className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-foreground"
-                    />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-          {/* Only the subject catalog is worth leaving for — a teacher is in
-              this department because of the subject they were given, so there
-              is nothing to "manage" elsewhere. */}
-          {tab === "subjects" && (
-            <Link
-              to="/subjects"
-              className="shrink-0 pr-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              All subjects →
-            </Link>
+      {/* What the department is, in brief. Changed only from Edit — this
+          is the record's summary, not a second place to edit it. */}
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
+        <SummaryRow label="Subjects">
+          {dept.subjects.length === 0 ? (
+            <span className="text-sm text-muted-foreground">
+              None yet — add them from Edit
+            </span>
+          ) : (
+            dept.subjects.map((s) => (
+              <span
+                key={s.id}
+                className="rounded-full bg-muted px-2.5 py-1 text-xs text-foreground"
+              >
+                {s.subject_name}
+              </span>
+            ))
+          )}
+        </SummaryRow>
+        <SummaryRow label="Grades">
+          {dept.grades.length === 0 ? (
+            <span className="text-sm text-muted-foreground">
+              Follows the grades its subjects run in
+            </span>
+          ) : (
+            dept.grades.map((g) => (
+              <span
+                key={g}
+                className="min-w-7 rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-center text-xs text-foreground tabular-nums"
+              >
+                {gradeLabel(g)}
+              </span>
+            ))
+          )}
+        </SummaryRow>
+      </div>
+
+      <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-foreground">Teachers</h2>
+          {isAdmin && (
+            <AddTeachers
+              candidates={teachers.filter((t) => t.department_id !== id)}
+              departmentNameById={departmentNameById}
+              onAdd={addTeachers}
+            />
           )}
         </div>
-
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: reduceMotion ? 0 : 0.18 }}
-          >
-            {tab === "teachers" ? (
-              <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
-                {members.length === 0 ? (
-                  <EmptyNote
-                    icon={UsersThreeIcon}
-                    title="No teachers here yet"
-                    hint="Add one from Edit, or a teacher can join from their own profile."
-                    action={
-                      isAdmin ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditOpen(true)}
-                        >
-                          <PencilIcon className="size-3.5" />
-                          Edit
-                        </Button>
-                      ) : (
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to="/teachers">Open Teachers</Link>
-                        </Button>
-                      )
-                    }
-                  />
-                ) : (
-                  <ul className="-mr-2 flex max-h-[32rem] flex-col divide-y divide-border overflow-y-auto pr-2">
-                    {members.map((t) => {
-                      const isHead = dept.heads.some((h) => h.id === t.id)
-                      return (
-                        <li
-                          key={t.id}
-                          className="flex flex-col gap-2 py-3 @2xl:flex-row @2xl:items-start @2xl:gap-6"
-                        >
-                          <div className="flex min-w-0 items-center gap-2 @2xl:w-56 @2xl:shrink-0">
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm text-foreground">
-                                {t.full_name}
-                              </span>
-                              {t.designation && (
-                                <span className="block truncate text-xs text-muted-foreground">
-                                  {t.designation}
-                                </span>
-                              )}
-                            </span>
-                            {isHead && (
-                              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
-                                Head
-                              </span>
-                            )}
-                          </div>
-                          {isAdmin && (
-                            <div className="min-w-0 flex-1">
-                              <TeacherAllotment
-                                teacher={t}
-                                departmentSubjects={dept.subjects}
-                                deptId={id}
-                                departmentIdBySubject={departmentIdBySubject}
-                                departmentNameById={departmentNameById}
-                                onSetSubjects={(sids, pid) =>
-                                  setTeacherSubjects(t, sids, pid)
-                                }
-                                onSetGrades={(g) => setTeacherGrades(t, g)}
-                              />
-                            </div>
-                          )}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </section>
-            ) : (
-              <section className="flex flex-col gap-4 rounded-xl border border-border bg-background p-5">
-                <div className="flex items-center justify-end gap-3">
-                  <Link
-                    to="/subjects"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    All subjects →
-                  </Link>
-                </div>
-                {dept.subjects.length === 0 ? (
-                  <EmptyNote
-                    icon={StackIcon}
-                    title="No subjects yet"
-                    hint="Fine for a Library or Physical Education department; otherwise add one below."
-                  />
-                ) : (
-                  <ul className="-mr-2 flex max-h-72 flex-col divide-y divide-border overflow-y-auto pr-2">
-                    {dept.subjects.map((s) => (
-                      <li
-                        key={s.id}
-                        className="flex items-center justify-between gap-3 py-2"
-                      >
-                        <span className="truncate text-sm text-foreground">
-                          {s.subject_name}
-                        </span>
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => toggleSubject(s)}
-                            className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {isAdmin && (
-                  <div className="flex">
-                    <Picker
-                      label="Add subject"
-                      empty="Every subject is already here."
-                      options={subjects
-                        .filter(
-                          (x) => !dept.subjects.some((y) => y.id === x.id)
-                        )
-                        .map((x) => ({ id: x.id, label: x.subject_name }))}
-                      onPick={(sid) => {
-                        const s = subjects.find((x) => x.id === sid)
-                        if (s) toggleSubject(s)
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-2 border-t border-border pt-4">
-                  <h3 className="text-xs font-medium text-muted-foreground">
-                    Grades it serves
-                  </h3>
-                  {dept.subjects.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      Grades follow the subjects a department owns.
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-sm text-foreground">
-                        {dept.grades.length === 0
-                          ? "Its subjects are not placed in any grade yet"
-                          : describeGrades(dept.grades, "")}
-                      </p>
-                      {dept.grades.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {dept.grades.map((g) => (
-                            <span
-                              key={g}
-                              className="min-w-8 rounded-md border border-border bg-muted/50 px-2 py-1 text-center text-xs text-foreground tabular-nums"
-                            >
-                              {gradeLabel(g)}
-                            </span>
-                          ))}
-                        </div>
+        {members.length === 0 ? (
+          <EmptyNote
+            icon={UsersThreeIcon}
+            title="No teachers here yet"
+            hint="Add one above, or give a teacher one of this department's subjects from their own profile."
+          />
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {members.map((t) => {
+              const isHead = dept.heads.some((h) => h.id === t.id)
+              return (
+                <li
+                  key={t.id}
+                  className="flex flex-col gap-2 py-3 @2xl:flex-row @2xl:items-start @2xl:gap-6"
+                >
+                  <div className="min-w-0 @2xl:w-56 @2xl:shrink-0">
+                    <span className="flex items-center gap-1.5 text-sm text-foreground">
+                      <span className="truncate">{t.full_name}</span>
+                      {isHead && (
+                        <CrownSimpleIcon
+                          weight="fill"
+                          aria-label="Head of department"
+                          className="size-3.5 shrink-0 text-amber-500"
+                        />
                       )}
-                      <p className="text-xs text-muted-foreground">
-                        Read from the subjects it owns.{" "}
-                        <Link
-                          to="/subjects"
-                          className="underline underline-offset-2 hover:text-foreground"
-                        >
-                          Change a subject&apos;s grades
-                        </Link>
-                        .
-                      </p>
-                    </>
+                    </span>
+                    {t.designation && (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {t.designation}
+                      </span>
+                    )}
+                  </div>
+                  {isAdmin && (
+                    <div className="min-w-0 flex-1">
+                      <TeacherAllotment
+                        teacher={t}
+                        departmentSubjects={dept.subjects}
+                        deptId={id}
+                        departmentIdBySubject={departmentIdBySubject}
+                        departmentNameById={departmentNameById}
+                        onSetSubjects={(sids, pid) =>
+                          setTeacherSubjects(t, sids, pid)
+                        }
+                        onSetGrades={(g) => setTeacherGrades(t, g)}
+                      />
+                    </div>
                   )}
-                </div>
-              </section>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
       <EditDepartmentDrawer
         open={editOpen}
@@ -611,6 +488,140 @@ export function DepartmentDetailPage() {
         onChanged={load}
       />
     </div>
+  )
+}
+
+function SummaryRow({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="w-16 shrink-0 text-xs text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * Put existing teachers in this department. Search, tick several, add them
+ * in one go (founder, 2026-09-15: "a teacher look up opens up for me to
+ * search and multi select and add them here"). A teacher who already sits
+ * somewhere else says so, so moving them is never a surprise.
+ */
+function AddTeachers({
+  candidates,
+  departmentNameById,
+  onAdd,
+}: {
+  candidates: Teacher[]
+  departmentNameById: Record<string, string>
+  onAdd: (picked: Teacher[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const [picked, setPicked] = useState<string[]>([])
+  const q = query.trim().toLowerCase()
+  const shown = q
+    ? candidates.filter((t) => t.full_name.toLowerCase().includes(q))
+    : candidates
+
+  const close = () => {
+    setOpen(false)
+    setQuery("")
+    setPicked([])
+  }
+
+  return (
+    <Popover open={open} onOpenChange={(v) => (v ? setOpen(true) : close())}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm">
+          <PlusIcon className="size-4" />
+          Add a teacher
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        collisionPadding={16}
+        className="w-80 max-w-[calc(100vw-2rem)] p-0"
+      >
+        <div className="border-b border-border p-2">
+          <Input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search teachers"
+            className="h-8 text-sm"
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto p-1">
+          {shown.length === 0 ? (
+            <p className="px-2 py-3 text-xs text-muted-foreground">
+              {candidates.length === 0
+                ? "Every teacher is already here."
+                : "No match."}
+            </p>
+          ) : (
+            shown.map((t) => {
+              const on = picked.includes(t.id)
+              const from = t.department_id
+                ? departmentNameById[t.department_id]
+                : null
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    setPicked((prev) =>
+                      on ? prev.filter((x) => x !== t.id) : [...prev, t.id]
+                    )
+                  }
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                >
+                  <span
+                    className={cn(
+                      "grid size-4 shrink-0 place-items-center rounded border",
+                      on
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border"
+                    )}
+                  >
+                    {on && <CheckIcon className="size-3" weight="bold" />}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{t.full_name}</span>
+                  {from && (
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      in {from}
+                    </span>
+                  )}
+                </button>
+              )
+            })
+          )}
+        </div>
+        <div className="border-t border-border p-2">
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={picked.length === 0}
+            onClick={() => {
+              onAdd(candidates.filter((t) => picked.includes(t.id)))
+              close()
+            }}
+          >
+            {picked.length > 1
+              ? `Add ${picked.length} teachers`
+              : "Add teacher"}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -659,6 +670,12 @@ function HeadTag({
           </Avatar>
         )}
         {label}
+        {head && (
+          <CrownSimpleIcon
+            weight="fill"
+            className="size-3 shrink-0 text-amber-500"
+          />
+        )}
       </span>
     )
   }
@@ -689,6 +706,12 @@ function HeadTag({
             </Avatar>
           )}
           {label}
+          {head && (
+            <CrownSimpleIcon
+              weight="fill"
+              className="size-3 shrink-0 text-amber-500"
+            />
+          )}
           <CaretDownIcon className="size-3" />
         </button>
       </PopoverTrigger>
@@ -765,82 +788,6 @@ function HeadTag({
                 {t.designation && (
                   <span className="shrink-0 text-[11px] text-muted-foreground">
                     {t.designation}
-                  </span>
-                )}
-              </button>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-/** Selection lives outside; this offers only the rest, searchable. */
-function Picker({
-  label,
-  options,
-  onPick,
-  empty,
-}: {
-  label: string
-  options: { id: string; label: string; note?: string }[]
-  onPick: (id: string) => void
-  empty: string
-}) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState("")
-  const q = query.trim().toLowerCase()
-  const shown = q
-    ? options.filter((o) => o.label.toLowerCase().includes(q))
-    : options
-
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v)
-        if (!v) setQuery("")
-      }}
-    >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <PlusIcon className="size-3" />
-          {label}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-0">
-        <div className="border-b border-border p-2">
-          <Input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search"
-            className="h-8 text-sm"
-          />
-        </div>
-        <div className="max-h-64 overflow-y-auto p-1">
-          {shown.length === 0 ? (
-            <p className="px-2 py-3 text-xs text-muted-foreground">{empty}</p>
-          ) : (
-            shown.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => {
-                  onPick(o.id)
-                  setOpen(false)
-                  setQuery("")
-                }}
-                className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-              >
-                <span className="truncate">{o.label}</span>
-                {o.note && (
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {o.note}
                   </span>
                 )}
               </button>
