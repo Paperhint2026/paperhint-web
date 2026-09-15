@@ -636,3 +636,91 @@ subjects paste-list flow. One shared import component, not one per module.
   EXISTS` throughout, safe to re-run. Blocks `PUT
   /auth/teacher/:id/subjects` and `.../grades` until applied — update
   `migrations/README.md`'s row 034 to applied once confirmed.
+
+## THE BUCKET MODEL (2026-09-15, founder) — read this before touching departments, teachers or subjects
+
+The founder's own framing of the school's topography, given to close a
+"fundamental clarity gap". Everything below follows from it.
+
+**Large buckets** hold things. **Small buckets** are the things held, and
+they are *shared* between the large ones — that sharing is the touchpoint
+where two modules meet.
+
+| | **Department** (large) | **Grade / Class** (large) |
+|---|---|---|
+| holds **subjects** | `department_subjects` | `grade_subjects` |
+| holds **teachers** | `users.department_id` | `teacher_grades` |
+| holds **students** | — | class memberships |
+
+- Small buckets: **teacher, subject, section**. Each is itself a bucket
+  with a page of its own, holding what it belongs to.
+- The work comes from the **intersection**, which is computed and never
+  stored: subject in Commerce ∩ subject in Grade 11 = *Grade 11
+  Accounting*; teacher in Commerce ∩ teacher in Grade 11 = *eligible to
+  teach it*; the **section** then picks the actual person.
+- `teacher_grades` is therefore NOT a bolted-on capability list — it is
+  grade-bucket membership, the exact mirror of `users.department_id`.
+  The two memberships are orthogonal, so the cross-product IS the intent.
+
+### Cardinality (founder, verbatim)
+
+> "In most cases a subject is always one department; a teacher is also of
+> one department."
+
+- **A subject sits in ONE department.** Migration 035 adds the unique
+  index on `department_subjects (subject_id)` that makes this real. This
+  is what makes "which department owns this subject" deterministic and
+  retires the old "first department by created_at wins" tie-break.
+- **A teacher sits in ONE department.**
+
+### Primary vs secondary subject — why the flag exists
+
+> "A Commerce department can have different sets of subjects associated to
+> different teachers who are capable of this. That is why selecting a
+> subject for a teacher can drop them inside the bucket of department, and
+> if needed they can manually change or edit — that's why we have primary
+> subject and secondary subject."
+
+- A teacher holds a **subset** of a department's subjects, never all of
+  them. Two Commerce teachers need not teach the same things.
+- **Picking the PRIMARY subject is the mechanism that drops the teacher
+  into a department bucket.** Secondary subjects are further capability
+  and do NOT move them — a secondary may even sit in another department;
+  the teacher still belongs to one.
+- The derived department is a **default, not a lock**: it can be changed
+  by hand afterwards. So `PUT /auth/teacher/:id/subjects` only re-derives
+  `users.department_id` when the primary subject actually CHANGES.
+  Editing secondary subjects must never silently undo a hand-set
+  department.
+
+### Every junction is one record with two doors
+
+> "In the teachers module I can edit teachers, as well I can alter the
+> teacher's subject in department. The user can either do it at teacher
+> level edit or — more through natural instinct — during the department
+> level."
+
+A membership row is a single fact reachable from both ends; neither door
+is the "real" one. This is `one record, many views` applied to relations,
+not just records.
+
+| The fact | Door A | Door B |
+|---|---|---|
+| Teacher ↔ Subject | Teacher form → Subjects | Department → Teachers tab |
+| Teacher ↔ Grade | Teacher form → Grades | Grade → Teachers |
+| Teacher ↔ Department | Teacher form → Department | Department → Teachers tab |
+| Subject ↔ Department | Subject page | Department → Subjects tab |
+| Subject ↔ Grade | Subject page → grades | Grade → Subjects |
+
+**Consequence, not yet built:** the Department's Teachers tab is
+currently a read-only list. Under this rule it must gain inline editing
+of each teacher's subjects and grades — the thing previously parked as a
+"future direction" is in fact the point.
+
+### What the model rules out
+
+- **Department does NOT hold grades.** Grades are a separate large
+  bucket. "Grades it serves" is a derived touchpoint — the union of the
+  grades its owned subjects run in — and `GET /departments` already
+  computes it this way. `department_grades` is written by create/update
+  and **never read**: it is dead weight and should be dropped.
