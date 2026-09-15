@@ -601,3 +601,38 @@ subjects paste-list flow. One shared import component, not one per module.
   department drawer (rather than only from the teacher's own form) is
   the follow-up this points at — ask before building, since it's a real
   scope addition to that drawer, not a small fix.
+
+## Department detail page: tabs, like the Class overview (2026-09-15, founder)
+
+- Founder: "now the department should have tabs basically like class
+  room with teachers and subject." The three stacked section-cards
+  (Teachers / Subjects it owns / Grades it serves) in
+  `department-detail-page.tsx` are now two tabs — Teachers, Subjects —
+  reusing `grade-overview-page.tsx`'s exact tab pattern for visual
+  consistency across the product: `motion/react`'s `AnimatePresence
+  mode="wait"` + a keyed `motion.div` for the content swap
+  (`opacity`/`y`, 0.18s), and a `motion.span` sliding underline sharing
+  one `layoutId` (`"department-tab"`) across tab buttons, both zeroed via
+  `useReducedMotion()`.
+- **Grades it serves folds into the Subjects tab** rather than becoming
+  a third tab — it's read-only and entirely derived from the subjects a
+  department owns (never set independently), so it sits as a labeled
+  sub-section under the subject list instead of claiming its own tab.
+  The founder's wording named two things ("teachers and subject"); a
+  third tab for a derived, non-actionable view would've been surplus.
+- Redundant per-section headers ("Teachers 3", "Subjects it owns") are
+  gone — the tab label already carries the name and the live count
+  (matches the earlier "we dont need counters against all the header"
+  correction); each panel keeps only its own action link
+  ("Manage in Teachers →", "All subjects →").
+
+## Migration 034 pending in production (2026-09-15)
+
+- Founder hit `Could not find the table 'public.teacher_subjects' in
+  the schema cache` live while editing a teacher — confirms
+  `034_teacher_subjects_grades.sql` has not been run yet. Handed the
+  founder the exact SQL to paste into the Supabase SQL editor for
+  `paanoatvjdjkgbwfpglc` (production); no destructive ops, `IF NOT
+  EXISTS` throughout, safe to re-run. Blocks `PUT
+  /auth/teacher/:id/subjects` and `.../grades` until applied — update
+  `migrations/README.md`'s row 034 to applied once confirmed.

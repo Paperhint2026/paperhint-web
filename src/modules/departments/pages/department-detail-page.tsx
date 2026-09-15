@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import {
   ArrowLeftIcon,
-  GraduationCapIcon,
   CaretDownIcon,
   CaretRightIcon,
   PencilIcon,
@@ -55,6 +55,8 @@ export function DepartmentDetailPage() {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+  const [tab, setTab] = useState<"teachers" | "subjects">("teachers")
+  const reduceMotion = useReducedMotion()
 
   const load = useCallback(async () => {
     try {
@@ -282,178 +284,241 @@ export function DepartmentDetailPage() {
         )}
       </div>
 
-      <div className="grid content-start gap-4 @3xl:grid-cols-2">
-        {/* Teachers */}
-        <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-foreground">
-              Teachers
-              {members.length > 0 && (
-                <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">
-                  {members.length}
-                </span>
-              )}
-            </h2>
-            <Link
-              to="/teachers"
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Manage in Teachers →
-            </Link>
-          </div>
-          {members.length === 0 ? (
-            <EmptyNote
-              icon={UsersThreeIcon}
-              title="No teachers here yet"
-              hint="Add one from Edit, or a teacher can join from their own profile."
-              action={
-                isAdmin ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditOpen(true)}
-                  >
-                    <PencilIcon className="size-3.5" />
-                    Edit
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to="/teachers">Open Teachers</Link>
-                  </Button>
-                )
-              }
-            />
-          ) : (
-            <ul className="-mr-2 flex max-h-72 flex-col divide-y divide-border overflow-y-auto pr-2">
-              {members.map((t) => {
-                const isHead = dept.heads.some((h) => h.id === t.id)
-                return (
-                  <li
-                    key={t.id}
-                    className="flex items-center justify-between gap-3 py-2"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm text-foreground">
-                        {t.full_name}
-                      </span>
-                      {t.designation && (
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {t.designation}
-                        </span>
-                      )}
-                    </span>
-                    {isHead && (
-                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
-                        Head
-                      </span>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
-
-        {/* Subjects */}
-        <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-foreground">
-              Subjects it owns
-            </h2>
-            <Link
-              to="/subjects"
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              All subjects →
-            </Link>
-          </div>
-          {dept.subjects.length === 0 ? (
-            <EmptyNote
-              icon={StackIcon}
-              title="No subjects yet"
-              hint="Fine for a Library or Physical Education department; otherwise add one below."
-            />
-          ) : (
-            <ul className="-mr-2 flex max-h-72 flex-col divide-y divide-border overflow-y-auto pr-2">
-              {dept.subjects.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between gap-3 py-2"
-                >
-                  <span className="truncate text-sm text-foreground">
-                    {s.subject_name}
-                  </span>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => toggleSubject(s)}
-                      className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
-                    >
-                      Remove
-                    </button>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-1 border-b border-border">
+          {(
+            [
+              {
+                key: "teachers",
+                label: "Teachers",
+                icon: UsersThreeIcon,
+                count: members.length,
+              },
+              {
+                key: "subjects",
+                label: "Subjects",
+                icon: StackIcon,
+                count: dept.subjects.length,
+              },
+            ] as const
+          ).map((t) => {
+            const on = tab === t.key
+            return (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  "relative flex items-center gap-1.5 px-3 py-2.5 text-sm transition-colors outline-none focus-visible:text-foreground",
+                  on
+                    ? "font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <t.icon className="size-4" />
+                {t.label}
+                <span
+                  className={cn(
+                    "text-xs tabular-nums",
+                    on ? "text-foreground/70" : "text-muted-foreground"
                   )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {isAdmin && (
-            <div className="flex">
-              <Picker
-                label="Add subject"
-                empty="Every subject is already here."
-                options={subjects
-                  .filter((x) => !dept.subjects.some((y) => y.id === x.id))
-                  .map((x) => ({ id: x.id, label: x.subject_name }))}
-                onPick={(sid) => {
-                  const s = subjects.find((x) => x.id === sid)
-                  if (s) toggleSubject(s)
-                }}
-              />
-            </div>
-          )}
-        </section>
-
-        {/* Grades — read back from the subjects it owns, never set here */}
-        <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
-          <h2 className="text-sm font-semibold text-foreground">
-            Grades it serves
-          </h2>
-          {dept.subjects.length === 0 ? (
-            <EmptyNote
-              icon={GraduationCapIcon}
-              title="No grades yet"
-              hint="Grades follow the subjects a department owns. Add a subject and the grades it runs in."
-            />
-          ) : (
-            <>
-              <p className="text-sm text-foreground">
-                {dept.grades.length === 0
-                  ? "Its subjects are not placed in any grade yet"
-                  : describeGrades(dept.grades, "")}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {dept.grades.map((g) => (
-                  <span
-                    key={g}
-                    className="min-w-8 rounded-md border border-border bg-muted/50 px-2 py-1 text-center text-xs text-foreground tabular-nums"
-                  >
-                    {gradeLabel(g)}
-                  </span>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Read from the subjects it owns.{" "}
-                <Link
-                  to="/subjects"
-                  className="underline underline-offset-2 hover:text-foreground"
                 >
-                  Change a subject&apos;s grades
-                </Link>
-                .
-              </p>
-            </>
-          )}
-        </section>
+                  {t.count}
+                </span>
+                {on && (
+                  <motion.span
+                    layoutId="department-tab"
+                    transition={
+                      reduceMotion
+                        ? { duration: 0 }
+                        : {
+                            type: "spring",
+                            stiffness: 480,
+                            damping: 40,
+                            mass: 0.8,
+                          }
+                    }
+                    className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-foreground"
+                  />
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: reduceMotion ? 0 : 0.18 }}
+          >
+            {tab === "teachers" ? (
+              <section className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5">
+                <div className="flex items-center justify-end gap-3">
+                  <Link
+                    to="/teachers"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Manage in Teachers →
+                  </Link>
+                </div>
+                {members.length === 0 ? (
+                  <EmptyNote
+                    icon={UsersThreeIcon}
+                    title="No teachers here yet"
+                    hint="Add one from Edit, or a teacher can join from their own profile."
+                    action={
+                      isAdmin ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditOpen(true)}
+                        >
+                          <PencilIcon className="size-3.5" />
+                          Edit
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to="/teachers">Open Teachers</Link>
+                        </Button>
+                      )
+                    }
+                  />
+                ) : (
+                  <ul className="-mr-2 flex max-h-96 flex-col divide-y divide-border overflow-y-auto pr-2">
+                    {members.map((t) => {
+                      const isHead = dept.heads.some((h) => h.id === t.id)
+                      return (
+                        <li
+                          key={t.id}
+                          className="flex items-center justify-between gap-3 py-2"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm text-foreground">
+                              {t.full_name}
+                            </span>
+                            {t.designation && (
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {t.designation}
+                              </span>
+                            )}
+                          </span>
+                          {isHead && (
+                            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+                              Head
+                            </span>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </section>
+            ) : (
+              <section className="flex flex-col gap-4 rounded-xl border border-border bg-background p-5">
+                <div className="flex items-center justify-end gap-3">
+                  <Link
+                    to="/subjects"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    All subjects →
+                  </Link>
+                </div>
+                {dept.subjects.length === 0 ? (
+                  <EmptyNote
+                    icon={StackIcon}
+                    title="No subjects yet"
+                    hint="Fine for a Library or Physical Education department; otherwise add one below."
+                  />
+                ) : (
+                  <ul className="-mr-2 flex max-h-72 flex-col divide-y divide-border overflow-y-auto pr-2">
+                    {dept.subjects.map((s) => (
+                      <li
+                        key={s.id}
+                        className="flex items-center justify-between gap-3 py-2"
+                      >
+                        <span className="truncate text-sm text-foreground">
+                          {s.subject_name}
+                        </span>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSubject(s)}
+                            className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {isAdmin && (
+                  <div className="flex">
+                    <Picker
+                      label="Add subject"
+                      empty="Every subject is already here."
+                      options={subjects
+                        .filter(
+                          (x) => !dept.subjects.some((y) => y.id === x.id)
+                        )
+                        .map((x) => ({ id: x.id, label: x.subject_name }))}
+                      onPick={(sid) => {
+                        const s = subjects.find((x) => x.id === sid)
+                        if (s) toggleSubject(s)
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2 border-t border-border pt-4">
+                  <h3 className="text-xs font-medium text-muted-foreground">
+                    Grades it serves
+                  </h3>
+                  {dept.subjects.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Grades follow the subjects a department owns.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-foreground">
+                        {dept.grades.length === 0
+                          ? "Its subjects are not placed in any grade yet"
+                          : describeGrades(dept.grades, "")}
+                      </p>
+                      {dept.grades.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {dept.grades.map((g) => (
+                            <span
+                              key={g}
+                              className="min-w-8 rounded-md border border-border bg-muted/50 px-2 py-1 text-center text-xs text-foreground tabular-nums"
+                            >
+                              {gradeLabel(g)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Read from the subjects it owns.{" "}
+                        <Link
+                          to="/subjects"
+                          className="underline underline-offset-2 hover:text-foreground"
+                        >
+                          Change a subject&apos;s grades
+                        </Link>
+                        .
+                      </p>
+                    </>
+                  )}
+                </div>
+              </section>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <EditDepartmentDrawer
