@@ -354,6 +354,15 @@ subjects paste-list flow. One shared import component, not one per module.
   class selected at a time instead of a single giant table; the identify
   list only shows automatically for a class with someone detained, with a
   "Review students" button as the manual escape hatch for any other class.
+- **Neither panel is an accordion.** Founder: opening a long student list
+  used to grow the whole row, stretching the short class list to match and
+  leaving a visible gap under it. Both the class list and the detail panel
+  are capped at the same height (`max-h-[32rem]`) and scroll independently —
+  the container's height never depends on which class is selected.
+- **The class detail header is a from → to, nothing else.** Founder's exact
+  shape: "Grade 5A {10 students} / 2025-2026 batch → Grade 6A {10 students}
+  / 2026-2027 batch." No detained count, no "change in Reshuffling" caption
+  — he said plainly "we don't need any other details here."
 - **Review is an itemized table, not just stat tiles.** Founder: "a complete
   table produced in a format of all the grades, all the sections, all the
   students." `POST /rollover/preview` now returns a `students` array (every

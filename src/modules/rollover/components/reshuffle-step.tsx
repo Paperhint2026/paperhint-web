@@ -123,7 +123,7 @@ export function ReshuffleStep({
             )
           })}
         </div>
-        <div className="min-w-0">
+        <div className="max-h-[32rem] min-w-0 overflow-y-auto">
           {selected ? (
             <ClassRosterPanel
               key={selected}

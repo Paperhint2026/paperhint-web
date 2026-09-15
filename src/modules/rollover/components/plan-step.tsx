@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import {
+  ArrowRightIcon,
   CaretRightIcon,
   CircleNotchIcon,
   GraduationCapIcon,
@@ -195,13 +196,14 @@ export function PlanStep({
           )}
         </div>
 
-        <div className="min-w-0">
+        <div className="max-h-[32rem] min-w-0 overflow-y-auto">
           {current && currentRow ? (
             <ClassDetail
               key={current.id}
               cls={current}
               row={currentRow}
               canGraduate={current.grade >= terminalGrade}
+              fromYear={plan.from_year}
               toYear={toYear}
               reviewing={!!reviewing[current.id] || current.detained_count > 0}
               onReview={() =>
@@ -227,6 +229,7 @@ function ClassDetail({
   cls,
   row,
   canGraduate,
+  fromYear,
   toYear,
   reviewing,
   onReview,
@@ -236,6 +239,7 @@ function ClassDetail({
   cls: ContextClass
   row: RolloverPlanClass
   canGraduate: boolean
+  fromYear: string
   toYear: string
   reviewing: boolean
   onReview: () => void
@@ -247,15 +251,36 @@ function ClassDetail({
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            Grade {cls.grade}
-            {cls.section}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {cls.student_count} students
-            {cls.detained_count > 0 && ` · ${cls.detained_count} detained`}
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Grade {cls.grade}
+              {cls.section}
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                {cls.student_count} students
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">{fromYear} batch</p>
+          </div>
+          <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {isGraduate ? (
+                "Graduates"
+              ) : (
+                <>
+                  Grade {row.target?.grade}
+                  {row.target?.section}
+                </>
+              )}
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                {cls.student_count} students
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {isGraduate ? "Leaves the school" : `${toYear} batch`}
+            </p>
+          </div>
         </div>
 
         {canGraduate ? (
@@ -310,17 +335,6 @@ function ClassDetail({
           <span className="text-xs text-muted-foreground">Promotes</span>
         )}
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        {isGraduate ? (
-          "Leaves the school"
-        ) : (
-          <>
-            Grade {row.target?.grade}
-            {row.target?.section} — change in Reshuffling
-          </>
-        )}
-      </p>
 
       <div className="rounded-lg border border-border">
         {reviewing ? (
