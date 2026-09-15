@@ -447,3 +447,23 @@ subjects paste-list flow. One shared import component, not one per module.
   the standalone `HeadTag` pill next to the department name on the main
   page is unchanged and still works; this is a second path to the same
   state, not a replacement.
+- **Divider bug, fixed**: the first version built the wave against a fixed
+  `viewBox="0 0 380 12"` stretched with `preserveAspectRatio="none"` — the
+  real drawer renders narrower than 380px, so the same 39 bumps compressed
+  into a tight, barely-visible tremor instead of a clean wave. Rebuilt as
+  an SVG `<pattern>` tiled with `patternUnits="userSpaceOnUse"` (a fixed
+  16px period, no viewBox scaling at all) so it looks identical at any
+  drawer width; the fade is a separate opacity `<mask>` built from a
+  gradient rect, not mixed into the stroke color, so the wave itself stays
+  one consistent color end to end.
+- Removed the redundant counts next to "Teachers"/"Subjects" section
+  labels (founder: "we dont need counters against all the header like
+  teachers 1") — the hero stat line already carries those numbers.
+- **Open question, not yet resolved**: founder said "we need to have grade
+  selection as well over here," which reads as either (a) an "edit grades"
+  action on every subject chip in the main view, not just the nested
+  set-grades step for a brand-new zero-grade subject, or (b) reopening the
+  earlier "grades stay derived" call in favor of a real department-level
+  grades field (the backend's `PUT /departments/:id/grades` exists but is
+  currently unused by any UI). Asked which; answer was "understood" with
+  no option picked — still open, nothing built yet.
