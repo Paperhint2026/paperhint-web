@@ -1,41 +1,87 @@
 import { useState } from "react"
 import {
   ArrowLeftIcon,
-  CaretRightIcon,
+  CaretDownIcon,
   CircleNotchIcon,
+  CrownSimpleIcon,
   MagnifyingGlassIcon,
   PlusIcon,
+  XIcon,
 } from "@phosphor-icons/react"
 
 import { apiClient } from "@/lib/api-client"
 import { describeGrades, GRADES, gradeLabel } from "@/lib/grades"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { lookFor } from "@/modules/departments/lib/department-look"
 import type {
   Department,
+  Head,
   SubjectOption,
   Teacher,
 } from "@/modules/departments/lib/types"
 
-type View = "main" | "add-subject" | "set-grades" | "add-teacher"
+type View = "main" | "add-subject" | "set-grades" | "add-teacher" | "pick-head"
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
+}
+
+/** A hairline that trails off instead of stopping dead — a beat between the
+ * department's own identity and the things it owns. */
+function CurlyDivider() {
+  const pts = Array.from({ length: 39 }, (_, i) => (i + 1) * 10).join(",6 T")
+  return (
+    <svg
+      viewBox="0 0 380 12"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      className="my-1 h-3 w-full"
+    >
+      <defs>
+        <linearGradient id="dept-curly-fade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" className="text-border" stopColor="currentColor" />
+          <stop
+            offset="55%"
+            className="text-border"
+            stopColor="currentColor"
+            stopOpacity="0.6"
+          />
+          <stop
+            offset="100%"
+            className="text-border"
+            stopColor="currentColor"
+            stopOpacity="0"
+          />
+        </linearGradient>
+      </defs>
+      <path
+        d={`M0,6 Q5,2 10,6 T${pts},6`}
+        fill="none"
+        stroke="url(#dept-curly-fade)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
 
 /**
  * Editing a department in one drawer, not a page navigation per field
- * (founder, 2026-09-15): renaming stays inline; adding a subject or a
- * teacher — and, when a newly-added subject has no grades yet, setting
- * them — opens as its own screen inside the same drawer with a back arrow,
- * never a separate route ("nest the drawer with a back button providing a
- * lookup to select subjects and teachers for the department").
+ * (founder, 2026-09-15): renaming stays inline; adding a teacher, a subject,
+ * or setting the head — and, when a newly-added subject has no grades yet,
+ * setting them — opens as its own screen inside the same drawer with a back
+ * arrow, never a separate route.
  */
 export function EditDepartmentDrawer({
   open,
@@ -45,6 +91,7 @@ export function EditDepartmentDrawer({
   allSubjects,
   allTeachers,
   onRemoveSubject,
+  onSetHead,
   onChanged,
 }: {
   open: boolean
@@ -56,6 +103,7 @@ export function EditDepartmentDrawer({
   /** Every teacher in the school, for the add-teacher lookup. */
   allTeachers: Teacher[]
   onRemoveSubject: (s: SubjectOption) => void
+  onSetHead: (t: Teacher | null) => void
   /** Refetch from the server after a write this drawer made directly. */
   onChanged: () => void
 }) {
@@ -70,12 +118,20 @@ export function EditDepartmentDrawer({
   const [saving, setSaving] = useState(false)
   const [movingTeacherId, setMovingTeacherId] = useState<string | null>(null)
 
+  const { Icon, palette } = lookFor(dept.name)
+  const head: Head | null = dept.heads[0] ?? null
+
   const reset = () => {
     setView("main")
     setName(dept.name)
     setQuery("")
     setPendingSubject(null)
     setPendingGrades([])
+  }
+
+  const back = () => {
+    setView("main")
+    setQuery("")
   }
 
   const setTeacherDepartment = async (
@@ -88,10 +144,7 @@ export function EditDepartmentDrawer({
         department_id: departmentId,
       })
       onChanged()
-      if (departmentId) {
-        setView("main")
-        setQuery("")
-      }
+      if (departmentId) back()
     } catch (e) {
       showError(e)
     } finally {
@@ -125,8 +178,7 @@ export function EditDepartmentDrawer({
         subject_ids: ids,
       })
       onChanged()
-      setView("main")
-      setQuery("")
+      back()
     } catch (e) {
       showError(e)
     } finally {
@@ -159,6 +211,9 @@ export function EditDepartmentDrawer({
     }
   }
 
+  const gradesFor = (subjectId: string) =>
+    allSubjects.find((s) => s.id === subjectId)?.grades ?? []
+
   const available = allSubjects
     .filter((s) => !dept.subjects.some((x) => x.id === s.id))
     .filter((s) =>
@@ -169,6 +224,15 @@ export function EditDepartmentDrawer({
 
   const availableTeachers = allTeachers
     .filter((t) => t.department_id !== dept.id)
+    .filter((t) =>
+      query.trim()
+        ? t.full_name.toLowerCase().includes(query.trim().toLowerCase())
+        : true
+    )
+
+  // A head leads the department, so they have to be in it.
+  const headOptions = members
+    .filter((t) => t.id !== head?.id)
     .filter((t) =>
       query.trim()
         ? t.full_name.toLowerCase().includes(query.trim().toLowerCase())
@@ -186,21 +250,25 @@ export function EditDepartmentDrawer({
       <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md">
         {view === "main" && (
           <>
-            <SheetHeader>
-              <SheetTitle>Edit {dept.name}</SheetTitle>
-              <SheetDescription>
-                Rename it, or change which teachers and subjects it owns.
-              </SheetDescription>
+            <SheetHeader className="flex-row items-center justify-between gap-2 space-y-0">
+              <SheetTitle className="sr-only">Edit {dept.name}</SheetTitle>
+              <span className="text-xs font-medium text-muted-foreground">
+                Edit department
+              </span>
             </SheetHeader>
 
-            <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-4">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="dept-name" className="text-xs">
-                  Name
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="dept-name"
+            <div className="flex flex-col overflow-y-auto px-4 pb-4">
+              <div className="flex items-center gap-3.5 pb-3">
+                <span
+                  className={cn(
+                    "grid size-13 shrink-0 place-items-center rounded-2xl text-white",
+                    palette.cover
+                  )}
+                >
+                  <Icon className="size-6" weight="fill" aria-hidden />
+                </span>
+                <div className="flex min-w-0 flex-col">
+                  <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     onBlur={saveName}
@@ -208,102 +276,231 @@ export function EditDepartmentDrawer({
                       if (e.key === "Enter") e.currentTarget.blur()
                     }}
                     maxLength={80}
+                    className="-mx-1 -my-0.5 rounded-md px-1 py-0.5 text-lg font-semibold text-foreground outline-none hover:bg-muted focus:bg-muted"
                   />
-                  {savingName && (
-                    <CircleNotchIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs">Teachers</Label>
-                <div className="overflow-hidden rounded-lg border border-border">
-                  {members.length === 0 ? (
-                    <p className="p-3 text-xs text-muted-foreground">
-                      No teachers yet.
-                    </p>
-                  ) : (
-                    <ul className="divide-y divide-border">
-                      {members.map((t) => (
-                        <li
-                          key={t.id}
-                          className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
-                        >
-                          <span className="truncate text-foreground">
-                            {t.full_name}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={movingTeacherId === t.id}
-                            onClick={() => setTeacherDepartment(t.id, null)}
-                            className="shrink-0 text-xs text-muted-foreground hover:text-destructive disabled:opacity-60"
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setView("add-teacher")}
-                    className="flex w-full items-center justify-between gap-2 border-t border-border px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <PlusIcon className="size-3.5" />
-                      Add a teacher
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {members.length}
+                      </span>{" "}
+                      {members.length === 1 ? "teacher" : "teachers"}
                     </span>
-                    <CaretRightIcon className="size-3.5" />
-                  </button>
+                    <span>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {dept.subjects.length}
+                      </span>{" "}
+                      {dept.subjects.length === 1 ? "subject" : "subjects"}
+                    </span>
+                    <span>{describeGrades(dept.grades)}</span>
+                    {savingName && (
+                      <CircleNotchIcon className="size-3 shrink-0 animate-spin" />
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">Subjects</Label>
-                  <span className="text-xs text-muted-foreground">
-                    {describeGrades(dept.grades)}
+              <CurlyDivider />
+
+              <div className="flex flex-col gap-1.5 pt-3">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Head of department
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setView("pick-head")}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-left hover:border-primary/40"
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <Avatar className="size-7">
+                      <AvatarFallback className="text-[11px]">
+                        {head ? initials(head.full_name) : "—"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate text-sm text-foreground">
+                      {head?.full_name ?? (
+                        <span className="text-muted-foreground">Not set</span>
+                      )}
+                    </span>
                   </span>
-                </div>
-                <div className="overflow-hidden rounded-lg border border-border">
-                  {dept.subjects.length === 0 ? (
-                    <p className="p-3 text-xs text-muted-foreground">
-                      No subjects yet.
-                    </p>
-                  ) : (
-                    <ul className="divide-y divide-border">
-                      {dept.subjects.map((s) => (
-                        <li
-                          key={s.id}
-                          className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
-                        >
-                          <span className="truncate text-foreground">
-                            {s.subject_name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onRemoveSubject(s as SubjectOption)}
-                            className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setView("add-subject")}
-                    className="flex w-full items-center justify-between gap-2 border-t border-border px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                  <CaretDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-1.5 pt-5">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Teachers{" "}
+                  <span className="font-normal normal-case">
+                    {members.length}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setView("add-teacher")}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-dashed border-border px-2.5 py-2 text-sm text-muted-foreground hover:border-solid hover:bg-muted"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <PlusIcon className="size-3.5" />
+                    Add a teacher
+                  </span>
+                </button>
+                {members.map((t) => (
+                  <div
+                    key={t.id}
+                    className="group flex items-center gap-2.5 rounded-lg px-1.5 py-1.5"
                   >
-                    <span className="flex items-center gap-1.5">
-                      <PlusIcon className="size-3.5" />
-                      Add a subject
+                    <Avatar className="size-7">
+                      <AvatarFallback className="text-[11px]">
+                        {initials(t.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="flex flex-1 items-center gap-1.5 truncate text-sm text-foreground">
+                      {t.full_name}
+                      {t.id === head?.id && (
+                        <CrownSimpleIcon
+                          weight="fill"
+                          className="size-3.5 shrink-0 text-amber-500"
+                        />
+                      )}
                     </span>
-                    <CaretRightIcon className="size-3.5" />
-                  </button>
+                    <button
+                      type="button"
+                      disabled={movingTeacherId === t.id}
+                      onClick={() => setTeacherDepartment(t.id, null)}
+                      className="shrink-0 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive disabled:opacity-60"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-1.5 pt-5">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Subjects{" "}
+                  <span className="font-normal normal-case">
+                    {dept.subjects.length}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setView("add-subject")}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-dashed border-border px-2.5 py-2 text-sm text-muted-foreground hover:border-solid hover:bg-muted"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <PlusIcon className="size-3.5" />
+                    Add a subject
+                  </span>
+                </button>
+                <div className="flex flex-wrap gap-1.5">
+                  {dept.subjects.map((s) => {
+                    const grades = gradesFor(s.id)
+                    return (
+                      <span
+                        key={s.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 py-1 pr-1 pl-3 text-xs text-foreground"
+                      >
+                        {s.subject_name}
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+                            grades.length > 0
+                              ? "bg-primary/10 text-primary"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+                          )}
+                        >
+                          {describeGrades(grades, "No grades")}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${s.subject_name}`}
+                          onClick={() => onRemoveSubject(s as SubjectOption)}
+                          className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-background hover:text-destructive"
+                        >
+                          <XIcon className="size-2.5" />
+                        </button>
+                      </span>
+                    )
+                  })}
                 </div>
               </div>
+            </div>
+          </>
+        )}
+
+        {view === "pick-head" && (
+          <>
+            <SheetHeader className="flex-row items-center gap-2 space-y-0">
+              <button
+                type="button"
+                onClick={back}
+                aria-label="Back"
+                className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <ArrowLeftIcon className="size-4" />
+              </button>
+              <SheetTitle>Head of department</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col gap-2 overflow-y-auto px-4 pb-4">
+              {head && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSetHead(null)
+                    back()
+                  }}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2.5 text-left text-sm hover:bg-muted"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Avatar className="size-7">
+                      <AvatarFallback className="text-[11px]">
+                        {initials(head.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    {head.full_name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    Remove
+                  </span>
+                </button>
+              )}
+              <div className="relative">
+                <MagnifyingGlassIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search teachers in this department"
+                  className="pl-8"
+                />
+              </div>
+              {headOptions.length === 0 ? (
+                <p className="px-1 py-4 text-sm text-muted-foreground">
+                  {members.length <= 1
+                    ? "A head has to already be a teacher here."
+                    : "No match."}
+                </p>
+              ) : (
+                <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                  {headOptions.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        onSetHead(t)
+                        back()
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-muted"
+                    >
+                      <Avatar className="size-7 shrink-0">
+                        <AvatarFallback className="text-[11px]">
+                          {initials(t.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="truncate">{t.full_name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -313,10 +510,7 @@ export function EditDepartmentDrawer({
             <SheetHeader className="flex-row items-center gap-2 space-y-0">
               <button
                 type="button"
-                onClick={() => {
-                  setView("main")
-                  setQuery("")
-                }}
+                onClick={back}
                 aria-label="Back"
                 className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
@@ -368,10 +562,7 @@ export function EditDepartmentDrawer({
             <SheetHeader className="flex-row items-center gap-2 space-y-0">
               <button
                 type="button"
-                onClick={() => {
-                  setView("main")
-                  setQuery("")
-                }}
+                onClick={back}
                 aria-label="Back"
                 className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
@@ -404,14 +595,21 @@ export function EditDepartmentDrawer({
                       type="button"
                       disabled={movingTeacherId === t.id}
                       onClick={() => setTeacherDepartment(t.id, dept.id)}
-                      className="flex items-center justify-between gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-60"
+                      className="flex items-center gap-2.5 px-3 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-60"
                     >
-                      <span className="truncate">{t.full_name}</span>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {t.department_id
-                          ? "Moves from another department"
-                          : "Unassigned"}
+                      <Avatar className="size-7 shrink-0">
+                        <AvatarFallback className="text-[11px]">
+                          {initials(t.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="min-w-0 flex-1 truncate">
+                        {t.full_name}
                       </span>
+                      {t.department_id && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                          Moves
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>

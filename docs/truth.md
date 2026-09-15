@@ -423,3 +423,27 @@ subjects paste-list flow. One shared import component, not one per module.
   Sticker-based empty-state convention used elsewhere (`worried`), with a
   Reload / Go home / Copy error action set — no 404 route was added, this
   covers only a route that actually throws.
+
+## Edit-department drawer visual pass (2026-09-15, founder)
+
+- Founder asked to borrow "the side panel we had for class details" — that
+  exact component (`grade-overview-sheet.tsx`) no longer exists; it was
+  converted to a routed page in `82c05e4` ("A grade opens as a page, not a
+  sliding sheet"). What transferred is its VISUAL language (stat strip,
+  chip-style tags, avatar rows, small-caps section labels), applied on top
+  of the in-place back-arrow navigation already built for this drawer —
+  not the old sheet's own interaction pattern (which stacked a second,
+  separate Sheet instead, with no back button).
+- `EditDepartmentDrawer` now opens on a hero (icon, inline-editable name,
+  a `teachers · subjects · grades` stat line), a `CurlyDivider` (a fading
+  squiggle, not a flat hairline) under it, then three sections: a "Head of
+  department" picker, Teachers as avatar rows with a crown on whoever is
+  head, and Subjects as chips carrying a grade pill (amber "No grades"
+  when a subject has none yet). Each section's add action sits pinned
+  above its list — founder: "as the list grows the CTA goes down as well"
+  — not appended below it.
+- The HOD picker inside the drawer reuses the department page's existing
+  `setHead()` (one head, picking replaces) via a new `onSetHead` prop —
+  the standalone `HeadTag` pill next to the department name on the main
+  page is unchanged and still works; this is a second path to the same
+  state, not a replacement.

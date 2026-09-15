@@ -464,6 +464,7 @@ export function DepartmentDetailPage() {
         allSubjects={subjects}
         allTeachers={teachers}
         onRemoveSubject={toggleSubject}
+        onSetHead={setHead}
         onChanged={load}
       />
     </div>
