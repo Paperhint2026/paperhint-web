@@ -56,13 +56,14 @@ type Candidate = {
   id: string
   full_name: string
   designation: string | null
-  tier: 1 | 2 | 3
+  tier: 1 | 2 | 3 | 4
   load: { slots: number; allotments: number }
 }
 const TIER_LABEL: Record<number, string> = {
   1: "Allotted",
-  2: "In the owning department",
-  3: "Everyone else",
+  2: "Can teach it",
+  3: "In the owning department",
+  4: "Everyone else",
 }
 
 export function AllotmentsPage() {
@@ -323,7 +324,7 @@ function Cell({
   const filtered = (candidates ?? []).filter((c) =>
     c.full_name.toLowerCase().includes(query.toLowerCase())
   )
-  const tiers = [1, 2, 3]
+  const tiers = [1, 2, 3, 4]
     .map((t) => ({ tier: t, rows: filtered.filter((c) => c.tier === t) }))
     .filter((g) => g.rows.length > 0)
 

@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { useSearchParams } from "react-router-dom"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 
 import { TimeSelectField } from "@/components/shared/time-select-field"
 import {
@@ -733,20 +733,24 @@ function ReadinessStrip({
             <button
               key={s.id}
               type="button"
-              onClick={() => s.ready && onSelect(s.id)}
-              disabled={!s.ready}
+              // Missing teachers no longer blocks the click — picking the
+              // class opens the staffing gate, where the teachers get
+              // assigned and the builder follows. Only a class with no
+              // subjects at all has nothing to open.
+              onClick={() => s.subject_count > 0 && onSelect(s.id)}
+              disabled={s.subject_count === 0}
               title={
                 s.ready
                   ? `${s.slot_count} slots placed`
                   : s.subject_count === 0
                     ? "No subjects yet"
-                    : `No teacher: ${s.missing_teacher.map((m) => m.subject_name).join(", ")}`
+                    : `Assign teachers first: ${s.missing_teacher.map((m) => m.subject_name).join(", ")}`
               }
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
                 selected
                   ? "border-primary/40 bg-primary/10 text-primary"
-                  : s.ready
+                  : s.subject_count > 0
                     ? "border-border bg-background text-secondary-foreground hover:bg-muted"
                     : "cursor-not-allowed border-border bg-muted/40 text-muted-foreground/60"
               )}
@@ -766,16 +770,12 @@ function ReadinessStrip({
           )
         })}
       </div>
-      {sections.some((s) => !s.ready) && (
+      {sections.some((s) => s.subject_count === 0) && (
         <p className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
           <WarningIcon className="size-3" />
           {sections
-            .filter((s) => !s.ready)
-            .map((s) =>
-              s.subject_count === 0
-                ? `${s.grade}-${s.section}: no subjects`
-                : `${s.grade}-${s.section}: no teacher for ${s.missing_teacher.map((m) => m.subject_name).join(", ")}`
-            )
+            .filter((s) => s.subject_count === 0)
+            .map((s) => `${s.grade}-${s.section}: no subjects yet`)
             .join(" · ")}
         </p>
       )}
@@ -1323,8 +1323,43 @@ function SectionBuilder({
   const cls = data?.class
   const readinessRow = readiness.find((r) => r.id === classId)
 
+  // Refresh the readiness chips exactly once, when staffing completes.
+  const unstaffedCount = data
+    ? data.subjects.filter((s) => !s.default_teacher_id).length
+    : 0
+  const wasGatedRef = useRef(false)
+  useEffect(() => {
+    if (unstaffedCount > 0) {
+      wasGatedRef.current = true
+    } else if (wasGatedRef.current) {
+      wasGatedRef.current = false
+      onSaved()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unstaffedCount])
+
   if (isLoading || !data) {
     return <Skeleton className="h-72 w-full rounded-xl" />
+  }
+
+  const unstaffed = data.subjects.filter((s) => !s.default_teacher_id)
+
+  // The gate: teachers are created with capability only, so a section may
+  // reach the builder unstaffed. Assign a teacher to every subject first,
+  // then the grid opens. onSaved (readiness refetch) fires once, on the
+  // transition to fully staffed — see the effect above.
+  if (unstaffed.length > 0) {
+    return (
+      <div className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold text-foreground">
+          Grade {cls?.grade} - {cls?.section}{" "}
+          <span className="font-normal text-muted-foreground">
+            ({cls?.academic_year})
+          </span>
+        </h3>
+        <StaffingPanel gate subjects={data.subjects} onAssigned={load} />
+      </div>
+    )
   }
 
   return (
@@ -1409,6 +1444,7 @@ function SectionBuilder({
           </Button>
         </div>
       </div>
+
 
       <div className="overflow-x-auto rounded-xl border border-border">
         {orientation === "days-rows" ? (
@@ -3973,6 +4009,237 @@ function TeacherTimetableView() {
             </div>
           )
         })()
+      )}
+    </div>
+  )
+}
+
+/* ── Staffing panel ─────────────────────────────────────────────────────────
+   Teachers are created with capability only (subjects + grades); the section
+   mapping happens per class. Before a timetable is built for a section, the
+   admin assigns a teacher to each of its unstaffed subjects right here. */
+
+interface StaffCandidate {
+  id: string
+  full_name: string
+  designation: string | null
+  tier: 1 | 2 | 3 | 4
+  load: { slots: number; allotments: number }
+}
+
+const STAFF_TIER_LABEL: Record<number, string> = {
+  1: "Allotted",
+  2: "Can teach it",
+  3: "In the owning department",
+  4: "Everyone else",
+}
+
+function StaffingPanel({
+  subjects,
+  onAssigned,
+  gate = false,
+}: {
+  subjects: BuilderSubject[]
+  onAssigned: () => void
+  /** Gate mode: the builder is held behind this panel — always expanded. */
+  gate?: boolean
+}) {
+  const unstaffed = subjects.filter((s) => !s.default_teacher_id)
+  const [open, setOpen] = useState(gate)
+  const [candidates, setCandidates] = useState<
+    Record<string, StaffCandidate[]>
+  >({})
+  const [picked, setPicked] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState<string | null>(null)
+  // Rows where the admin asked to see beyond the capability filter.
+  const [showAll, setShowAll] = useState<Record<string, boolean>>({})
+
+  // Candidates load once per expanded panel, in parallel for every gap.
+  useEffect(() => {
+    if (!open || unstaffed.length === 0) return
+    let alive = true
+    Promise.all(
+      unstaffed
+        .filter((s) => !candidates[s.class_subject_id])
+        .map((s) =>
+          apiClient
+            .get<{ candidates: StaffCandidate[] }>(
+              `/api/teacher-assignments/candidates?class_subject_id=${s.class_subject_id}`
+            )
+            .then((r) => [s.class_subject_id, r.candidates ?? []] as const)
+            .catch(() => [s.class_subject_id, []] as const)
+        )
+    ).then((pairs) => {
+      if (!alive || pairs.length === 0) return
+      setCandidates((prev) => ({ ...prev, ...Object.fromEntries(pairs) }))
+    })
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, unstaffed.length])
+
+  if (unstaffed.length === 0) return null
+
+  const assign = async (classSubjectId: string) => {
+    const teacherId = picked[classSubjectId]
+    if (!teacherId) return
+    setBusy(classSubjectId)
+    try {
+      await apiClient.post("/api/teacher-assignments", {
+        teacher_id: teacherId,
+        class_subject_id: classSubjectId,
+      })
+      toast.success("Teacher assigned")
+      onAssigned()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not assign")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/40">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+        <WarningIcon className="size-3.5 shrink-0" />
+        <span>
+          {unstaffed.length === 1
+            ? `${unstaffed[0].subject_name} has no teacher for this section`
+            : `${unstaffed.length} subjects have no teacher for this section`}
+          {gate
+            ? " — assign a teacher to each subject to start building the timetable."
+            : " — assign them before building, or their periods go out teacherless."}
+        </span>
+        {!gate && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            className="font-medium underline underline-offset-2 hover:opacity-80"
+          >
+            {open ? "Hide" : "Assign teachers"}
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="flex flex-col divide-y divide-amber-200/70 rounded-lg border border-amber-200/70 bg-background dark:divide-amber-800/50 dark:border-amber-800/50">
+          {unstaffed.map((s) => {
+            const rows = candidates[s.class_subject_id]
+            return (
+              <div
+                key={s.class_subject_id}
+                className="flex flex-wrap items-center gap-2 px-3 py-2"
+              >
+                <span className="w-40 truncate text-xs font-medium text-foreground">
+                  {s.subject_name}
+                </span>
+                <div className="min-w-56 flex-1">
+                  {(() => {
+                    // Only teachers who CAN take this subject (capability,
+                    // tier 2). Teachers from before capability existed have
+                    // no rows, so an empty result offers "show all" instead
+                    // of a dead end.
+                    const capable = (rows ?? []).filter((c) => c.tier === 2)
+                    const all = showAll[s.class_subject_id] || capable.length === 0
+                    const tiers = all ? [2, 3, 4] : [2]
+                    return (
+                      <Select
+                        value={picked[s.class_subject_id] ?? ""}
+                        onValueChange={(v) =>
+                          setPicked((prev) => ({
+                            ...prev,
+                            [s.class_subject_id]: v,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-full text-xs">
+                          <SelectValue
+                            placeholder={
+                              !rows
+                                ? "Loading candidates…"
+                                : capable.length > 0
+                                  ? `Pick a teacher (${capable.length} can teach ${s.subject_name})…`
+                                  : "Pick a teacher…"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {rows && capable.length === 0 && (
+                            <div className="max-w-72 px-2 py-1.5 text-[11px] text-muted-foreground">
+                              No teacher has {s.subject_name} in their
+                              subjects yet — showing everyone. Set it on the
+                              teacher to see them ranked here.
+                            </div>
+                          )}
+                          {tiers.map((tier) => {
+                            const inTier = (rows ?? []).filter(
+                              (c) => c.tier === tier
+                            )
+                            if (inTier.length === 0) return null
+                            return (
+                              <Fragment key={tier}>
+                                <div className="px-2 py-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                                  {STAFF_TIER_LABEL[tier]}
+                                </div>
+                                {inTier.map((c) => (
+                                  <SelectItem key={c.id} value={c.id}>
+                                    {c.full_name}
+                                    {c.load.allotments > 0
+                                      ? ` · ${c.load.allotments} allotments`
+                                      : ""}
+                                  </SelectItem>
+                                ))}
+                              </Fragment>
+                            )
+                          })}
+                          {!all && (
+                            <button
+                              type="button"
+                              className="w-full px-2 py-1.5 text-left text-[11px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                              onPointerDown={(e) => {
+                                // pointerdown, not click: Radix closes the
+                                // menu on click before a click handler runs.
+                                e.preventDefault()
+                                setShowAll((prev) => ({
+                                  ...prev,
+                                  [s.class_subject_id]: true,
+                                }))
+                              }}
+                            >
+                              Show all teachers…
+                            </button>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )
+                  })()}
+                </div>
+                <Button
+                  size="sm"
+                  className="h-8 rounded-full text-xs"
+                  disabled={
+                    !picked[s.class_subject_id] ||
+                    busy === s.class_subject_id
+                  }
+                  onClick={() => assign(s.class_subject_id)}
+                >
+                  {busy === s.class_subject_id ? "Assigning…" : "Assign"}
+                </Button>
+              </div>
+            )
+          })}
+          <div className="px-3 py-2 text-[11px] text-muted-foreground">
+            Assigning here creates the allotment — the same one the{" "}
+            <Link
+              to="/allotments"
+              className="underline underline-offset-2"
+            >
+              Allotments board
+            </Link>{" "}
+            shows.
+          </div>
+        </div>
       )}
     </div>
   )
