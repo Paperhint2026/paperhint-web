@@ -186,11 +186,24 @@ interface AttentionItem {
   onClick: () => void
 }
 
+/** Module 07: the server-computed nine-step setup checklist. */
+interface SetupStatus {
+  steps: {
+    key: string
+    label: string
+    done: boolean
+    detail: string | null
+    link: string
+  }[]
+  complete: boolean
+}
+
 export function AdminHome({ firstName }: { firstName: string }) {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const subjects = useAppSelector((s) => s.subjects.subjects)
   const [data, setData] = useState<SchoolData | null>(null)
+  const [setup, setSetup] = useState<SetupStatus | null>(null)
 
   useEffect(() => {
     dispatch(fetchSubjects())
@@ -198,12 +211,18 @@ export function AdminHome({ firstName }: { firstName: string }) {
     Promise.allSettled([
       apiClient.get<GroupedClasses>("/api/classes/grouped"),
       apiClient.get<{ teachers: TeacherLite[] }>("/api/auth/teachers/overview"),
-    ]).then(([g, t]) => {
+      apiClient.get<SetupStatus>("/api/home/setup-status"),
+    ]).then(([g, t, s]) => {
       if (cancelled) return
       setData({
         grouped: g.status === "fulfilled" ? g.value : { classes: {} },
         teachers: t.status === "fulfilled" ? (t.value.teachers ?? []) : [],
       })
+      // Server checklist is the nine-step truth (module 07); on failure the
+      // local four-step fallback below still renders.
+      if (s.status === "fulfilled" && Array.isArray(s.value.steps)) {
+        setSetup(s.value)
+      }
     })
     return () => {
       cancelled = true
@@ -289,8 +308,17 @@ export function AdminHome({ firstName }: { firstName: string }) {
       onClick: () => navigate("/students"),
     },
   ]
-  const doneCount = checklist.filter((c) => c.done).length
-  const setupDone = doneCount === checklist.length
+  // Nine server-computed steps when available; the local four otherwise.
+  const steps = setup
+    ? setup.steps.map((s) => ({
+        label: s.label,
+        done: s.done,
+        hint: s.detail ?? (s.done ? "Done" : ""),
+        onClick: () => navigate(s.link),
+      }))
+    : checklist
+  const doneCount = steps.filter((c) => c.done).length
+  const setupDone = setup ? setup.complete : doneCount === steps.length
 
   const attention: AttentionItem[] = []
   for (const t of view.invited.slice(0, 3)) {
@@ -385,15 +413,15 @@ export function AdminHome({ firstName }: { firstName: string }) {
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
               <span
                 className="block h-full rounded-full bg-primary transition-[width] duration-500"
-                style={{ width: `${(doneCount / checklist.length) * 100}%` }}
+                style={{ width: `${(doneCount / steps.length) * 100}%` }}
               />
             </span>
             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-              {doneCount} of {checklist.length}
+              {doneCount} of {steps.length}
             </span>
           </div>
           <div className="grid gap-1 p-2 pt-3 sm:grid-cols-2">
-            {checklist.map((step) => (
+            {steps.map((step) => (
               <button
                 key={step.label}
                 type="button"
@@ -430,6 +458,14 @@ export function AdminHome({ firstName }: { firstName: string }) {
             ))}
           </div>
         </HomePanel>
+      )}
+
+      {/* Folded state: setup finished — one quiet line, operations lead. */}
+      {!isLoading && setupDone && setup && (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CheckCircleIcon weight="fill" className="size-3.5 text-primary" />
+          School setup is complete — timetable published for every class.
+        </p>
       )}
 
       {/* ── Grades: a corridor of doors ── */}
