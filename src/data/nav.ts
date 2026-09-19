@@ -221,13 +221,13 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: "Operations",
     items: [
-      soon(
-        "attendance",
-        "Attendance",
-        ClipboardTextIcon,
-        "A9",
-        "The day's roll across the school; absences dispatched to parents; registers that haven't come in are visible and can be chased."
-      ),
+      {
+        key: "attendance",
+        title: "Attendance",
+        icon: ClipboardTextIcon,
+        path: "/attendance",
+        status: "live",
+      },
       soon(
         "substitution",
         "Leave & substitution",
@@ -298,6 +298,13 @@ export const TEACHER_NAV: NavGroup[] = [
         title: "Classes",
         icon: ChalkboardIcon,
         path: "/classes",
+        status: "live",
+      },
+      {
+        key: "attendance",
+        title: "Attendance",
+        icon: ClipboardTextIcon,
+        path: "/attendance",
         status: "live",
       },
       {

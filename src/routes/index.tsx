@@ -38,6 +38,7 @@ import { PlatformSchoolNewPage } from "@/modules/platform/pages/platform-school-
 import { FeatureRoute } from "@/components/shared/feature-route"
 import { ComingSoonPage } from "@/modules/coming-soon/pages/coming-soon-page"
 import { AllotmentsPage } from "@/modules/allotments/pages/allotments-page"
+import { AttendancePage } from "@/modules/attendance/pages/attendance-page"
 import { RolloverPage } from "@/modules/rollover/pages/rollover-page"
 import { DepartmentsPage } from "@/modules/departments/pages/departments-page"
 import { DepartmentDetailPage } from "@/modules/departments/pages/department-detail-page"
@@ -101,6 +102,7 @@ export const router = createBrowserRouter([
           // School admin's configuration home (role-gated in the page)
           { path: "soon/:slug", element: <ComingSoonPage /> },
           { path: "allotments", element: <AllotmentsPage /> },
+          { path: "attendance", element: <AttendancePage /> },
           { path: "rollover", element: <RolloverPage /> },
           { path: "departments", element: <DepartmentsPage /> },
           { path: "departments/:id", element: <DepartmentDetailPage /> },

@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { DatePickerField } from "@/components/shared/date-picker-field"
 
 /**
  * Setup › Academic year (module 01). One year is open at a time; closed years
@@ -188,24 +189,20 @@ export function AcademicYearCard() {
                   <Label htmlFor="ay-start" className="text-xs">
                     Starts
                   </Label>
-                  <Input
-                    id="ay-start"
-                    type="date"
-                    className="w-40"
+                  <DatePickerField
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={setStartDate}
+                    className="w-48"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="ay-end" className="text-xs">
                     Ends
                   </Label>
-                  <Input
-                    id="ay-end"
-                    type="date"
-                    className="w-40"
+                  <DatePickerField
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={setEndDate}
+                    className="w-48"
                   />
                 </div>
                 <div className="ml-auto flex gap-2">

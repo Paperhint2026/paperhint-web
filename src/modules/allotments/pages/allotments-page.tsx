@@ -45,6 +45,8 @@ type BoardSection = {
   class_id: string
   section: string
   academic_year: string
+  class_teacher_id: string | null
+  class_teacher_name: string | null
   subjects: BoardSubject[]
 }
 type Board = {
@@ -193,7 +195,7 @@ export function AllotmentsPage() {
                   <table className="w-full min-w-[640px] text-sm">
                     <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
                       <tr>
-                        <th className="w-24 px-3 py-2 font-medium">Section</th>
+                        <th className="w-40 px-3 py-2 font-medium">Section</th>
                         <th className="px-3 py-2 font-medium">
                           Subjects and who teaches them
                         </th>
@@ -203,7 +205,14 @@ export function AllotmentsPage() {
                       {g.sections.map((s) => (
                         <tr key={s.class_id} className="align-top">
                           <td className="px-3 py-3 font-medium text-foreground">
-                            {s.section}
+                            <div className="flex flex-col gap-1">
+                              <span>{s.section}</span>
+                              <ClassTeacherPicker
+                                section={s}
+                                canEdit={isAdmin}
+                                onChanged={load}
+                              />
+                            </div>
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex flex-wrap gap-2">
@@ -446,3 +455,171 @@ function Cell({
     </div>
   )
 }
+
+/* ── Class teacher ──────────────────────────────────────────────────────────
+   One per section, chosen here on the board. Owns the section: takes the
+   day roll in per-day attendance, sees the class's full day in per-period
+   mode; later student-update privileges hang off it. */
+
+let teacherListCache: TeacherLite[] | null = null
+
+function ClassTeacherPicker({
+  section,
+  canEdit,
+  onChanged,
+}: {
+  section: BoardSection
+  canEdit: boolean
+  onChanged: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [teachers, setTeachers] = useState<TeacherLite[] | null>(teacherListCache)
+  const [query, setQuery] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!open || teachers) return
+    apiClient
+      .get<{ teachers: TeacherLite[] }>("/api/auth/teachers")
+      .then((r) => {
+        teacherListCache = r.teachers ?? []
+        setTeachers(teacherListCache)
+      })
+      .catch(() => setTeachers([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const set = async (teacher_id: string | null) => {
+    setBusy(true)
+    try {
+      await apiClient.put("/api/teacher-assignments/class-teacher", {
+        class_id: section.class_id,
+        teacher_id,
+      })
+      toast.success(teacher_id ? "Class teacher set" : "Class teacher cleared")
+      setOpen(false)
+      onChanged()
+    } catch (e) {
+      showError(e, "Could not set the class teacher")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!canEdit) {
+    return section.class_teacher_name ? (
+      <span className="text-[11px] font-normal whitespace-nowrap text-muted-foreground">
+        CT: {section.class_teacher_name}
+      </span>
+    ) : null
+  }
+
+  const filtered = (teachers ?? []).filter((t) =>
+    t.full_name.toLowerCase().includes(query.toLowerCase())
+  )
+  // Teachers already teaching this section lead the list — the class teacher
+  // is almost always one of them.
+  const sectionTeacherIds = new Set(
+    section.subjects.flatMap((sub) => sub.teachers.map((t) => t.id))
+  )
+  const teachesHere = filtered.filter((t) => sectionTeacherIds.has(t.id))
+  const others = filtered.filter((t) => !sectionTeacherIds.has(t.id))
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={
+            section.class_teacher_name
+              ? `Class teacher: ${section.class_teacher_name} — change`
+              : "Choose the class teacher"
+          }
+          className={cn(
+            "self-start rounded-md border border-dashed px-1.5 py-0.5 text-[11px] font-normal whitespace-nowrap transition-colors",
+            section.class_teacher_name
+              ? "border-transparent bg-primary/10 text-primary hover:bg-primary/15"
+              : "border-border text-muted-foreground hover:bg-muted"
+          )}
+        >
+          {section.class_teacher_name ? (
+            <>
+              CT:{" "}
+              <span className="inline-block max-w-28 truncate align-bottom">
+                {section.class_teacher_name}
+              </span>
+            </>
+          ) : (
+            "+ Class teacher"
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <Input
+          autoFocus
+          placeholder="Find a teacher…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="mb-2 h-8 text-xs"
+        />
+        <div className="max-h-56 overflow-y-auto">
+          {teachers === null ? (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">Loading…</p>
+          ) : (
+            <>
+              {teachesHere.length > 0 && (
+                <p className="px-2 pt-1 pb-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                  Teaches this class
+                </p>
+              )}
+              {teachesHere.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => set(t.id)}
+                  className={cn(
+                    "block w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted",
+                    t.id === section.class_teacher_id && "font-medium text-primary"
+                  )}
+                >
+                  {t.full_name}
+                </button>
+              ))}
+              {teachesHere.length > 0 && others.length > 0 && (
+                <p className="px-2 pt-1.5 pb-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                  Everyone else
+                </p>
+              )}
+              {others.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => set(t.id)}
+                  className={cn(
+                    "block w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted",
+                    t.id === section.class_teacher_id && "font-medium text-primary"
+                  )}
+                >
+                  {t.full_name}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+        {section.class_teacher_id && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => set(null)}
+            className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-xs text-destructive transition-colors hover:bg-destructive/10"
+          >
+            Clear class teacher
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  )
+}
+

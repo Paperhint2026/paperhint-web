@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import { DatePickerField } from "@/components/shared/date-picker-field"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
@@ -208,10 +209,9 @@ export function PlatformSchoolPage() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs">Valid until</Label>
-                  <Input
-                    type="date"
+                  <DatePickerField
                     value={validUntil}
-                    onChange={(e) => setValidUntil(e.target.value)}
+                    onChange={setValidUntil}
                   />
                 </div>
               </div>
