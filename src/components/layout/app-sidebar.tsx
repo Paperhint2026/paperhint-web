@@ -18,6 +18,7 @@ import {
 import { SidebarIcon } from "@phosphor-icons/react"
 import { PaperhintMark } from "@/components/shared/paperhint-mark"
 import { PaperhintWordmark } from "@/components/shared/paperhint-wordmark"
+import { NotificationsBell } from "@/components/layout/notifications-bell"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { NavViewRole } from "@/components/nav-view-role"
@@ -158,6 +159,7 @@ export function AppSidebar() {
             <>
               <PaperhintMark className="size-7 shrink-0 text-primary" />
               <PaperhintWordmark className="min-w-0 flex-1 truncate text-base text-foreground" />
+              <NotificationsBell />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button

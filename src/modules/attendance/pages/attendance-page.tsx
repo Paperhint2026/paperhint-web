@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useLocation } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CameraIcon,
@@ -16,6 +17,7 @@ import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
@@ -130,27 +132,45 @@ export function AttendancePage() {
 }
 
 function AdminAttendance() {
-  const [tab, setTab] = useState<"students" | "teachers">("students")
+  const [tab, setTab] = useState<"students" | "teachers" | "leave">("students")
+  const [pending, setPending] = useState(0)
+  useEffect(() => {
+    apiClient
+      .get<{ pending: number }>("/api/leaves")
+      .then((r) => setPending(r.pending ?? 0))
+      .catch(() => {})
+  }, [tab])
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-1 rounded-lg bg-muted p-1 self-start">
-        {(["students", "teachers"] as const).map((t) => (
+      <div className="flex gap-1 self-start rounded-lg bg-muted p-1">
+        {(["students", "teachers", "leave"] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
             className={cn(
-              "rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors",
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors",
               tab === t
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
             {t}
+            {t === "leave" && pending > 0 && (
+              <span className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                {pending}
+              </span>
+            )}
           </button>
         ))}
       </div>
-      {tab === "students" ? <AdminDayView /> : <AdminTeacherRoll />}
+      {tab === "students" ? (
+        <AdminDayView />
+      ) : tab === "teachers" ? (
+        <AdminTeacherRoll />
+      ) : (
+        <AdminLeaveList onPendingChange={setPending} />
+      )}
     </div>
   )
 }
@@ -352,6 +372,8 @@ function TeacherToday() {
         date={date}
         onChecked={(s) => setSelf(s)}
       />
+
+      <LeaveCard />
 
       <div className="flex items-center gap-3">
         <DatePickerField value={date} onChange={load} className="w-52" disableFuture />
@@ -1095,6 +1117,346 @@ function ClassDayView({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Leave requests (module A10 · phase 1) ──────────────────────────────── */
+
+type Leave = {
+  id: string
+  start_date: string
+  end_date: string
+  reason: string | null
+  status: "requested" | "approved" | "rejected"
+  created_at: string
+  decided_at?: string | null
+  teacher?: { full_name: string } | null
+  decider?: { full_name: string } | null
+}
+
+const LEAVE_BADGE: Record<Leave["status"], string> = {
+  requested: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  approved: "bg-primary/10 text-primary",
+  rejected: "bg-destructive/10 text-destructive",
+}
+
+function fmtRange(l: Leave) {
+  return l.start_date === l.end_date ? l.start_date : `${l.start_date} → ${l.end_date}`
+}
+
+function LeaveCard() {
+  const location = useLocation()
+  const [leaves, setLeaves] = useState<Leave[] | null>(null)
+  const [waveId, setWaveId] = useState<string | null>(null)
+  const [waveKind, setWaveKind] = useState<"approved" | "rejected">("approved")
+  const [applying, setApplying] = useState(false)
+  const [start, setStart] = useState("")
+  const [end, setEnd] = useState("")
+  const [reason, setReason] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(() => {
+    apiClient
+      .get<{ leaves: Leave[] }>("/api/leaves/mine")
+      .then((r) => setLeaves(r.leaves))
+      .catch(() => setLeaves([]))
+  }, [])
+  useEffect(() => {
+    load()
+    // A decision arriving over the rail refreshes the card in place.
+    const onRail = (e: Event) => {
+      const n = (e as CustomEvent).detail
+      if (n?.type === "leave_decided") load()
+    }
+    window.addEventListener("ph:notification", onRail)
+    return () => window.removeEventListener("ph:notification", onRail)
+  }, [load])
+
+  // Arriving here FROM the decision notification: play the approval wave on
+  // the freshly decided row (calmer pulse for a rejection).
+  useEffect(() => {
+    const state = location.state as { rail?: string; at?: number } | null
+    if (state?.rail !== "leave_decided" || !leaves?.length) return
+    const decided = [...leaves]
+      .filter((l) => l.status !== "requested" && l.decided_at)
+      .sort((a, b) => (b.decided_at! > a.decided_at! ? 1 : -1))[0]
+    if (!decided) return
+    setWaveKind(decided.status === "approved" ? "approved" : "rejected")
+    setWaveId(decided.id)
+    // consume the state so a refresh doesn't replay the animation
+    window.history.replaceState({}, "")
+    const t = setTimeout(() => setWaveId(null), 3200)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, leaves === null])
+
+  const submit = async () => {
+    setBusy(true)
+    try {
+      await apiClient.post("/api/leaves", {
+        start_date: start,
+        end_date: end || start,
+        reason,
+      })
+      toast.success("Leave requested — the office will decide")
+      setApplying(false)
+      setStart("")
+      setEnd("")
+      setReason("")
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not request leave")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const withdraw = async (id: string) => {
+    try {
+      await apiClient.delete(`/api/leaves/${id}`)
+      toast.success("Request withdrawn")
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not withdraw")
+    }
+  }
+
+  const visible = (leaves ?? []).slice(0, 4)
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background px-4 py-3">
+      {/* The approval wave: three soft ripples spreading from the row, green
+          for approved; a single quiet grey pulse for rejected. */}
+      <style>{`
+        @keyframes leaveWaveApproved {
+          0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 45%, transparent); background: color-mix(in oklch, var(--color-primary) 14%, transparent); }
+          70%  { box-shadow: 0 0 0 18px transparent; }
+          100% { box-shadow: 0 0 0 0 transparent; background: color-mix(in oklch, var(--color-primary) 6%, transparent); }
+        }
+        @keyframes leaveWaveRejected {
+          0%   { background: color-mix(in oklch, var(--color-muted-foreground) 18%, transparent); }
+          100% { background: transparent; }
+        }
+        .leave-wave-approved { animation: leaveWaveApproved 1s ease-out 3; }
+        .leave-wave-rejected { animation: leaveWaveRejected 2.4s ease-out 1; }
+        @media (prefers-reduced-motion: reduce) {
+          .leave-wave-approved, .leave-wave-rejected { animation: none; background: color-mix(in oklch, var(--color-primary) 10%, transparent); }
+        }
+      `}</style>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium text-foreground">Leave</span>
+        {!applying && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => setApplying(true)}
+          >
+            Apply for leave
+          </Button>
+        )}
+      </div>
+
+      {applying && (
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/30 p-3">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">From</span>
+            <DatePickerField
+              value={start}
+              onChange={(d) => {
+                setStart(d)
+                if (end && end < d) setEnd(d)
+              }}
+              className="w-36"
+              short
+              disablePast
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">To</span>
+            <DatePickerField
+              value={end || start}
+              onChange={setEnd}
+              className="w-36"
+              short
+              disablePast
+              minDate={start || undefined}
+            />
+          </div>
+          {start && (
+            <span className="pb-2 text-xs font-medium whitespace-nowrap text-primary">
+              {(() => {
+                const days =
+                  Math.round(
+                    (new Date((end || start) + "T00:00:00").getTime() -
+                      new Date(start + "T00:00:00").getTime()) /
+                      86400000
+                  ) + 1
+                return days > 0 ? `${days} day${days === 1 ? "" : "s"}` : "check the dates"
+              })()}
+            </span>
+          )}
+          <div className="flex min-w-48 flex-1 flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">Reason</span>
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. medical, family function…"
+              maxLength={500}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setApplying(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={submit} disabled={busy || !start}>
+              {busy ? <CircleNotchIcon className="size-4 animate-spin" /> : "Request"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {visible.length > 0 && (
+        <div className="flex flex-col divide-y divide-border">
+          {visible.map((l) => (
+            <div
+              key={l.id}
+              className={cn(
+                "flex flex-wrap items-center gap-2 rounded-lg px-2 py-1.5 text-xs",
+                waveId === l.id &&
+                  (waveKind === "approved" ? "leave-wave-approved" : "leave-wave-rejected")
+              )}
+            >
+              <span className="font-medium text-foreground">{fmtRange(l)}</span>
+              {l.reason && <span className="text-muted-foreground">· {l.reason}</span>}
+              {l.status !== "requested" && l.decider?.full_name && (
+                <span className="text-[11px] text-muted-foreground">
+                  · {l.status} by {l.decider.full_name}
+                  {l.decided_at
+                    ? ` on ${new Date(l.decided_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                    : ""}
+                </span>
+              )}
+              <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium", LEAVE_BADGE[l.status])}>
+                {l.status}
+              </span>
+              {l.status === "requested" && (
+                <button
+                  type="button"
+                  onClick={() => withdraw(l.id)}
+                  className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-destructive"
+                >
+                  withdraw
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AdminLeaveList({ onPendingChange }: { onPendingChange: (n: number) => void }) {
+  const [leaves, setLeaves] = useState<Leave[] | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    apiClient
+      .get<{ leaves: Leave[]; pending: number }>("/api/leaves")
+      .then((r) => {
+        setLeaves(r.leaves)
+        onPendingChange(r.pending ?? 0)
+      })
+      .catch(() => setLeaves([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const decide = async (id: string, action: "approve" | "reject") => {
+    setBusy(id)
+    try {
+      await apiClient.post(`/api/leaves/${id}/decide`, { action })
+      toast.success(action === "approve" ? "Approved — staff roll marked for those days" : "Rejected")
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not decide")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (leaves === null) return <Skeleton className="h-48 w-full rounded-xl" />
+  if (leaves.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-background px-5 py-12 text-center">
+        <Sticker name="greet" size={88} />
+        <p className="text-sm text-muted-foreground">No leave requests yet.</p>
+      </div>
+    )
+  }
+
+  const pending = leaves.filter((l) => l.status === "requested")
+  const decided = leaves.filter((l) => l.status !== "requested")
+
+  const Row = ({ l }: { l: Leave }) => (
+    <div className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-foreground">
+          {l.teacher?.full_name ?? "—"}
+        </span>
+        <span className="text-[11px] text-muted-foreground">
+          {fmtRange(l)}
+          {l.reason ? ` · ${l.reason}` : ""}
+          {l.status !== "requested" && l.decider?.full_name
+            ? ` · ${l.status} by ${l.decider.full_name}`
+            : ""}
+        </span>
+      </span>
+      {l.status === "requested" ? (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" disabled={busy === l.id} onClick={() => decide(l.id, "reject")}>
+            Reject
+          </Button>
+          <Button size="sm" disabled={busy === l.id} onClick={() => decide(l.id, "approve")}>
+            Approve
+          </Button>
+        </div>
+      ) : (
+        <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", LEAVE_BADGE[l.status])}>
+          {l.status}
+        </span>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      {pending.length > 0 && (
+        <div className="flex flex-col">
+          <span className="mb-1 text-xs font-medium text-muted-foreground">
+            Waiting for a decision
+          </span>
+          <div className="divide-y divide-border rounded-xl border border-border bg-background">
+            {pending.map((l) => (
+              <Row key={l.id} l={l} />
+            ))}
+          </div>
+        </div>
+      )}
+      {decided.length > 0 && (
+        <div className="flex flex-col">
+          <span className="mb-1 text-xs font-medium text-muted-foreground">History</span>
+          <div className="divide-y divide-border rounded-xl border border-border bg-background">
+            {decided.map((l) => (
+              <Row key={l.id} l={l} />
+            ))}
+          </div>
         </div>
       )}
     </div>
