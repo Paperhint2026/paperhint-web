@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useLocation } from "react-router-dom"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useLocation, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CameraIcon,
   CheckCircleIcon,
+  CheckIcon,
+  XIcon,
   CircleNotchIcon,
   ClipboardTextIcon,
   WarningIcon,
@@ -18,6 +20,11 @@ import { PageHeader } from "@/components/layout/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
@@ -52,6 +59,9 @@ type TodayPeriod = {
   start_time: string | null
   end_time: string | null
   subject: string
+  covering_for?: string | null
+  borrowed_from?: string | null
+  lent_to?: string | null
   marked_at: string | null
 }
 
@@ -105,6 +115,13 @@ function fmtClock(iso: string | null) {
   })
 }
 
+/** The period number as the school says it — from the NAME ("Period 6" → 6).
+ *  Raw period_number counts breaks (recess/lunch), so it drifts: 1,2,4,5,6,8… */
+function periodNo(name: string | null | undefined, number: number | null | undefined) {
+  const m = String(name || "").match(/\d+/)
+  return m ? m[0] : (number ?? "?")
+}
+
 function fmtTime(t: string | null) {
   if (!t) return ""
   const [h, m] = t.split(":").map(Number)
@@ -131,8 +148,19 @@ export function AttendancePage() {
   )
 }
 
+const ADMIN_TABS = ["students", "teachers", "leave", "substitutions"] as const
+type AdminTab = (typeof ADMIN_TABS)[number]
+
 function AdminAttendance() {
-  const [tab, setTab] = useState<"students" | "teachers" | "leave">("students")
+  const navigate = useNavigate()
+  const { tab: tabParam } = useParams<{ tab: string }>()
+  // The tab lives in the URL (/attendance/substitutions …) so notification
+  // links and shared URLs land on the right view.
+  const tab: AdminTab = ADMIN_TABS.includes(tabParam as AdminTab)
+    ? (tabParam as AdminTab)
+    : "students"
+  const setTab = (t: AdminTab) =>
+    navigate(t === "students" ? "/attendance" : `/attendance/${t}`)
   const [pending, setPending] = useState(0)
   useEffect(() => {
     apiClient
@@ -143,7 +171,7 @@ function AdminAttendance() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-1 self-start rounded-lg bg-muted p-1">
-        {(["students", "teachers", "leave"] as const).map((t) => (
+        {ADMIN_TABS.map((t) => (
           <button
             key={t}
             type="button"
@@ -168,8 +196,10 @@ function AdminAttendance() {
         <AdminDayView />
       ) : tab === "teachers" ? (
         <AdminTeacherRoll />
-      ) : (
+      ) : tab === "leave" ? (
         <AdminLeaveList onPendingChange={setPending} />
+      ) : (
+        <AdminSubstitutions />
       )}
     </div>
   )
@@ -375,6 +405,12 @@ function TeacherToday() {
 
       <LeaveCard />
 
+      <MyCoversCard />
+
+      <OpenClassesCard onChanged={() => load(date)} />
+
+      <BorrowCard onChanged={() => load(date)} />
+
       <div className="flex items-center gap-3">
         <DatePickerField value={date} onChange={load} className="w-52" disableFuture />
         {periods && (
@@ -405,11 +441,15 @@ function TeacherToday() {
             <button
               key={`${p.class_id}|${p.period_id}`}
               type="button"
+              disabled={!!p.lent_to}
               onClick={() => setOpen(p)}
-              className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-muted/60"
+              className={cn(
+                "flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors",
+                p.lent_to ? "opacity-60" : "hover:bg-muted/60"
+              )}
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-secondary-foreground">
-                {p.period_number ?? "D"}
+                {p.period_id ? periodNo(p.period_name, p.period_number) : "D"}
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-sm font-medium text-foreground">
@@ -419,9 +459,28 @@ function TeacherToday() {
                   {p.start_time
                     ? `${fmtTime(p.start_time)} – ${fmtTime(p.end_time)}`
                     : p.period_name}
+                  {p.covering_for ? (
+                    <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      covering for {p.covering_for}
+                    </span>
+                  ) : null}
+                  {p.borrowed_from ? (
+                    <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                      borrowed from {p.borrowed_from}
+                    </span>
+                  ) : null}
+                  {p.lent_to ? (
+                    <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground line-through">
+                      lent to {p.lent_to}
+                    </span>
+                  ) : null}
                 </span>
               </span>
-              {p.marked_at ? (
+              {p.lent_to ? (
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  their roll now
+                </span>
+              ) : p.marked_at ? (
                 <CheckCircleIcon weight="fill" className="size-5 shrink-0 text-primary" />
               ) : (
                 <Badge variant="secondary" className="shrink-0 rounded-full text-[10px]">
@@ -873,7 +932,7 @@ function AdminDayView() {
                     key={p.id}
                     className="border-b border-l border-border px-2 py-2 text-center font-medium text-muted-foreground"
                   >
-                    {p.period_number}
+                    {periodNo(p.name, p.period_number)}
                   </th>
                 ))}
               </tr>
@@ -1459,6 +1518,931 @@ function AdminLeaveList({ onPendingChange }: { onPendingChange: (n: number) => v
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ── Substitutions (module A10 · phase 2) ───────────────────────────────── */
+
+type Gap = {
+  slot_id: string
+  class_label: string
+  period_number: number | null
+  period_name: string | null
+  start_time: string | null
+  subject: string
+  absent_teacher_name: string | null
+  absent_status: "absent" | "leave"
+  cover: { id: string; teacher_name: string | null; source: string } | null
+  offers: { id: string; teacher_id: string; teacher_name: string | null; status: string }[]
+}
+
+type SubCandidate = {
+  id: string
+  full_name: string
+  tier: 1 | 2 | 3 | 4 | 5
+  offer_id: string | null
+  covers_today: number
+  checked_in: boolean | null
+}
+
+const SUB_TIER: Record<number, string> = {
+  1: "Volunteered",
+  2: "Teaches this class",
+  3: "Can teach the subject",
+  4: "Owning department",
+  5: "Free",
+}
+
+/* Teacher: confirmed covering periods, this week */
+
+function MyCoversCard() {
+  type Cover = {
+    id: string
+    date: string
+    source: string
+    class_label: string
+    period_number: number | null
+    period_name: string | null
+    start_time: string | null
+    subject: string
+    absent_teacher_name: string | null
+  }
+  const [covers, setCovers] = useState<Cover[] | null>(null)
+
+  const load = useCallback(() => {
+    apiClient
+      .get<{ covers: Cover[] }>("/api/substitutions/mine")
+      .then((r) => setCovers(r.covers))
+      .catch(() => setCovers([]))
+  }, [])
+  useEffect(() => {
+    load()
+    const onRail = (e: Event) => {
+      const t = (e as CustomEvent).detail?.type
+      if (t?.startsWith("substitution")) load()
+    }
+    window.addEventListener("ph:notification", onRail)
+    return () => window.removeEventListener("ph:notification", onRail)
+  }, [load])
+
+  if (!covers || covers.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+      <span className="text-sm font-medium text-foreground">
+        You&apos;re covering
+      </span>
+      <div className="flex flex-col divide-y divide-primary/15">
+        {covers.map((c) => (
+          <div key={c.id} className="flex flex-wrap items-center gap-2 py-1.5 text-xs">
+            <span className="font-medium text-foreground">
+              {c.class_label} · {c.subject}
+            </span>
+            <span className="text-muted-foreground">
+              {new Date(c.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+              {" · "}
+              {c.period_name || `P${periodNo(null, c.period_number)}`}
+              {c.start_time ? ` · ${fmtTime(c.start_time)}` : ""}
+              {c.absent_teacher_name ? ` · for ${c.absent_teacher_name}` : ""}
+            </span>
+            {c.source === "auto" && (
+              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                auto-confirmed
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        The period appears in your day on that date — take the roll there.
+      </p>
+    </div>
+  )
+}
+
+/* Teacher: borrowed periods — direct teacher-to-teacher */
+
+type Borrow = {
+  id: string
+  date: string
+  slot_id: string
+  status: string
+  reason: string | null
+  owner_teacher_id: string
+  borrower_teacher_id: string
+  owner_name: string | null
+  borrower_name: string | null
+  class_label: string
+  period_number: number | null
+  period_name: string | null
+  start_time: string | null
+  subject: string
+}
+
+type AxisPeriod = {
+  period_id: string
+  name: string
+  start_time: string | null
+  end_time: string | null
+  is_break: boolean
+}
+
+type DayPeriod = {
+  slot_id: string
+  period_id: string
+  period_number: number | null
+  period_name: string | null
+  start_time: string | null
+  end_time: string | null
+  subject: string
+  owner_name: string | null
+  taken_by: string | null
+  state: "mine" | "borrowable" | "busy" | "taken" | "asked" | "unstaffed"
+}
+
+function fmtDay(d: string) {
+  return new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+}
+
+function BorrowCard({ onChanged }: { onChanged: () => void }) {
+  const [data, setData] = useState<{ incoming: Borrow[]; outgoing: Borrow[]; confirmed: Borrow[] } | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [asking, setAsking] = useState(false)
+  const [askDate, setAskDate] = useState(
+    () => new Intl.DateTimeFormat("en-CA").format(new Date())
+  )
+  const [classes, setClasses] = useState<{ id: string; label: string }[] | null>(null)
+  const [pickedClass, setPickedClass] = useState("")
+  const [day, setDay] = useState<DayPeriod[] | null>(null)
+  const [axis, setAxis] = useState<AxisPeriod[]>([])
+  const [pickedSlot, setPickedSlot] = useState("")
+  const [reason, setReason] = useState("")
+
+  const load = useCallback(() => {
+    apiClient
+      .get<{ incoming: Borrow[]; outgoing: Borrow[]; confirmed: Borrow[] }>("/api/borrows/mine")
+      .then(setData)
+      .catch(() => setData({ incoming: [], outgoing: [], confirmed: [] }))
+  }, [])
+  useEffect(() => {
+    load()
+    const onRail = (e: Event) => {
+      const t = (e as CustomEvent).detail?.type
+      if (t?.startsWith("borrow")) {
+        load()
+        onChanged()
+      }
+    }
+    window.addEventListener("ph:notification", onRail)
+    return () => window.removeEventListener("ph:notification", onRail)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load])
+
+  const loadClasses = () => {
+    if (classes) return
+    apiClient
+      .get<{ classes: { id: string; label: string }[] }>("/api/borrows/context")
+      .then((r) => {
+        setClasses(r.classes)
+        if (r.classes.length === 1) pickClass(r.classes[0].id, askDate)
+      })
+      .catch(() => setClasses([]))
+  }
+
+  const loadDay = (classId: string, d: string) => {
+    setDay(null)
+    setPickedSlot("")
+    apiClient
+      .get<{ axis: AxisPeriod[]; periods: DayPeriod[] }>(`/api/borrows/day?class_id=${classId}&date=${d}`)
+      .then((r) => {
+        setAxis(r.axis ?? [])
+        setDay(r.periods)
+      })
+      .catch(() => setDay([]))
+  }
+
+  const pickClass = (classId: string, d: string) => {
+    setPickedClass(classId)
+    loadDay(classId, d)
+  }
+
+  const sendRequest = async () => {
+    setBusy("ask")
+    try {
+      await apiClient.post("/api/borrows", { slot_id: pickedSlot, date: askDate, reason })
+      toast.success("Request sent — they'll confirm")
+      setAsking(false)
+      setPickedSlot("")
+      setReason("")
+      if (pickedClass) loadDay(pickedClass, askDate)
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not send")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const decide = async (id: string, action: "approve" | "decline") => {
+    setBusy(id)
+    try {
+      await apiClient.post(`/api/borrows/${id}/decide`, { action })
+      toast.success(action === "approve" ? "Lent — it's on their day now" : "Declined")
+      load()
+      onChanged()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not decide")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const cancel = async (id: string) => {
+    setBusy(id)
+    try {
+      await apiClient.delete(`/api/borrows/${id}`)
+      load()
+      onChanged()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not cancel")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const line = (b: Borrow) =>
+    `${fmtDay(b.date)} · ${b.period_name || `P${b.period_number}`}${b.start_time ? ` · ${fmtTime(b.start_time)}` : ""}`
+  const hasAnything =
+    data && (data.incoming.length || data.outgoing.length || data.confirmed.length)
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium text-foreground">Borrow a period</span>
+        <span className="text-xs text-muted-foreground">
+          Need more time with a class? Ask a colleague for their period.
+        </span>
+        {!asking && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={() => {
+              setAsking(true)
+              loadClasses()
+            }}
+          >
+            Ask for a period
+          </Button>
+        )}
+      </div>
+
+      {asking && (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+          {/* 1 · day and section */}
+          <div className="flex flex-wrap items-center gap-3">
+            <DatePickerField
+              value={askDate}
+              onChange={(d) => {
+                setAskDate(d)
+                if (pickedClass) loadDay(pickedClass, d)
+              }}
+              className="w-36"
+              short
+              disablePast
+            />
+            {classes === null ? (
+              <Skeleton className="h-7 w-40 rounded-full" />
+            ) : classes.length === 0 ? (
+              <span className="text-xs text-muted-foreground">You have no classes to borrow for.</span>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {classes.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => pickClass(c.id, askDate)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                      pickedClass === c.id
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border text-secondary-foreground hover:bg-muted"
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 2 · the section's day as the real timetable strip — breaks and
+              all — pick a cell. Same table styling the timetable page uses. */}
+          {pickedClass &&
+            (day === null ? (
+              <Skeleton className="h-24 w-full rounded-lg" />
+            ) : day.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No timetable for this section on that day.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full border-collapse bg-background text-xs">
+                  <thead>
+                    <tr className="bg-sidebar">
+                      {axis.map((a) =>
+                        a.is_break ? (
+                          <th
+                            key={a.period_id}
+                            className="w-8 border-b border-l border-border bg-sidebar/80 px-1 py-2 align-middle"
+                          >
+                            <span className="mx-auto block text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase [writing-mode:vertical-rl]">
+                              {a.name}
+                            </span>
+                          </th>
+                        ) : (
+                          <th
+                            key={a.period_id}
+                            className="min-w-28 border-b border-l border-border px-2 py-2 text-center font-medium first:border-l-0"
+                          >
+                            <span className="block text-foreground">{a.name}</span>
+                            <span className="block text-[10px] font-normal text-muted-foreground">
+                              {fmtTime(a.start_time)}
+                            </span>
+                          </th>
+                        )
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {axis.map((a) => {
+                          if (a.is_break)
+                            return (
+                              <td
+                                key={a.period_id}
+                                className="w-8 border-l border-border bg-sidebar/50 first:border-l-0"
+                              />
+                            )
+                          const s = day.find((x) => x.period_id === a.period_id)
+                          if (!s)
+                            return (
+                              <td key={a.period_id} className="border-l border-border px-2 py-3 text-center text-muted-foreground/30 first:border-l-0">
+                                ·
+                              </td>
+                            )
+                          const selectable = s.state === "borrowable"
+                          const selected = pickedSlot === s.slot_id
+                          return (
+                            <td key={a.period_id} className="border-l border-border p-1 first:border-l-0">
+                              <button
+                                type="button"
+                                disabled={!selectable}
+                                onClick={() => setPickedSlot(selected ? "" : s.slot_id)}
+                                className={cn(
+                                  "flex w-full flex-col items-center gap-0.5 rounded-md px-1.5 py-2 text-center transition-colors",
+                                  selected
+                                    ? "bg-primary text-primary-foreground"
+                                    : selectable
+                                      ? "hover:bg-primary/10"
+                                      : "opacity-45"
+                                )}
+                              >
+                                <span className="w-full truncate text-xs font-medium">
+                                  {s.subject}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "w-full truncate text-[10px]",
+                                    selected ? "text-primary-foreground/80" : "text-muted-foreground"
+                                  )}
+                                >
+                                  {s.state === "mine"
+                                    ? "your period"
+                                    : s.state === "taken"
+                                      ? `borrowed · ${s.taken_by}`
+                                      : s.state === "asked"
+                                        ? "already asked"
+                                        : s.state === "busy"
+                                          ? "you teach then"
+                                          : s.state === "unstaffed"
+                                            ? "no teacher"
+                                            : s.owner_name}
+                                </span>
+                              </button>
+                            </td>
+                          )
+                        })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ))}
+
+          {/* 3 · reason + send */}
+          {pickedSlot && (
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-48 flex-1">
+                <span className="mb-1.5 block text-xs text-muted-foreground">Why (they see this)</span>
+                <Input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g. one more period to finish Photosynthesis"
+                  maxLength={300}
+                />
+              </div>
+              <Button size="sm" disabled={busy === "ask"} onClick={sendRequest}>
+                {busy === "ask" ? <CircleNotchIcon className="size-4 animate-spin" /> : "Borrow"}
+              </Button>
+            </div>
+          )}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setAsking(false)}
+              className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hasAnything ? (
+        <div className="flex flex-col divide-y divide-border">
+          {data!.incoming.map((b) => (
+            <div key={b.id} className="flex flex-wrap items-center gap-2 py-2 text-xs">
+              <span className="font-medium text-foreground">
+                {b.borrower_name} asks for your {b.class_label} {b.subject}
+              </span>
+              <span className="text-muted-foreground">
+                {line(b)}
+                {b.reason ? ` · "${b.reason}"` : ""}
+              </span>
+              <span className="ml-auto flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={busy === b.id}
+                  aria-label="Lend it"
+                  onClick={() => decide(b.id, "approve")}
+                  className="grid size-6 place-items-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-85"
+                >
+                  <CheckIcon className="size-3.5" weight="bold" />
+                </button>
+                <button
+                  type="button"
+                  disabled={busy === b.id}
+                  aria-label="Decline"
+                  onClick={() => decide(b.id, "decline")}
+                  className="grid size-6 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <XIcon className="size-3.5" weight="bold" />
+                </button>
+              </span>
+            </div>
+          ))}
+          {data!.outgoing.map((b) => (
+            <div key={b.id} className="flex flex-wrap items-center gap-2 py-2 text-xs">
+              <span className="font-medium text-foreground">
+                {b.class_label} · {b.subject}
+              </span>
+              <span className="text-muted-foreground">
+                {line(b)} · asked {b.owner_name}
+              </span>
+              <span className="ml-auto flex items-center gap-2">
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                  waiting
+                </span>
+                <button
+                  type="button"
+                  onClick={() => cancel(b.id)}
+                  className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-destructive"
+                >
+                  withdraw
+                </button>
+              </span>
+            </div>
+          ))}
+          {data!.confirmed.map((b) => (
+            <div key={b.id} className="flex flex-wrap items-center gap-2 py-2 text-xs">
+              <span className="font-medium text-foreground">
+                {b.class_label} · {b.subject}
+              </span>
+              <span className="text-muted-foreground">{line(b)}</span>
+              <span className="ml-auto flex items-center gap-2">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                  {b.owner_name && b.borrower_name
+                    ? b.owner_teacher_id === b.borrower_teacher_id
+                      ? "borrowed"
+                      : `${b.borrower_name} ← ${b.owner_name}`
+                    : "borrowed"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => cancel(b.id)}
+                  className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-destructive"
+                >
+                  cancel
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/* Teacher: volunteer for open classes */
+
+function OpenClassesCard({ onChanged }: { onChanged: () => void }) {
+  type OpenGap = Omit<Gap, "offers" | "cover"> & {
+    date: string
+    offer_count: number
+    my_offer: { id: string; status: string } | null
+  }
+  const [open, setOpen] = useState<OpenGap[] | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  // A week ahead, always from today — leave is approved in advance, so the
+  // opportunities are mostly on future days regardless of the marking date.
+  const load = useCallback(() => {
+    apiClient
+      .get<{ open: OpenGap[] }>("/api/substitutions/open?days=7")
+      .then((r) => setOpen(r.open))
+      .catch(() => setOpen([]))
+  }, [])
+  useEffect(() => {
+    load()
+    const onRail = (e: Event) => {
+      const t = (e as CustomEvent).detail?.type
+      if (t?.startsWith("substitution")) {
+        load()
+        onChanged()
+      }
+    }
+    window.addEventListener("ph:notification", onRail)
+    return () => window.removeEventListener("ph:notification", onRail)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load])
+
+  const volunteer = async (g: OpenGap) => {
+    setBusy(g.slot_id)
+    try {
+      await apiClient.post("/api/substitutions/offers", { slot_id: g.slot_id, date: g.date })
+      toast.success("Offer made — the office will confirm")
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not offer")
+    } finally {
+      setBusy(null)
+    }
+  }
+  const withdraw = async (g: OpenGap) => {
+    if (!g.my_offer) return
+    setBusy(g.slot_id)
+    try {
+      await apiClient.delete(`/api/substitutions/offers/${g.my_offer.id}`)
+      load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not withdraw")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (!open || open.length === 0) return null
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
+      <span className="text-sm font-medium text-foreground">
+        Open classes — a colleague is away
+      </span>
+      <div className="flex flex-col divide-y divide-amber-200/60 dark:divide-amber-800/40">
+        {open.map((g) => (
+          <div key={`${g.slot_id}|${g.date}`} className="flex flex-wrap items-center gap-2 py-2 text-xs">
+            <span className="font-medium text-foreground">
+              {g.class_label} · {g.subject}
+            </span>
+            <span className="text-muted-foreground">
+              {new Date(g.date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+              {" · "}
+              {g.period_name || `P${g.period_number}`}
+              {g.start_time ? ` · ${fmtTime(g.start_time)}` : ""} · for {g.absent_teacher_name}
+            </span>
+            {g.offer_count > 0 && !g.my_offer && (
+              <span className="text-[10px] text-muted-foreground">
+                {g.offer_count} volunteered
+              </span>
+            )}
+            <span className="ml-auto">
+              {g.my_offer ? (
+                <span className="flex items-center gap-2">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    you offered
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => withdraw(g)}
+                    className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-destructive"
+                  >
+                    withdraw
+                  </button>
+                </span>
+              ) : (
+                <Button size="sm" variant="outline" disabled={busy === g.slot_id} onClick={() => volunteer(g)}>
+                  I can take it
+                </Button>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* Admin: the substitution board */
+
+function AdminSubstitutions() {
+  const [date, setDate] = useState("")
+  const [gaps, setGaps] = useState<Gap[] | null>(null)
+  const [totals, setTotals] = useState({ total: 0, covered: 0 })
+
+  const load = useCallback((d?: string) => {
+    setGaps(null)
+    apiClient
+      .get<{ date: string; gaps: Gap[]; totals: { total: number; covered: number } }>(
+        `/api/substitutions/gaps${d ? `?date=${d}` : ""}`
+      )
+      .then((r) => {
+        setDate(r.date)
+        setGaps(r.gaps)
+        setTotals(r.totals)
+      })
+      .catch(() => setGaps([]))
+  }, [])
+  useEffect(() => {
+    load()
+    const onRail = (e: Event) => {
+      const t = (e as CustomEvent).detail?.type
+      if (t?.startsWith("substitution")) load()
+    }
+    window.addEventListener("ph:notification", onRail)
+    return () => window.removeEventListener("ph:notification", onRail)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <DatePickerField
+          value={date}
+          onChange={(d) => {
+            setDate(d)
+            load(d)
+          }}
+          className="w-52"
+          short
+        />
+        {gaps && totals.total > 0 && (
+          <span
+            className={cn(
+              "text-xs",
+              totals.covered < totals.total ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"
+            )}
+          >
+            {totals.covered} of {totals.total} gaps covered
+          </span>
+        )}
+      </div>
+
+      {gaps === null ? (
+        <Skeleton className="h-48 w-full rounded-xl" />
+      ) : gaps.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-background px-5 py-12 text-center">
+          <Sticker name="greet" size={88} />
+          <p className="text-sm text-muted-foreground">
+            No one is away this day — no periods need cover.
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-border rounded-xl border border-border bg-background">
+          {gaps.map((g) => (
+            <GapRow key={g.slot_id} gap={g} date={date} onChanged={() => load(date)} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GapRow({ gap, date, onChanged }: { gap: Gap; date: string; onChanged: () => void }) {
+  const [candidates, setCandidates] = useState<SubCandidate[] | null>(null)
+  const [query, setQuery] = useState("")
+  const [picked, setPicked] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [openPicker, setOpenPicker] = useState(false)
+
+  const loadCandidates = () => {
+    if (candidates) return
+    apiClient
+      .get<{ candidates: SubCandidate[] }>(
+        `/api/substitutions/candidates?slot_id=${gap.slot_id}&date=${date}`
+      )
+      .then((r) => setCandidates(r.candidates))
+      .catch(() => setCandidates([]))
+  }
+
+  const assign = async (teacherId: string) => {
+    if (!teacherId) return
+    setBusy(true)
+    try {
+      await apiClient.post("/api/substitutions/assign", {
+        slot_id: gap.slot_id,
+        date,
+        teacher_id: teacherId,
+      })
+      toast.success("Cover assigned — the teacher has been told")
+      onChanged()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not assign")
+      onChanged()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const declineOffer = async (offerId: string) => {
+    setBusy(true)
+    try {
+      await apiClient.post(`/api/substitutions/offers/${offerId}/decline`)
+      toast.success("Offer declined — the teacher has been told")
+      onChanged()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not decline")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const unassign = async () => {
+    if (!gap.cover) return
+    setBusy(true)
+    try {
+      await apiClient.delete(`/api/substitutions/${gap.cover.id}`)
+      toast.success("Cover removed — offers reopened")
+      onChanged()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not remove")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const openOffers = gap.offers.filter((o) => o.status === "open")
+
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-secondary-foreground">
+          {periodNo(gap.period_name, gap.period_number)}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-medium text-foreground">
+            {gap.class_label} · {gap.subject}
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            {gap.start_time ? `${fmtTime(gap.start_time)} · ` : ""}
+            {gap.absent_teacher_name} is {gap.absent_status === "leave" ? "on leave" : "absent"}
+          </span>
+        </span>
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          {gap.cover ? (
+            <>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                {gap.cover.teacher_name}
+                {gap.cover.source === "auto" ? " · auto" : gap.cover.source === "volunteer" ? " · volunteered" : ""}
+              </span>
+              <button
+                type="button"
+                onClick={unassign}
+                disabled={busy}
+                className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-destructive"
+              >
+                remove
+              </button>
+            </>
+          ) : (
+            <>
+              {openOffers.map((o) => (
+                <span
+                  key={o.id}
+                  className="flex items-center gap-0.5 rounded-full border border-primary/40 bg-primary/5 py-0.5 pr-1 pl-2 text-[11px] font-medium text-primary"
+                >
+                  ✋ {o.teacher_name}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-label={`Confirm ${o.teacher_name}`}
+                        onClick={() => assign(o.teacher_id)}
+                        className="ml-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-85"
+                      >
+                        <CheckIcon className="size-3" weight="bold" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Confirm — they cover it</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-label={`Decline ${o.teacher_name}`}
+                        onClick={() => declineOffer(o.id)}
+                        className="grid size-5 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <XIcon className="size-3" weight="bold" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Decline this offer</TooltipContent>
+                  </Tooltip>
+                </span>
+              ))}
+              <Popover open={openPicker} onOpenChange={(o) => { setOpenPicker(o); if (o) { setPicked(""); setQuery(""); loadCandidates() } }}>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    {openOffers.length ? "Someone else…" : "Assign cover"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72 p-0">
+                  <div className="border-b border-border p-2">
+                    <Input
+                      autoFocus
+                      placeholder="Find a teacher…"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto py-1">
+                    {candidates === null ? (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">Loading…</p>
+                    ) : (
+                      (() => {
+                        const q = query.trim().toLowerCase()
+                        const shown = candidates.filter((c) => c.full_name.toLowerCase().includes(q))
+                        if (shown.length === 0)
+                          return <p className="px-3 py-2 text-xs text-muted-foreground">No free teacher matches.</p>
+                        return [1, 2, 3, 4, 5].map((tier) => {
+                          const inTier = shown.filter((c) => c.tier === tier)
+                          if (inTier.length === 0) return null
+                          return (
+                            <Fragment key={tier}>
+                              <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                                {SUB_TIER[tier]}
+                              </div>
+                              {inTier.map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => setPicked(picked === c.id ? "" : c.id)}
+                                  className={cn(
+                                    "flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-muted",
+                                    picked === c.id && "bg-primary/10 font-medium text-primary hover:bg-primary/15"
+                                  )}
+                                >
+                                  <span className="truncate">{c.full_name}</span>
+                                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                                    {c.checked_in ? "in" : ""}
+                                    {c.covers_today > 0 ? ` · ${c.covers_today} cover${c.covers_today === 1 ? "" : "s"}` : ""}
+                                  </span>
+                                </button>
+                              ))}
+                            </Fragment>
+                          )
+                        })
+                      })()
+                    )}
+                  </div>
+                  <div className="flex items-center justify-end gap-2 border-t border-border p-2">
+                    <Button size="sm" variant="ghost" onClick={() => setOpenPicker(false)}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" disabled={!picked || busy} onClick={() => assign(picked)}>
+                      {busy ? <CircleNotchIcon className="size-4 animate-spin" /> : "Assign"}
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
+        </span>
+      </div>
     </div>
   )
 }

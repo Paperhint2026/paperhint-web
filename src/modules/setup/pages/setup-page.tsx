@@ -325,6 +325,8 @@ function AttendanceModeCard() {
   const [mode, setMode] = useState<"per_period" | "per_day" | null>(null)
   const [checkin, setCheckin] = useState<TeacherCheckin>("button")
   const [schoolLoc, setSchoolLoc] = useState<{ lat: number; lng: number; radius_m: number } | null>(null)
+  const [autoApprove, setAutoApprove] = useState(true)
+  const [autoMins, setAutoMins] = useState("15")
   const [saving, setSaving] = useState(false)
   const [locating, setLocating] = useState(false)
   const [lat, setLat] = useState("")
@@ -337,11 +339,15 @@ function AttendanceModeCard() {
         attendance_mode: "per_period" | "per_day"
         teacher_checkin: TeacherCheckin
         school_location: { lat: number; lng: number; radius_m: number } | null
+        sub_auto_approve: boolean
+        sub_auto_approve_mins: number
       }>("/api/attendance/settings")
       .then((r) => {
         setMode(r.attendance_mode)
         setCheckin(r.teacher_checkin)
         setSchoolLoc(r.school_location)
+        setAutoApprove(r.sub_auto_approve)
+        setAutoMins(String(r.sub_auto_approve_mins ?? 15))
         if (r.school_location) {
           setLat(String(r.school_location.lat))
           setLng(String(r.school_location.lng))
@@ -592,6 +598,66 @@ function AttendanceModeCard() {
           )}
         </>
       )}
+
+      <div className="mt-2 flex items-center gap-2 border-t border-border pt-4">
+        <h2 className="text-sm font-semibold text-foreground">
+          Substitution auto-approve
+        </h2>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        When an away teacher&apos;s period has exactly one volunteer and is
+        about to start, confirm that volunteer automatically so nobody is left
+        waiting on a busy office. Only volunteers are ever auto-confirmed.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={async () => {
+            const next = !autoApprove
+            setAutoApprove(next)
+            try {
+              await apiClient.put("/api/attendance/settings", { sub_auto_approve: next })
+              toast.success(next ? "Auto-approve on" : "Auto-approve off")
+            } catch (e) {
+              setAutoApprove(!next)
+              toast.error(e instanceof Error ? e.message : "Could not save")
+            }
+          }}
+          className={cn(
+            "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+            autoApprove
+              ? "bg-primary/10 text-primary"
+              : "border border-border text-muted-foreground hover:bg-muted"
+          )}
+        >
+          {autoApprove ? "On" : "Off"}
+        </button>
+        {autoApprove && (
+          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            when the period starts within
+            <Input
+              className="h-8 w-16 text-xs"
+              value={autoMins}
+              onChange={(e) => setAutoMins(e.target.value)}
+              onBlur={async () => {
+                const mins = Number(autoMins)
+                if (!Number.isFinite(mins) || mins < 5 || mins > 60) {
+                  setAutoMins("15")
+                  return
+                }
+                try {
+                  await apiClient.put("/api/attendance/settings", { sub_auto_approve_mins: Math.round(mins) })
+                  toast.success(`Auto-approve window: ${Math.round(mins)} min`)
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Could not save")
+                }
+              }}
+            />
+            minutes (5–60)
+          </span>
+        )}
+      </div>
     </section>
   )
 }

@@ -72,6 +72,18 @@ function chime() {
   }
 }
 
+/** Where a notification leads. The stored link decides; rows from before
+ *  tabs existed fall back to a route derived from their type. */
+const TYPE_ROUTE: Record<string, string> = {
+  leave_requested: "/attendance/leave",
+  substitution_offer: "/attendance/substitutions",
+  substitution_auto: "/attendance/substitutions",
+}
+function routeFor(n: Notification) {
+  if (n.link && n.link !== "/attendance") return n.link
+  return TYPE_ROUTE[n.type] ?? n.link
+}
+
 function ago(iso: string) {
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
   if (mins < 1) return "just now"
@@ -230,8 +242,9 @@ export function NotificationsBell() {
                 type="button"
                 onClick={() => {
                   setOpen(false)
-                  if (n.link)
-                    navigate(n.link, { state: { rail: n.type, at: Date.now() } })
+                  const target = routeFor(n)
+                  if (target)
+                    navigate(target, { state: { rail: n.type, at: Date.now() } })
                 }}
                 className={cn(
                   "block w-full border-b border-border/60 px-3 py-2.5 text-left transition-colors last:border-0 hover:bg-muted/60",

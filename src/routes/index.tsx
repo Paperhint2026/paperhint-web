@@ -103,6 +103,7 @@ export const router = createBrowserRouter([
           { path: "soon/:slug", element: <ComingSoonPage /> },
           { path: "allotments", element: <AllotmentsPage /> },
           { path: "attendance", element: <AttendancePage /> },
+          { path: "attendance/:tab", element: <AttendancePage /> },
           { path: "rollover", element: <RolloverPage /> },
           { path: "departments", element: <DepartmentsPage /> },
           { path: "departments/:id", element: <DepartmentDetailPage /> },
