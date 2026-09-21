@@ -39,6 +39,14 @@ async function request<T>(
     const { store } = await import("@/store")
     const { logout } = await import("@/store/auth-slice")
     store.dispatch(logout())
+    // Remember where the session died so login can put the user back there
+    // (a teacher kicked mid-roll should land back on the roll, not Home).
+    try {
+      const here = window.location.pathname + window.location.search
+      if (here !== "/login") sessionStorage.setItem("post_login_redirect", here)
+    } catch {
+      /* storage unavailable — plain login flow */
+    }
     window.location.href = "/login"
     throw new Error("Unauthorized")
   }

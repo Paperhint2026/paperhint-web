@@ -114,7 +114,16 @@ export function LoginPage() {
     try {
       await login({ email, password })
       setPhase("success")
-      setTimeout(() => navigate("/", { replace: true }), reduceMotion ? 0 : 700)
+      // Return to where the previous session died, when we know it.
+      let dest = "/"
+      try {
+        const saved = sessionStorage.getItem("post_login_redirect")
+        if (saved && saved.startsWith("/") && !saved.startsWith("//")) dest = saved
+        sessionStorage.removeItem("post_login_redirect")
+      } catch {
+        /* storage unavailable */
+      }
+      setTimeout(() => navigate(dest, { replace: true }), reduceMotion ? 0 : 700)
     } catch (err) {
       setPhase("form")
       const msg = err instanceof Error ? err.message : ""

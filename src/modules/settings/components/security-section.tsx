@@ -23,7 +23,7 @@ import {
 } from "@/modules/settings/components/settings-primitives"
 
 /** Backend minimum. The meter nudges further; this is the hard gate. */
-const MIN_LENGTH = 6
+const MIN_LENGTH = 8
 
 type Strength = { score: 0 | 1 | 2 | 3 | 4; label: string }
 
@@ -249,7 +249,7 @@ export function SecuritySection() {
               </span>
             </div>
             <ul className="grid gap-1 sm:grid-cols-2">
-              <Requirement met={longEnough}>At least 6 characters</Requirement>
+              <Requirement met={longEnough}>At least 8 characters</Requirement>
               <Requirement met={mixedCase}>Upper and lower case</Requirement>
               <Requirement met={hasSymbol}>A number or symbol</Requirement>
               <Requirement met={matches}>Both entries match</Requirement>
