@@ -221,7 +221,7 @@ type TeacherRow = {
 }
 
 function AdminTeacherRoll() {
-  const [date, setDate] = useState("")
+  const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()))
   const [rows, setRows] = useState<TeacherRow[] | null>(null)
   const [totals, setTotals] = useState({ total: 0, marked: 0, unmarked: 0 })
 
@@ -337,7 +337,7 @@ function AdminTeacherRoll() {
 /* ── Teacher: my periods today ──────────────────────────────────────────── */
 
 function TeacherToday() {
-  const [date, setDate] = useState("")
+  const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()))
   const [periods, setPeriods] = useState<TodayPeriod[] | null>(null)
   const [self, setSelf] = useState<SelfAttendance>(null)
   const [checkinMethod, setCheckinMethod] = useState<CheckinMethod>("button")
@@ -876,7 +876,7 @@ function RosterMarking({
 
 function AdminDayView() {
   const [data, setData] = useState<Overview | null>(null)
-  const [date, setDate] = useState("")
+  const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()))
 
   const load = useCallback((d?: string) => {
     setData(null)
@@ -1530,6 +1530,7 @@ type Gap = {
   period_number: number | null
   period_name: string | null
   start_time: string | null
+  end_time: string | null
   subject: string
   absent_teacher_name: string | null
   absent_status: "absent" | "leave"
@@ -1544,6 +1545,18 @@ type SubCandidate = {
   offer_id: string | null
   covers_today: number
   checked_in: boolean | null
+}
+
+/** The period is in the past — the date has gone by, or it ended today. */
+function gapOver(date: string, endTime: string | null, startTime: string | null) {
+  const today = new Intl.DateTimeFormat("en-CA").format(new Date())
+  if (date < today) return true
+  if (date > today) return false
+  const t = endTime || startTime
+  if (!t) return false
+  const [h, m] = t.split(":").map(Number)
+  const now = new Date()
+  return h * 60 + m <= now.getHours() * 60 + now.getMinutes()
 }
 
 const SUB_TIER: Record<number, string> = {
@@ -2166,7 +2179,7 @@ function OpenClassesCard({ onChanged }: { onChanged: () => void }) {
 /* Admin: the substitution board */
 
 function AdminSubstitutions() {
-  const [date, setDate] = useState("")
+  const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()))
   const [gaps, setGaps] = useState<Gap[] | null>(null)
   const [totals, setTotals] = useState({ total: 0, covered: 0 })
 
@@ -2214,6 +2227,16 @@ function AdminSubstitutions() {
             )}
           >
             {totals.covered} of {totals.total} gaps covered
+            {(() => {
+              const missed = (gaps ?? []).filter(
+                (g) => !g.cover && gapOver(date, g.end_time, g.start_time)
+              ).length
+              return missed > 0 ? (
+                <span className="ml-1.5 font-semibold text-destructive">
+                  · {missed} went uncovered
+                </span>
+              ) : null
+            })()}
           </span>
         )}
       </div>
@@ -2302,6 +2325,7 @@ function GapRow({ gap, date, onChanged }: { gap: Gap; date: string; onChanged: (
   }
 
   const openOffers = gap.offers.filter((o) => o.status === "open")
+  const over = gapOver(date, gap.end_time, gap.start_time)
 
   return (
     <div className="flex flex-col gap-2 px-4 py-3">
@@ -2319,6 +2343,12 @@ function GapRow({ gap, date, onChanged }: { gap: Gap; date: string; onChanged: (
           </span>
         </span>
         <span className="ml-auto flex flex-wrap items-center gap-2">
+          {!gap.cover && over && (
+            <span className="flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-[11px] font-semibold text-destructive">
+              <WarningIcon className="size-3.5" weight="fill" />
+              Went uncovered
+            </span>
+          )}
           {gap.cover ? (
             <>
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
@@ -2336,7 +2366,7 @@ function GapRow({ gap, date, onChanged }: { gap: Gap; date: string; onChanged: (
             </>
           ) : (
             <>
-              {openOffers.map((o) => (
+              {!over && openOffers.map((o) => (
                 <span
                   key={o.id}
                   className="flex items-center gap-0.5 rounded-full border border-primary/40 bg-primary/5 py-0.5 pr-1 pl-2 text-[11px] font-medium text-primary"
@@ -2374,9 +2404,18 @@ function GapRow({ gap, date, onChanged }: { gap: Gap; date: string; onChanged: (
               ))}
               <Popover open={openPicker} onOpenChange={(o) => { setOpenPicker(o); if (o) { setPicked(""); setQuery(""); loadCandidates() } }}>
                 <PopoverTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    {openOffers.length ? "Someone else…" : "Assign cover"}
-                  </Button>
+                  {over ? (
+                    <button
+                      type="button"
+                      className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    >
+                      record a cover
+                    </button>
+                  ) : (
+                    <Button size="sm" variant="outline">
+                      {openOffers.length ? "Someone else…" : "Assign cover"}
+                    </Button>
+                  )}
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-72 p-0">
                   <div className="border-b border-border p-2">
