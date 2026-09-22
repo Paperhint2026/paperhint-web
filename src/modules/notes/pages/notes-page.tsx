@@ -56,6 +56,7 @@ import { DatePickerField } from "@/components/shared/date-picker-field"
 import { Skeleton } from "@/components/ui/skeleton"
 import { RichNotesEditor } from "@/modules/notes/components/rich-notes-editor"
 import { NotesMarkdown } from "@/modules/notes/components/notes-markdown"
+import { SyllabusView } from "@/modules/notes/components/syllabus-view"
 
 interface TeachingNote {
   id: string
@@ -142,7 +143,7 @@ function dateHeading(date: string) {
 export function NotesPage() {
   const { classSubjectId } = useParams<{ classSubjectId: string }>()
 
-  const [view, setView] = useState<"prepare" | "journal">("prepare")
+  const [view, setView] = useState<"prepare" | "journal" | "syllabus">("syllabus")
   const [notes, setNotes] = useState<TeachingNote[]>([])
   const [logs, setLogs] = useState<LessonLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -190,6 +191,13 @@ export function NotesPage() {
   const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set())
   const recorderRef = useRef<MediaRecorder | null>(null)
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const recordStartRef = useRef(0)
+  // Loudest moment observed while recording (0-128). Silence hovers near 0;
+  // speech peaks well past 20. Used to refuse silent recordings — sending
+  // silence to a speech model makes it HALLUCINATE a whole entry.
+  const peakLevelRef = useRef(0)
+  const levelTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
 
   const fetchAll = useCallback(async (csId: string) => {
     setIsLoading(true)
@@ -275,6 +283,8 @@ export function NotesPage() {
     return () => {
       recorderRef.current?.stream.getTracks().forEach((t) => t.stop())
       if (recordTimerRef.current) clearInterval(recordTimerRef.current)
+      if (levelTimerRef.current) clearInterval(levelTimerRef.current)
+      void audioCtxRef.current?.close().catch(() => {})
     }
   }, [])
 
@@ -421,9 +431,19 @@ export function NotesPage() {
         if (recordTimerRef.current) clearInterval(recordTimerRef.current)
         setIsRecording(false)
         setRecordSeconds(0)
+        if (levelTimerRef.current) clearInterval(levelTimerRef.current)
+        void audioCtxRef.current?.close().catch(() => {})
+        audioCtxRef.current = null
         const blob = new Blob(chunks, { type: mimeType })
-        if (blob.size < 1000) {
-          toast.error("Recording was too short")
+        // Neither a tap-on-tap-off nor a silent hold ever reaches the AI —
+        // speech models hallucinate whole entries from silence.
+        const elapsedMs = Date.now() - recordStartRef.current
+        if (elapsedMs < 1500 || blob.size < 2000) {
+          toast.error("Too short — hold the mic and say what happened")
+          return
+        }
+        if (peakLevelRef.current < 10) {
+          toast.error("Couldn't hear anything — check your mic and try again")
           return
         }
         setIsTranscribing(true)
@@ -450,8 +470,33 @@ export function NotesPage() {
           setIsTranscribing(false)
         }
       }
+      // Level meter: sample the waveform while recording, keep the peak.
+      peakLevelRef.current = 0
+      try {
+        const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        const audioCtx = new Ctx()
+        audioCtxRef.current = audioCtx
+        const analyser = audioCtx.createAnalyser()
+        analyser.fftSize = 2048
+        audioCtx.createMediaStreamSource(stream).connect(analyser)
+        const samples = new Uint8Array(analyser.fftSize)
+        levelTimerRef.current = setInterval(() => {
+          analyser.getByteTimeDomainData(samples)
+          let max = 0
+          for (const v of samples) {
+            const dev = Math.abs(v - 128)
+            if (dev > max) max = dev
+          }
+          if (max > peakLevelRef.current) peakLevelRef.current = max
+        }, 150)
+      } catch {
+        // No metering (old browser) — the duration/size gates still apply,
+        // and a peak of 0 must not block: treat as "unknown, allow".
+        peakLevelRef.current = 128
+      }
       recorderRef.current = recorder
       recorder.start()
+      recordStartRef.current = Date.now()
       setIsRecording(true)
       setRecordSeconds(0)
       recordTimerRef.current = setInterval(
@@ -495,6 +540,7 @@ export function NotesPage() {
           <div className="flex rounded-lg border bg-muted/40 p-0.5">
             {(
               [
+                { key: "syllabus", label: "Syllabus" },
                 { key: "prepare", label: "Prepare" },
                 { key: "journal", label: "Journal" },
               ] as const
@@ -807,7 +853,7 @@ export function NotesPage() {
             </Accordion>
           )}
         </>
-      ) : (
+      ) : view === "journal" ? (
         <>
           {/* ── Journal composer: full form, or a quick-capture row ── */}
           {journalOpen ? (
@@ -1132,6 +1178,8 @@ export function NotesPage() {
             </div>
           )}
         </>
+      ) : (
+        classSubjectId && <SyllabusView classSubjectId={classSubjectId} />
       )}
       <AlertDialog
         open={!!pendingDelete}
