@@ -5,6 +5,7 @@ import {
   ChalkboardIcon,
   ExamIcon,
   ListChecksIcon,
+  NotePencilIcon,
   UsersIcon,
 } from "@phosphor-icons/react"
 import { isNavItemActive, navForRole } from "@/data/nav"
@@ -39,6 +40,7 @@ import {
 /** Sections inside a class, in the order they appear under the class in the nav. */
 const CLASS_SECTIONS = [
   { slug: "knowledge", label: "Knowledge", icon: BookOpenIcon },
+  { slug: "notes", label: "Notes", icon: NotePencilIcon },
   { slug: "exams", label: "Exams", icon: ExamIcon },
   { slug: "grading", label: "Grading", icon: ListChecksIcon },
   { slug: "students", label: "Students", icon: UsersIcon },

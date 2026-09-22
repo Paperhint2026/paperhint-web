@@ -3,6 +3,8 @@ import { useLocation, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftIcon,
   CameraIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
   CheckCircleIcon,
   CheckIcon,
   XIcon,
@@ -394,104 +396,197 @@ function TeacherToday() {
     )
   }
 
+  const today = new Intl.DateTimeFormat("en-CA").format(new Date())
+  const isToday = date === today
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  const toMin = (t: string | null) => {
+    if (!t) return null
+    const [h, m] = t.split(":").map(Number)
+    return h * 60 + (m || 0)
+  }
+  const shiftDay = (delta: number) => {
+    const d = new Date(date + "T00:00:00")
+    d.setDate(d.getDate() + delta)
+    const next = new Intl.DateTimeFormat("en-CA").format(d)
+    if (next > today) return
+    load(next)
+  }
+  // Lent periods are someone else's roll — they don't count against you.
+  const rollable = periods?.filter((p) => !p.lent_to) ?? []
+  const taken = rollable.filter((p) => p.marked_at).length
+
   return (
     <div className="flex flex-col gap-4">
-      <CheckInCard
-        method={checkinMethod}
-        self={self}
-        date={date}
-        onChecked={(s) => setSelf(s)}
-      />
-
-      <LeaveCard />
-
-      <MyCoversCard />
-
-      <OpenClassesCard onChanged={() => load(date)} />
-
-      <BorrowCard onChanged={() => load(date)} />
-
-      <div className="flex items-center gap-3">
-        <DatePickerField value={date} onChange={load} className="w-52" disableFuture />
-        {periods && (
-          <span className="text-xs text-muted-foreground">
-            {periods.filter((p) => p.marked_at).length} of {periods.length}{" "}
-            registers taken
-          </span>
+      {/* Day strip: which day, your own check-in, how the roll is going */}
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-3 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Previous day"
+              onClick={() => shiftDay(-1)}
+            >
+              <CaretLeftIcon className="size-4" />
+            </Button>
+            <DatePickerField value={date} onChange={load} short disableFuture />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Next day"
+              disabled={isToday}
+              onClick={() => shiftDay(1)}
+            >
+              <CaretRightIcon className="size-4" />
+            </Button>
+            {isToday && (
+              <Badge variant="secondary" className="ml-1 rounded-full">
+                Today
+              </Badge>
+            )}
+          </div>
+          <CheckInCard
+            bare
+            method={checkinMethod}
+            self={self}
+            date={date}
+            onChecked={(s) => setSelf(s)}
+          />
+        </div>
+        {periods && rollable.length > 0 && (
+          <div className="flex items-center gap-3">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${(taken / rollable.length) * 100}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {taken} of {rollable.length} registers taken
+            </span>
+          </div>
         )}
       </div>
 
+      {/* Things that need you — each renders nothing when empty */}
+      <MyCoversCard />
+      <OpenClassesCard onChanged={() => load(date)} />
+      <MyClassStrip classes={myClasses} onOpen={setClassView} />
+
+      {/* The day, period by period */}
       {periods === null ? (
         <Skeleton className="h-48 w-full rounded-xl" />
       ) : periods.length === 0 ? (
-        <>
-          <MyClassStrip classes={myClasses} onOpen={setClassView} />
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-background px-5 py-12 text-center">
-            <Sticker name="greet" size={88} />
-            <p className="text-sm text-muted-foreground">
-              No periods scheduled for you on this day.
-            </p>
-          </div>
-        </>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-background px-5 py-12 text-center">
+          <Sticker name="greet" size={88} />
+          <p className="text-sm text-muted-foreground">
+            No periods scheduled for you on this day.
+          </p>
+        </div>
       ) : (
-        <>
-          <MyClassStrip classes={myClasses} onOpen={setClassView} />
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {periods.map((p) => (
-            <button
-              key={`${p.class_id}|${p.period_id}`}
-              type="button"
-              disabled={!!p.lent_to}
-              onClick={() => setOpen(p)}
-              className={cn(
-                "flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors",
-                p.lent_to ? "opacity-60" : "hover:bg-muted/60"
-              )}
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-secondary-foreground">
-                {p.period_id ? periodNo(p.period_name, p.period_number) : "D"}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium text-foreground">
-                  {p.class_label} · {p.subject}
+        <div className="overflow-hidden rounded-xl border border-border bg-background">
+          {periods.map((p, i) => {
+            const start = toMin(p.start_time)
+            const end = toMin(p.end_time)
+            const isNow =
+              isToday && start != null && end != null && start <= nowMin && nowMin < end
+            const isPast = isToday ? end != null && end <= nowMin : date < today
+            const pending = !p.marked_at && !p.lent_to && isPast
+            return (
+              <button
+                key={`${p.class_id}|${p.period_id}`}
+                type="button"
+                disabled={!!p.lent_to}
+                onClick={() => setOpen(p)}
+                className={cn(
+                  "flex w-full items-center gap-3 px-3 py-3 text-left transition-colors sm:gap-4 sm:px-4",
+                  i > 0 && "border-t border-border",
+                  p.lent_to ? "opacity-60" : "hover:bg-muted/50",
+                  isNow && "bg-primary/5"
+                )}
+              >
+                <span className="flex w-16 shrink-0 flex-col text-xs leading-tight text-muted-foreground sm:w-[4.5rem]">
+                  <span className={cn("font-medium", isNow && "text-primary")}>
+                    {p.start_time ? fmtTime(p.start_time) : p.period_name}
+                  </span>
+                  {p.end_time && <span>{fmtTime(p.end_time)}</span>}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {p.start_time
-                    ? `${fmtTime(p.start_time)} – ${fmtTime(p.end_time)}`
-                    : p.period_name}
-                  {p.covering_for ? (
-                    <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                      covering for {p.covering_for}
+                <span
+                  className={cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold",
+                    isNow
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-secondary-foreground"
+                  )}
+                >
+                  {p.period_id ? periodNo(p.period_name, p.period_number) : "D"}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {p.class_label} · {p.subject}
                     </span>
-                  ) : null}
-                  {p.borrowed_from ? (
-                    <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                      borrowed from {p.borrowed_from}
+                    {isNow && (
+                      <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                        Now
+                      </span>
+                    )}
+                  </span>
+                  {(p.covering_for || p.borrowed_from || p.lent_to) && (
+                    <span className="flex flex-wrap gap-1">
+                      {p.covering_for && (
+                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          covering for {p.covering_for}
+                        </span>
+                      )}
+                      {p.borrowed_from && (
+                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                          borrowed from {p.borrowed_from}
+                        </span>
+                      )}
+                      {p.lent_to && (
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          lent to {p.lent_to}
+                        </span>
+                      )}
                     </span>
-                  ) : null}
+                  )}
+                </span>
+                <span className="shrink-0">
                   {p.lent_to ? (
-                    <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground line-through">
-                      lent to {p.lent_to}
+                    <span className="text-[11px] text-muted-foreground">their roll</span>
+                  ) : p.marked_at ? (
+                    <span className="flex items-center gap-1 text-xs text-primary">
+                      <CheckCircleIcon weight="fill" className="size-4" />
+                      <span className="hidden sm:inline">
+                        Roll taken · {fmtClock(p.marked_at)}
+                      </span>
                     </span>
-                  ) : null}
+                  ) : pending ? (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      Roll pending
+                    </span>
+                  ) : isNow ? (
+                    <span className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground">
+                      Take roll
+                    </span>
+                  ) : (
+                    <Badge variant="secondary" className="rounded-full text-[10px]">
+                      Take roll
+                    </Badge>
+                  )}
                 </span>
-              </span>
-              {p.lent_to ? (
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  their roll now
-                </span>
-              ) : p.marked_at ? (
-                <CheckCircleIcon weight="fill" className="size-5 shrink-0 text-primary" />
-              ) : (
-                <Badge variant="secondary" className="shrink-0 rounded-full text-[10px]">
-                  Take roll
-                </Badge>
-              )}
-            </button>
-          ))}
-          </div>
-        </>
+              </button>
+            )
+          })}
+        </div>
       )}
+
+      {/* Requests — side by side; whichever opens its form takes the row */}
+      <div className="grid gap-3 lg:grid-cols-2 lg:[&>[data-expanded=true]]:col-span-2">
+        <LeaveCard />
+        <BorrowCard onChanged={() => load(date)} />
+      </div>
     </div>
   )
 }
@@ -515,11 +610,14 @@ function CheckInCard({
   self,
   date,
   onChecked,
+  bare = false,
 }: {
   method: CheckinMethod
   self: SelfAttendance
   date: string
   onChecked: (s: SelfAttendance) => void
+  /** Inline inside the day strip — no card chrome, status as a pill. */
+  bare?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [photo, setPhoto] = useState<File | null>(null)
@@ -562,22 +660,42 @@ function CheckInCard({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background px-4 py-3">
-      <span className="text-sm font-medium text-foreground">
-        Your attendance
-      </span>
-      {self ? (
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <CheckCircleIcon weight="fill" className="size-4 text-primary" />
-          Marked {self.status} for {date}
-          {self.marked_at ? ` at ${fmtClock(self.marked_at)}` : ""}
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-3",
+        !bare && "rounded-xl border border-border bg-background px-4 py-3"
+      )}
+    >
+      {!bare && (
+        <span className="text-sm font-medium text-foreground">
+          Your attendance
         </span>
+      )}
+      {self ? (
+        bare ? (
+          <span
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+              STATUS_STYLE[self.status]
+            )}
+          >
+            <CheckCircleIcon weight="fill" className="size-3.5" />
+            You: {STATUS_NAME[self.status]}
+            {self.marked_at ? ` · ${fmtClock(self.marked_at)}` : ""}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CheckCircleIcon weight="fill" className="size-4 text-primary" />
+            Marked {self.status} for {date}
+            {self.marked_at ? ` at ${fmtClock(self.marked_at)}` : ""}
+          </span>
+        )
       ) : method === "admin_only" ? (
         <span className="text-xs text-muted-foreground">
           Not marked yet — your school marks the staff roll at the office.
         </span>
       ) : (
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className={cn("flex flex-wrap items-center gap-2", !bare && "ml-auto")}>
           {method === "photo_geo" && (
             <>
               <button
@@ -1286,7 +1404,10 @@ function LeaveCard() {
   const visible = (leaves ?? []).slice(0, 4)
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background px-4 py-3">
+    <div
+      data-expanded={applying}
+      className="flex flex-col gap-3 rounded-xl border border-border bg-background px-4 py-3"
+    >
       {/* The approval wave: three soft ripples spreading from the row, green
           for approved; a single quiet grey pulse for rejected. */}
       <style>{`
@@ -1790,10 +1911,13 @@ function BorrowCard({ onChanged }: { onChanged: () => void }) {
     data && (data.incoming.length || data.outgoing.length || data.confirmed.length)
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-background px-4 py-3">
+    <div
+      data-expanded={asking}
+      className="flex flex-col gap-3 rounded-xl border border-border bg-background px-4 py-3"
+    >
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-medium text-foreground">Borrow a period</span>
-        <span className="text-xs text-muted-foreground">
+        <span className="hidden text-xs text-muted-foreground xl:inline">
           Need more time with a class? Ask a colleague for their period.
         </span>
         {!asking && (

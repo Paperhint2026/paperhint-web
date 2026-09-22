@@ -19,6 +19,7 @@ import { CalendarPage } from "@/modules/calendar/pages/calendar-page"
 import { TimetablePage } from "@/modules/timetable/pages/timetable-page"
 import { ClassStudentsMarksPage } from "@/modules/students/pages/class-students-marks-page"
 import { KnowledgePage } from "@/modules/knowledge/pages/knowledge-page"
+import { NotesPage } from "@/modules/notes/pages/notes-page"
 import { LibraryPage } from "@/modules/knowledge/pages/library-page"
 import { BankPage } from "@/modules/knowledge/pages/bank-page"
 import { ExamsPage } from "@/modules/exams/pages/exams-page"
@@ -125,6 +126,7 @@ export const router = createBrowserRouter([
             path: "class/:classSubjectId/knowledge",
             element: <KnowledgePage />,
           },
+          { path: "class/:classSubjectId/notes", element: <NotesPage /> },
           { path: "class/:classSubjectId/exams", element: <ExamsPage /> },
           {
             path: "class/:classSubjectId/exams/:examId/generate",
