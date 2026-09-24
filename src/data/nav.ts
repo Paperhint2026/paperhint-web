@@ -235,13 +235,15 @@ export const ADMIN_NAV: NavGroup[] = [
         "A10",
         "Approve leave, watch every alteration, and cover the gaps: for any period no colleague filled, free teachers are suggested and a cover assigned."
       ),
-      soon(
-        "notifications",
-        "Notifications & circulars",
-        BellIcon,
-        "A11",
-        "One place to send school-wide or targeted messages to parents and staff. Homework, absence and marks notifications ride these rails automatically."
-      ),
+      // Circulars (authored school-wide messages) are still to come — the
+      // page today is the rail's full history and the digest's landing spot.
+      {
+        key: "notifications",
+        title: "Notifications",
+        icon: BellIcon,
+        path: "/notifications",
+        status: "live",
+      },
       soon(
         "reports",
         "Reports & KPI",
@@ -305,6 +307,13 @@ export const TEACHER_NAV: NavGroup[] = [
         title: "Attendance",
         icon: ClipboardTextIcon,
         path: "/attendance",
+        status: "live",
+      },
+      {
+        key: "notifications",
+        title: "Notifications",
+        icon: BellIcon,
+        path: "/notifications",
         status: "live",
       },
       {

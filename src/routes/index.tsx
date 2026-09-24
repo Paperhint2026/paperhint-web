@@ -20,6 +20,7 @@ import { TimetablePage } from "@/modules/timetable/pages/timetable-page"
 import { ClassStudentsMarksPage } from "@/modules/students/pages/class-students-marks-page"
 import { KnowledgePage } from "@/modules/knowledge/pages/knowledge-page"
 import { NotesPage } from "@/modules/notes/pages/notes-page"
+import { NotificationsPage } from "@/modules/notifications/pages/notifications-page"
 import { LibraryPage } from "@/modules/knowledge/pages/library-page"
 import { BankPage } from "@/modules/knowledge/pages/bank-page"
 import { ExamsPage } from "@/modules/exams/pages/exams-page"
@@ -103,6 +104,7 @@ export const router = createBrowserRouter([
           // School admin's configuration home (role-gated in the page)
           { path: "soon/:slug", element: <ComingSoonPage /> },
           { path: "allotments", element: <AllotmentsPage /> },
+          { path: "notifications", element: <NotificationsPage /> },
           { path: "attendance", element: <AttendancePage /> },
           { path: "attendance/:tab", element: <AttendancePage /> },
           { path: "rollover", element: <RolloverPage /> },
@@ -127,6 +129,7 @@ export const router = createBrowserRouter([
             element: <KnowledgePage />,
           },
           { path: "class/:classSubjectId/notes", element: <NotesPage /> },
+          { path: "class/:classSubjectId/notes/:view", element: <NotesPage /> },
           { path: "class/:classSubjectId/exams", element: <ExamsPage /> },
           {
             path: "class/:classSubjectId/exams/:examId/generate",

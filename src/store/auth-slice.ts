@@ -16,7 +16,6 @@ export interface User {
 
 interface AuthState {
   user: User | null
-  token: string | null
   isLoading: boolean
   error: string | null
 }
@@ -28,15 +27,15 @@ interface LoginRequest {
 
 interface LoginResponse {
   message: string
-  session: {
-    access_token: string
-  }
+  // The server still returns `session` for one release so the Bearer-header
+  // fallback stays alive for any tab that missed the cookies deploy; the
+  // web app no longer reads it — the browser handles cookies transparently.
+  session?: { access_token?: string }
   user: User
 }
 
 const initialState: AuthState = {
   user: JSON.parse(localStorage.getItem("user") || "null"),
-  token: localStorage.getItem("access_token"),
   isLoading: false,
   error: null,
 }
@@ -53,18 +52,38 @@ export const login = createAsyncThunk<
   }
 })
 
+/**
+ * Log out the server session (revokes the refresh token, clears cookies)
+ * THEN clear local UI state. Best-effort — a network failure still logs
+ * the user out locally; the server's cookies were HttpOnly and expire
+ * on their own, and any real forced-logout is done via the direct `logout`
+ * action (which api-client dispatches on a definitive 401).
+ */
+export const logoutServer = createAsyncThunk("auth/logoutServer", async () => {
+  try {
+    await apiClient.post("/api/auth/logout")
+  } catch {
+    /* offline / expired session — clear locally either way */
+  }
+})
+
+const clearLocalState = (state: AuthState) => {
+  state.user = null
+  state.error = null
+  localStorage.removeItem("user")
+  localStorage.removeItem("school")
+  localStorage.removeItem("subjects")
+  // Legacy: earlier builds stored the JWT here. Wipe on this build so no
+  // stale token lingers where a future XSS could read it.
+  localStorage.removeItem("access_token")
+}
+
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
     logout(state) {
-      state.user = null
-      state.token = null
-      state.error = null
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("user")
-      localStorage.removeItem("school")
-      localStorage.removeItem("subjects")
+      clearLocalState(state)
     },
     clearError(state) {
       state.error = null
@@ -84,15 +103,18 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false
-        state.token = action.payload.session.access_token
         state.user = action.payload.user
-        localStorage.setItem("access_token", state.token)
         localStorage.setItem("user", JSON.stringify(state.user))
+        // Legacy from the pre-cookies build — clear it here on the first
+        // successful login after the migration.
+        localStorage.removeItem("access_token")
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload ?? "Login failed"
       })
+      .addCase(logoutServer.fulfilled, clearLocalState)
+      .addCase(logoutServer.rejected, clearLocalState)
   },
 })
 

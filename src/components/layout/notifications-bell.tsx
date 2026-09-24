@@ -3,6 +3,7 @@ import { BellIcon } from "@phosphor-icons/react"
 import { useNavigate } from "react-router-dom"
 
 import { apiClient } from "@/lib/api-client"
+import { routeFor } from "@/modules/notifications/lib/route-for"
 import { cn } from "@/lib/utils"
 import {
   Popover,
@@ -72,17 +73,6 @@ function chime() {
   }
 }
 
-/** Where a notification leads. The stored link decides; rows from before
- *  tabs existed fall back to a route derived from their type. */
-const TYPE_ROUTE: Record<string, string> = {
-  leave_requested: "/attendance/leave",
-  substitution_offer: "/attendance/substitutions",
-  substitution_auto: "/attendance/substitutions",
-}
-function routeFor(n: Notification) {
-  if (n.link && n.link !== "/attendance") return n.link
-  return TYPE_ROUTE[n.type] ?? n.link
-}
 
 function ago(iso: string) {
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
@@ -113,22 +103,37 @@ export function NotificationsBell() {
 
   const [connected, setConnected] = useState(false)
 
-  // Fast path: the socket. Token goes in the FIRST message, never the URL.
+  // Fast path: the socket. The server reads the `ph_at` HttpOnly cookie
+  // from the upgrade handshake (auth-cookies migration, 2026-09-22) — JS
+  // can't attach it manually. The presence of the `ph_uid` cookie is the
+  // client-side "session exists" hint; without it, don't even try. If a
+  // legacy `access_token` in localStorage is still around from before the
+  // migration, we send the first-message auth as a one-release fallback.
   useEffect(() => {
     let ws: WebSocket | null = null
     let retry: ReturnType<typeof setTimeout> | null = null
     let closed = false
     let backoff = 1000
 
+    const hasSessionCookie = () =>
+      typeof document !== "undefined" &&
+      /(?:^|;\s*)ph_uid=/.test(document.cookie)
+
     const connect = () => {
-      const token = localStorage.getItem("access_token")
-      if (!token) return
+      const legacyToken = localStorage.getItem("access_token")
+      if (!hasSessionCookie() && !legacyToken) return
       try {
         ws = new WebSocket(wsUrl())
       } catch {
         return
       }
-      ws.onopen = () => ws?.send(JSON.stringify({ type: "auth", token }))
+      ws.onopen = () => {
+        // Cookie handshake carries auth; the legacy token stays as a
+        // fallback for one release.
+        if (legacyToken) {
+          ws?.send(JSON.stringify({ type: "auth", token: legacyToken }))
+        }
+      }
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data)
@@ -243,8 +248,11 @@ export function NotificationsBell() {
                 onClick={() => {
                   setOpen(false)
                   const target = routeFor(n)
+                  // A row with no destination IS its own detail (the morning
+                  // digest) — the full page shows the untruncated body.
                   if (target)
                     navigate(target, { state: { rail: n.type, at: Date.now() } })
+                  else navigate("/notifications")
                 }}
                 className={cn(
                   "block w-full border-b border-border/60 px-3 py-2.5 text-left transition-colors last:border-0 hover:bg-muted/60",
@@ -273,6 +281,16 @@ export function NotificationsBell() {
             ))
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false)
+            navigate("/notifications")
+          }}
+          className="block w-full border-t border-border px-3 py-2 text-center text-xs font-medium text-primary transition-colors hover:bg-muted/60"
+        >
+          View all notifications
+        </button>
       </PopoverContent>
     </Popover>
   )

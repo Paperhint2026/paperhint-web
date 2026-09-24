@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   BookmarkSimpleIcon,
   CalendarBlankIcon,
@@ -140,10 +140,29 @@ function dateHeading(date: string) {
   return d.format("ddd, D MMM")
 }
 
-export function NotesPage() {
-  const { classSubjectId } = useParams<{ classSubjectId: string }>()
+type NotesView = "syllabus" | "prepare" | "journal"
+const NOTES_VIEWS: NotesView[] = ["syllabus", "prepare", "journal"]
 
-  const [view, setView] = useState<"prepare" | "journal" | "syllabus">("syllabus")
+export function NotesPage() {
+  const { classSubjectId, view: viewParam } = useParams<{
+    classSubjectId: string
+    view: string
+  }>()
+  const navigate = useNavigate()
+
+  // The view IS the URL — /notes/journal etc. — so notifications can land
+  // on the exact surface the teacher needs (collect homework → journal,
+  // notes ready → prepare) and back/forward work between tabs.
+  const view: NotesView = NOTES_VIEWS.includes(viewParam as NotesView)
+    ? (viewParam as NotesView)
+    : "syllabus"
+  const setView = (v: NotesView) =>
+    navigate(`/class/${classSubjectId}/notes/${v}`, { replace: true })
+
+  // Arriving FROM a nudge: ?log=<id> names the journal entry the
+  // notification quoted — scroll to it and play the spotlight wave.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [waveLogId, setWaveLogId] = useState<string | null>(null)
   const [notes, setNotes] = useState<TeachingNote[]>([])
   const [logs, setLogs] = useState<LessonLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -221,6 +240,29 @@ export function NotesPage() {
   useEffect(() => {
     if (classSubjectId) void fetchAll(classSubjectId)
   }, [classSubjectId, fetchAll])
+
+  // Spotlight the entry a notification pointed at, once the logs are in.
+  useEffect(() => {
+    const target = searchParams.get("log")
+    if (!target || view !== "journal" || logs.length === 0) return
+    if (!logs.some((l) => l.id === target)) {
+      // Entry deleted since the nudge — drop the param quietly.
+      setSearchParams({}, { replace: true })
+      return
+    }
+    setWaveLogId(target)
+    // Let the day groups render, then bring the entry into view.
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`journal-log-${target}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+    })
+    // Consume the param so a refresh doesn't replay the animation.
+    setSearchParams({}, { replace: true })
+    const t = setTimeout(() => setWaveLogId(null), 3200)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logs.length === 0, view, searchParams])
 
   // Upcoming slots for the "For" picker — default to the next class.
   useEffect(() => {
@@ -1024,6 +1066,20 @@ export function NotesPage() {
             </div>
           )}
 
+          {/* Spotlight wave for the entry a notification pointed at — same
+              ripple language as the leave-approval wave. */}
+          <style>{`
+            @keyframes journalLogWave {
+              0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 45%, transparent); background: color-mix(in oklch, var(--color-primary) 12%, transparent); }
+              70%  { box-shadow: 0 0 0 16px transparent; }
+              100% { box-shadow: 0 0 0 0 transparent; background: var(--color-card); }
+            }
+            .journal-log-wave { animation: journalLogWave 1s ease-out 3; }
+            @media (prefers-reduced-motion: reduce) {
+              .journal-log-wave { animation: none; background: color-mix(in oklch, var(--color-primary) 10%, transparent); }
+            }
+          `}</style>
+
           {/* ── Timeline, grouped by day ── */}
           {isLoading ? (
             <div className="flex flex-col gap-3">
@@ -1060,7 +1116,11 @@ export function NotesPage() {
                     return (
                       <article
                         key={log.id}
-                        className="rounded-xl border bg-card p-4"
+                        id={`journal-log-${log.id}`}
+                        className={cn(
+                          "rounded-xl border bg-card p-4",
+                          waveLogId === log.id && "journal-log-wave"
+                        )}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex min-w-0 flex-wrap items-center gap-1.5">

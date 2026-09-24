@@ -2,7 +2,7 @@ import { useCallback } from "react"
 import { useAppDispatch, useAppSelector } from "@/store"
 import {
   login as loginThunk,
-  logout as logoutAction,
+  logoutServer,
   type User,
 } from "@/store/auth-slice"
 import { fetchSchool, clearSchool } from "@/store/school-slice"
@@ -12,9 +12,7 @@ export type { User }
 
 export function useAuth() {
   const dispatch = useAppDispatch()
-  const { user, token, isLoading, error } = useAppSelector(
-    (state) => state.auth
-  )
+  const { user, isLoading, error } = useAppSelector((state) => state.auth)
 
   const login = useCallback(
     async (credentials: { email: string; password: string }) => {
@@ -27,16 +25,22 @@ export function useAuth() {
     [dispatch]
   )
 
+  // Fire the server-side logout (revokes the refresh token and clears
+  // cookies) — the thunk's fulfilled/rejected handlers both clear local
+  // state so a network failure never leaves the UI half-logged-in.
   const logout = useCallback(() => {
-    dispatch(logoutAction())
+    dispatch(logoutServer())
     dispatch(clearSchool())
     resetFeaturesCache() // next login refetches this school's license map
   }, [dispatch])
 
   return {
     user,
-    token,
-    isAuthenticated: !!token,
+    // Session presence used to be `!!token` (from localStorage); with
+    // cookies the JS can't see the token, so we treat the loaded user blob
+    // as the "am I logged in?" signal. A dead session is caught by
+    // api-client's silent-refresh-then-logout path on the next request.
+    isAuthenticated: !!user,
     isLoading,
     error,
     login,
