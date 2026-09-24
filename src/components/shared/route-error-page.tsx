@@ -32,10 +32,20 @@ export function RouteErrorPage() {
       ? error.message
       : String(error ?? "Something went wrong")
   const stack = error instanceof Error ? error.stack : undefined
+  // The api-client stamps `request_id` on every error (the server echoes it
+  // in the body for 5xx and always sets an `x-request-id` header) — support
+  // greps by it, so surfacing it here and in the copy payload matters.
+  const requestId =
+    error && typeof error === "object" && "request_id" in error
+      ? ((error as { request_id?: string | null }).request_id ?? null)
+      : null
 
   const copy = async () => {
+    const payload = requestId
+      ? `${stack ?? message}\n\nRequest ID: ${requestId}`
+      : (stack ?? message)
     try {
-      await navigator.clipboard.writeText(stack ?? message)
+      await navigator.clipboard.writeText(payload)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -51,6 +61,11 @@ export function RouteErrorPage() {
           {status ? `${status} — this page hit a snag` : "This page hit a snag"}
         </p>
         <p className="text-sm text-muted-foreground">{message}</p>
+        {requestId && (
+          <p className="mt-1 font-mono text-[11px] text-muted-foreground/80">
+            Request ID: {requestId}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button onClick={() => navigate(0)}>

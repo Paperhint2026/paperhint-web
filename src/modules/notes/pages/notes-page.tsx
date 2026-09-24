@@ -57,6 +57,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { RichNotesEditor } from "@/modules/notes/components/rich-notes-editor"
 import { NotesMarkdown } from "@/modules/notes/components/notes-markdown"
 import { SyllabusView } from "@/modules/notes/components/syllabus-view"
+import { ErrorState } from "@/components/shared/error-state"
 
 interface TeachingNote {
   id: string
@@ -166,6 +167,7 @@ export function NotesPage() {
   const [notes, setNotes] = useState<TeachingNote[]>([])
   const [logs, setLogs] = useState<LessonLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<unknown | null>(null)
   // Which note card is expanded — one at a time keeps a long history scannable.
   const [openNoteId, setOpenNoteId] = useState<string>("")
   // The generator folds away once there are notes; a slim row reopens it.
@@ -220,6 +222,7 @@ export function NotesPage() {
 
   const fetchAll = useCallback(async (csId: string) => {
     setIsLoading(true)
+    setLoadError(null)
     try {
       const res = await apiClient.get<{ notes: TeachingNote[]; logs: LessonLog[] }>(
         `/api/notes/${csId}`
@@ -231,7 +234,10 @@ export function NotesPage() {
       setComposerOpen(list.length === 0)
       setJournalOpen((res.logs ?? []).length === 0)
     } catch (err) {
-      showError(err, "Could not load notes")
+      // Show a real error surface in place of the list — silently rendering
+      // "No notes yet" on a 500 has misled teachers into thinking a class
+      // was blank when the API was actually down.
+      setLoadError(err)
     } finally {
       setIsLoading(false)
     }
@@ -738,7 +744,13 @@ export function NotesPage() {
           )}
 
           {/* ── Notes: one collapsible card each, newest first ── */}
-          {isLoading ? (
+          {loadError ? (
+            <ErrorState
+              title="Couldn't load your notes"
+              error={loadError}
+              onRetry={() => classSubjectId && void fetchAll(classSubjectId)}
+            />
+          ) : isLoading ? (
             <div className="flex flex-col gap-3">
               <Skeleton className="h-16 w-full rounded-xl" />
               <Skeleton className="h-16 w-full rounded-xl" />
@@ -1081,7 +1093,13 @@ export function NotesPage() {
           `}</style>
 
           {/* ── Timeline, grouped by day ── */}
-          {isLoading ? (
+          {loadError ? (
+            <ErrorState
+              title="Couldn't load the class journal"
+              error={loadError}
+              onRetry={() => classSubjectId && void fetchAll(classSubjectId)}
+            />
+          ) : isLoading ? (
             <div className="flex flex-col gap-3">
               <Skeleton className="h-20 w-full rounded-xl" />
               <Skeleton className="h-20 w-full rounded-xl" />

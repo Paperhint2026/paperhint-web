@@ -116,8 +116,22 @@ async function request<T>(
     const error = await response.json().catch(() => ({}))
     const err = new Error(
       error.message || error.error || `Request failed: ${response.status}`
-    ) as Error & { field?: string; data?: Record<string, unknown> }
+    ) as Error & {
+      status?: number
+      field?: string
+      request_id?: string | null
+      data?: Record<string, unknown>
+    }
+    err.status = response.status
     if (typeof error.field === "string") err.field = error.field
+    // The server sanitizes 5xx bodies to a generic message + request_id
+    // (server-side error hygiene); the request_id is the thread support
+    // uses to grep the actual error out of the log. Fall back to the
+    // x-request-id header if the body was empty (a proxy timeout, an
+    // upstream 502) so every failure still surfaces one.
+    err.request_id =
+      (typeof error.request_id === "string" ? error.request_id : null) ??
+      response.headers.get("x-request-id")
     err.data = error
     throw err
   }

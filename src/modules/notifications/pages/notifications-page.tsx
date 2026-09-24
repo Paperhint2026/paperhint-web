@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ErrorState } from "@/components/shared/error-state"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
 import {
@@ -53,8 +54,13 @@ export function NotificationsPage() {
   const [unread, setUnread] = useState(0)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [exhausted, setExhausted] = useState(false)
+  // Distinguish "the fetch failed" from "there's nothing here" — silently
+  // rendering the empty state on a 500 fooled users into thinking the API
+  // was quiet when it was broken.
+  const [loadError, setLoadError] = useState<unknown | null>(null)
 
   const load = useCallback(() => {
+    setLoadError(null)
     apiClient
       .get<{ notifications: RailNotification[]; unread: number }>(
         `/api/notifications?limit=${PAGE_SIZE}`
@@ -64,7 +70,10 @@ export function NotificationsPage() {
         setUnread(r.unread ?? 0)
         setExhausted((r.notifications ?? []).length < PAGE_SIZE)
       })
-      .catch(() => setItems([]))
+      .catch((err) => {
+        setLoadError(err)
+        setItems(null)
+      })
   }, [])
 
   useEffect(() => {
@@ -135,7 +144,14 @@ export function NotificationsPage() {
         )}
       </PageHeader>
 
-      {items === null ? (
+      {loadError ? (
+        <ErrorState
+          size="page"
+          title="Couldn't load your notifications"
+          error={loadError}
+          onRetry={load}
+        />
+      ) : items === null ? (
         <div className="flex flex-col gap-3">
           <Skeleton className="h-20 w-full rounded-xl" />
           <Skeleton className="h-20 w-full rounded-xl" />
