@@ -145,10 +145,10 @@ type NotesView = "syllabus" | "prepare" | "journal"
 const NOTES_VIEWS: NotesView[] = ["syllabus", "prepare", "journal"]
 
 export function NotesPage() {
-  const { classSubjectId, view: viewParam } = useParams<{
-    classSubjectId: string
-    view: string
-  }>()
+  const params = useParams<{ classSubjectId: string; "*": string }>()
+  const classSubjectId = params.classSubjectId
+  // Wildcard route: the view is whatever follows /notes/ (may be "").
+  const viewParam = (params["*"] ?? "").split("/")[0]
   const navigate = useNavigate()
 
   // The view IS the URL — /notes/journal etc. — so notifications can land

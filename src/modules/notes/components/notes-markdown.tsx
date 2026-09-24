@@ -51,6 +51,14 @@ const COMPONENTS: Partial<Components> = {
     </blockquote>
   ),
   hr: () => <hr className="my-4 border-border" />,
+  img: ({ src, alt }) => (
+    <img
+      src={typeof src === "string" ? src : undefined}
+      alt={alt ?? ""}
+      loading="lazy"
+      className="my-3 max-h-[28rem] max-w-full rounded-lg border object-contain"
+    />
+  ),
   table: ({ children }) => (
     <div className="my-3 overflow-x-auto rounded-lg border">
       <table className="w-full text-[13px]">{children}</table>

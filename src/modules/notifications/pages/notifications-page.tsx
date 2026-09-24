@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import {
+  Navigate,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom"
 import {
   ArrowRightIcon,
   BellIcon,
@@ -11,6 +17,7 @@ import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ErrorState } from "@/components/shared/error-state"
@@ -20,6 +27,9 @@ import {
   routeFor,
   type RailNotification,
 } from "@/modules/notifications/lib/route-for"
+import { CircularsTab } from "@/modules/notifications/components/circulars-tab"
+import { CircularDetailView } from "@/modules/notifications/components/circular-detail"
+import { CircularComposer } from "@/modules/notifications/components/circular-composer"
 
 const PAGE_SIZE = 50
 
@@ -43,12 +53,93 @@ function groupByDay(items: RailNotification[]) {
 }
 
 /**
- * The full notifications rail — where a bell item with no destination lands
- * (the morning digest's detail IS its text), and the browsable history for
- * everything else. Circulars (school-wide announcements) will live here
- * when they ship; the rail is their delivery mechanism.
+ * Notifications & circulars — a LAYOUT route: this component renders the
+ * header and the tab toggle exactly once and never remounts while the
+ * children swap through the <Outlet />:
+ *   /notifications                       → <NotificationsList/> (index)
+ *   /notifications/circulars             → <CircularsListRoute/>
+ *   /notifications/circulars/new         → <CircularComposerRoute/>
+ *   /notifications/circulars/:circularId → <CircularDetailRoute/>
+ * The tab IS the URL so a bell click can land on the exact surface, and
+ * only the body below the toggle re-renders on a switch.
  */
-export function NotificationsPage() {
+export function NotificationsLayout() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === "admin"
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const tab: "notifications" | "circulars" = pathname.startsWith(
+    "/notifications/circulars"
+  )
+    ? "circulars"
+    : "notifications"
+
+  return (
+    <div className={cn(PAGE_GUTTER, PAGE_TOP, "flex min-h-full flex-col gap-5 pb-12")}>
+      <PageHeader
+        icon={BellIcon}
+        title="Notifications & circulars"
+        description={
+          isAdmin
+            ? "Everything the rail delivered, and the circulars you've sent — with who read them."
+            : "Everything the school sent your way — nudges, covers, leave decisions, and circulars from the office."
+        }
+      >
+        <div className="flex rounded-lg border bg-muted/40 p-0.5 self-start">
+          {(
+            [
+              { key: "notifications", label: "Notifications", to: "/notifications" },
+              { key: "circulars", label: "Circulars", to: "/notifications/circulars" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => navigate(t.to)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                tab === t.key ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </PageHeader>
+
+      {/* Only this swaps on a tab/route change; keying by path restarts the
+          fade so the change reads as a transition, not a flash. */}
+      <div key={pathname} className="animate-in fade-in duration-200">
+        <Outlet />
+      </div>
+    </div>
+  )
+}
+
+/* ── Route children ─────────────────────────────────────────────────────── */
+
+export function CircularsListRoute() {
+  const { user } = useAuth()
+  return <CircularsTab isAdmin={user?.role === "admin"} />
+}
+
+export function CircularComposerRoute() {
+  const { user } = useAuth()
+  // Teachers have no composer — back to the list, no dead end.
+  if (user?.role !== "admin") return <Navigate to="/notifications/circulars" replace />
+  return <CircularComposer />
+}
+
+export function CircularDetailRoute() {
+  const { user } = useAuth()
+  const { circularId } = useParams<{ circularId: string }>()
+  if (!circularId) return <Navigate to="/notifications/circulars" replace />
+  return <CircularDetailView circularId={circularId} isAdmin={user?.role === "admin"} />
+}
+
+/* ── The rail: every notification, grouped by day (index child) ─────────── */
+
+export function NotificationsList() {
   const navigate = useNavigate()
   const [items, setItems] = useState<RailNotification[] | null>(null)
   const [unread, setUnread] = useState(0)
@@ -111,9 +202,7 @@ export function NotificationsPage() {
     try {
       await apiClient.post("/api/notifications/read", { all: true })
       const now = new Date().toISOString()
-      setItems((prev) =>
-        (prev ?? []).map((n) => (n.read_at ? n : { ...n, read_at: now }))
-      )
+      setItems((prev) => (prev ?? []).map((n) => (n.read_at ? n : { ...n, read_at: now })))
       setUnread(0)
     } catch {
       toast.error("Could not mark as read")
@@ -126,31 +215,18 @@ export function NotificationsPage() {
   }
 
   return (
-    <div
-      className={cn(PAGE_GUTTER, PAGE_TOP, "flex min-h-full flex-col gap-5 pb-12")}
-    >
-      <PageHeader
-        icon={BellIcon}
-        title="Notifications"
-        description="Everything the school sent your way — nudges, covers, leave decisions, the morning digest."
-      >
-        {unread > 0 && (
-          <div className="flex justify-end">
-            <Button size="sm" variant="outline" onClick={() => void markAllRead()}>
-              <ChecksIcon className="size-4" />
-              Mark all read ({unread})
-            </Button>
-          </div>
-        )}
-      </PageHeader>
+    <div className="flex flex-col gap-4">
+      {unread > 0 && (
+        <div className="flex justify-end">
+          <Button size="sm" variant="outline" onClick={() => void markAllRead()}>
+            <ChecksIcon className="size-4" />
+            Mark all read ({unread})
+          </Button>
+        </div>
+      )}
 
       {loadError ? (
-        <ErrorState
-          size="page"
-          title="Couldn't load your notifications"
-          error={loadError}
-          onRetry={load}
-        />
+        <ErrorState size="page" title="Couldn't load your notifications" error={loadError} onRetry={load} />
       ) : items === null ? (
         <div className="flex flex-col gap-3">
           <Skeleton className="h-20 w-full rounded-xl" />
@@ -161,8 +237,7 @@ export function NotificationsPage() {
           <BellIcon className="size-8 text-muted-foreground/60" />
           <p className="text-sm font-medium">Nothing yet</p>
           <p className="max-w-sm text-xs text-muted-foreground">
-            Class nudges, covers, leave decisions and the morning digest will
-            collect here.
+            Class nudges, covers, leave decisions, circulars and the morning digest will collect here.
           </p>
         </div>
       ) : (
@@ -183,9 +258,7 @@ export function NotificationsPage() {
                   return (
                     <Row
                       key={n.id}
-                      {...(target
-                        ? { type: "button" as const, onClick: () => open(n) }
-                        : {})}
+                      {...(target ? { type: "button" as const, onClick: () => open(n) } : {})}
                       className={cn(
                         "block w-full px-4 py-3 text-left",
                         i > 0 && "border-t",
@@ -230,12 +303,7 @@ export function NotificationsPage() {
 
           {!exhausted && (
             <div className="flex justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void loadOlder()}
-                disabled={loadingOlder}
-              >
+              <Button variant="outline" size="sm" onClick={() => void loadOlder()} disabled={loadingOlder}>
                 {loadingOlder ? (
                   <>
                     <CircleNotchIcon className="size-4 animate-spin" />

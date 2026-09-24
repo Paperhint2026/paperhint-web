@@ -239,7 +239,7 @@ export const ADMIN_NAV: NavGroup[] = [
       // page today is the rail's full history and the digest's landing spot.
       {
         key: "notifications",
-        title: "Notifications",
+        title: "Notifications & circulars",
         icon: BellIcon,
         path: "/notifications",
         status: "live",
@@ -311,7 +311,7 @@ export const TEACHER_NAV: NavGroup[] = [
       },
       {
         key: "notifications",
-        title: "Notifications",
+        title: "Notifications & circulars",
         icon: BellIcon,
         path: "/notifications",
         status: "live",
