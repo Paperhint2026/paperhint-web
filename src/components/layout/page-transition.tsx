@@ -30,7 +30,9 @@ export function PageTransition({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "absolute inset-0 overflow-x-hidden overflow-y-auto",
+        // overscroll-contain: reaching the end of the page must not hand the
+        // scroll to the document and drag the phone's pinned app bar with it.
+        "absolute inset-0 overflow-x-hidden overflow-y-auto overscroll-y-contain",
         className
       )}
     >

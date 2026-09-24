@@ -161,7 +161,9 @@ export function AppSidebar() {
             <>
               <PaperhintMark className="size-7 shrink-0 text-primary" />
               <PaperhintWordmark className="min-w-0 flex-1 truncate text-base text-foreground" />
-              <NotificationsBell />
+              {/* On phones the bell sits in the top bar instead — rendering
+                  it twice would open two sockets and chime twice. */}
+              {!isMobile && <NotificationsBell />}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button

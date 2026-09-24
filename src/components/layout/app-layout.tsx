@@ -13,7 +13,6 @@ import { ClassAiChatSheet } from "@/components/class-ai-chat/class-ai-chat-sheet
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
 import {
@@ -23,8 +22,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { AppSidebar } from "@/components/layout/app-sidebar"
-import { PAGE_GUTTER } from "@/components/layout/page-container"
 import { HeaderActionsProvider } from "@/components/layout/header-actions-context"
+import {
+  MobileTopBar,
+  MOBILE_TOP_BAR_PAD,
+} from "@/components/layout/mobile-top-bar"
 import { PageTransition } from "@/components/layout/page-transition"
 import {
   HelpDialogProvider,
@@ -75,20 +77,13 @@ function AppLayoutInner() {
     <>
       <AppSidebar />
       <SidebarInset>
-        {/* No chrome bar. These float inside the page's top padding so they
-            cost no vertical space and stay aligned with the page gutter. */}
-        {isMobile ? (
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 pt-4">
-            <div className={cn(PAGE_GUTTER, "flex items-center gap-2")}>
-              {isMobile ? (
-                <SidebarTrigger className="pointer-events-auto -ml-1 shrink-0" />
-              ) : null}
-            </div>
-          </div>
-        ) : null}
+        {/* Phones get a real app bar (menu · logo · bell · avatar), pinned
+            at the top — only the page content below it scrolls. Desktop
+            keeps the sidebar's own header and no bar at all. */}
+        {isMobile ? <MobileTopBar /> : null}
 
         <div className="relative min-h-0 flex-1">
-          <PageTransition>
+          <PageTransition className={cn(isMobile && MOBILE_TOP_BAR_PAD)}>
             <Outlet />
           </PageTransition>
         </div>
