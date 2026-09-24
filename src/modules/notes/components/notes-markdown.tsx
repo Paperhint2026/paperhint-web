@@ -51,14 +51,21 @@ const COMPONENTS: Partial<Components> = {
     </blockquote>
   ),
   hr: () => <hr className="my-4 border-border" />,
-  img: ({ src, alt }) => (
-    <img
-      src={typeof src === "string" ? src : undefined}
-      alt={alt ?? ""}
-      loading="lazy"
-      className="my-3 max-h-[28rem] max-w-full rounded-lg border object-contain"
-    />
-  ),
+  img: ({ src, alt }) => {
+    // Inline images can carry a size marker in the alt — `![alt|w=50](src)` —
+    // written by the editor's Small/Medium/Full presets.
+    const m = (alt ?? "").match(/^(.*?)\|w=(\d{1,3})$/)
+    const width = m ? Math.min(100, Math.max(10, Number(m[2]))) : 100
+    return (
+      <img
+        src={typeof src === "string" ? src : undefined}
+        alt={m ? m[1] : (alt ?? "")}
+        loading="lazy"
+        style={width < 100 ? { width: `${width}%` } : undefined}
+        className="my-3 max-h-[28rem] max-w-full rounded-lg border object-contain"
+      />
+    )
+  },
   table: ({ children }) => (
     <div className="my-3 overflow-x-auto rounded-lg border">
       <table className="w-full text-[13px]">{children}</table>

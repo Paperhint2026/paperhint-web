@@ -2,7 +2,7 @@ import { useRef } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { TableKit } from "@tiptap/extension-table"
-import ImageExtension from "@tiptap/extension-image"
+import { ResizableImage } from "@/components/shared/resizable-image"
 import { Markdown } from "tiptap-markdown"
 import {
   ImageSquareIcon,
@@ -49,7 +49,7 @@ export function RichTextEditor({
     extensions: [
       StarterKit,
       TableKit,
-      ImageExtension,
+      ResizableImage,
       Markdown.configure({ html: false, linkify: true, breaks: false }),
     ],
     content: value,
@@ -63,8 +63,7 @@ export function RichTextEditor({
           "[&_h3]:mt-3 [&_h3]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold",
           "[&_p]:mb-2 [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-0.5",
           "[&_strong]:font-semibold [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:italic",
-          "[&_table]:w-full [&_th]:bg-muted/50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border-t [&_td]:px-2 [&_td]:py-1",
-          "[&_img]:my-2 [&_img]:max-h-80 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:border"
+          "[&_table]:w-full [&_th]:bg-muted/50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border-t [&_td]:px-2 [&_td]:py-1"
         ),
       },
     },
