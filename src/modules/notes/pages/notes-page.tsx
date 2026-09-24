@@ -1156,16 +1156,32 @@ export function NotesPage() {
                               </Badge>
                             )}
                             {log.next_intent && (
+                              // The badge is the only wrappable-into-a-long-line
+                              // chip here; `max-w-full` + truncation on the
+                              // inner topic span keeps it inside the card on
+                              // phones and shows the full text on wider views.
                               <Badge
                                 variant="secondary"
+                                title={
+                                  log.next_intent.topic
+                                    ? `Next: ${INTENT_LABEL[log.next_intent.type].toLowerCase()} — ${log.next_intent.topic}`
+                                    : undefined
+                                }
                                 className={cn(
+                                  "flex max-w-full items-center gap-1 overflow-hidden whitespace-nowrap",
                                   log.next_intent.type === "test"
                                     ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
                                     : "bg-primary/10 text-primary"
                                 )}
                               >
-                                Next: {INTENT_LABEL[log.next_intent.type].toLowerCase()}
-                                {log.next_intent.topic ? ` — ${log.next_intent.topic}` : ""}
+                                <span className="shrink-0">
+                                  Next: {INTENT_LABEL[log.next_intent.type].toLowerCase()}
+                                </span>
+                                {log.next_intent.topic ? (
+                                  <span className="min-w-0 truncate">
+                                    — {log.next_intent.topic}
+                                  </span>
+                                ) : null}
                               </Badge>
                             )}
                           </div>
