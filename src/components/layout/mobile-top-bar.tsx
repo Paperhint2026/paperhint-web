@@ -8,10 +8,11 @@ import { PaperhintMark } from "@/components/shared/paperhint-mark"
 import { PaperhintWordmark } from "@/components/shared/paperhint-wordmark"
 import { NotificationsBell } from "@/components/layout/notifications-bell"
 
-/** Bar is 3.5rem + the phone's top inset (notch / status bar in a PWA);
- *  the page scroller pads by the same amount so content never sits under it. */
-export const MOBILE_TOP_BAR_H = "box-content h-14"
-export const MOBILE_TOP_BAR_PAD = "pt-[calc(3.5rem+env(safe-area-inset-top,0px))]"
+/** Bar is 3.5rem, plus the phone's top inset ONLY in standalone (PWA) mode —
+ *  see .ph-topbar in index.css. The page scroller pads by the same amount
+ *  (.ph-topbar-pad) so content never sits under the bar. */
+export const MOBILE_TOP_BAR_H = "box-content h-14 ph-topbar"
+export const MOBILE_TOP_BAR_PAD = "ph-topbar-pad"
 
 /**
  * The phone's app bar: menu · logo · bell · avatar. Replaces the floating
@@ -37,8 +38,6 @@ export function MobileTopBar() {
         "absolute inset-x-0 top-0 z-20 flex items-center gap-1 border-b bg-background/95 px-2 backdrop-blur",
         MOBILE_TOP_BAR_H
       )}
-      // Fixed-position bars add the phone's top inset themselves.
-      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
       <SidebarTrigger className="shrink-0" />
 

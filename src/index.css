@@ -309,3 +309,23 @@ input:-webkit-autofill:focus {
   caret-color: var(--foreground);
   transition: background-color 9999s ease-in-out 0s;
 }
+
+/* Mobile app bar × notch. With viewport-fit=cover, iOS reports the top
+   safe-area inset even inside a Chrome/Safari TAB — where the browser's own
+   chrome already clears the notch — which padded the bar by ~90px on an
+   iPhone 15. The inset is only real when the app runs from the home screen,
+   so it is applied under display-mode: standalone alone. */
+.ph-topbar {
+  padding-top: 0;
+}
+.ph-topbar-pad {
+  padding-top: 3.5rem;
+}
+@media (display-mode: standalone) {
+  .ph-topbar {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .ph-topbar-pad {
+    padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
+  }
+}
