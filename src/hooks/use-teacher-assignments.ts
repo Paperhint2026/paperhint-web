@@ -50,7 +50,17 @@ export function useTeacherAssignments() {
       const res = await apiClient.get<{ teacher: TeacherOverview }>(
         `/api/auth/teacher/${user.id}/overview`
       )
-      const list = res.teacher.assignments ?? []
+      // Stable order everywhere (sidebar, home, pickers): grade 5 before 6,
+      // section A before B, then subject name. The API returns rows in
+      // whatever order the DB felt like, which visibly reshuffled the nav.
+      const list = [...(res.teacher.assignments ?? [])].sort(
+        (x, y) =>
+          (x.class?.grade ?? 0) - (y.class?.grade ?? 0) ||
+          (x.class?.section ?? "").localeCompare(y.class?.section ?? "") ||
+          (x.subject?.subject_name ?? "").localeCompare(
+            y.subject?.subject_name ?? ""
+          )
+      )
       cachedAssignments = list
       cacheUserId = user.id
       setAssignments(list)

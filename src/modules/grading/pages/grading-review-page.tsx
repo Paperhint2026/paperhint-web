@@ -515,7 +515,9 @@ export function GradingReviewPage() {
                     <button
                       type="button"
                       onClick={() => handleEdit(qm)}
-                      className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity group-hover/q:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
+                      // Always visible on touch (no hover to reveal it);
+                      // hover-revealed only from md up where a cursor exists.
+                      className="rounded-md p-1 text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 md:opacity-0 md:group-hover/q:opacity-100"
                       aria-label={`Adjust marks for question ${q?.question_number}`}
                     >
                       <PencilSimpleIcon className="size-3.5" />

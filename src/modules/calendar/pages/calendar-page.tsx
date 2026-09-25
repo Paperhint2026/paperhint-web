@@ -1145,7 +1145,8 @@ function EventList({
                 )}
                 {isAdmin && (
                   <span
-                    className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+                    // Visible on touch; hover-revealed only where a cursor exists.
+                    className="flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100"
                     onClick={(ev) => ev.stopPropagation()}
                   >
                     <Button
