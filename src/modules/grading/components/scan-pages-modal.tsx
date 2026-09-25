@@ -6,6 +6,7 @@ import {
   ImageSquareIcon,
   CircleNotchIcon,
   CameraRotateIcon,
+  CropIcon,
   TrashIcon,
   UploadIcon,
   XIcon,
@@ -31,11 +32,21 @@ import { jsPDF } from "jspdf"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { ImageCropper } from "@/components/shared/image-cropper"
+import { toast } from "sonner"
+import {
+  compressForUpload,
+  HEIC_UNSUPPORTED_MESSAGE,
+  isHeic,
+} from "@/lib/image-upload"
 
 interface PageImage {
   id: string
+  /** What gets uploaded — the crop when one was made, else the original. */
   file: File
   preview: string
+  /** Untouched source so re-cropping never compounds quality loss. */
+  original: File
 }
 
 interface ScanPagesModalProps {
@@ -71,10 +82,12 @@ function SortablePageCard({
   page,
   index,
   onRemove,
+  onCrop,
 }: {
   page: PageImage
   index: number
   onRemove: () => void
+  onCrop: () => void
 }) {
   const {
     attributes,
@@ -119,7 +132,16 @@ function SortablePageCard({
       </button>
 
       <button
+        onClick={onCrop}
+        aria-label={`Crop page ${index + 1}`}
+        className="absolute bottom-2 left-2 rounded-md bg-background/85 p-1.5 text-foreground shadow backdrop-blur-sm transition-colors hover:bg-background"
+      >
+        <CropIcon className="size-3.5" />
+      </button>
+
+      <button
         onClick={onRemove}
+        aria-label={`Remove page ${index + 1}`}
         className="text-destructive-foreground absolute right-2 bottom-2 rounded-md bg-destructive/90 p-1.5 shadow transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
       >
         <TrashIcon className="size-3.5" />
@@ -135,6 +157,7 @@ export function ScanPagesModal({
   onSubmit,
 }: ScanPagesModalProps) {
   const [pages, setPages] = useState<PageImage[]>([])
+  const [cropping, setCropping] = useState<PageImage | null>(null)
   const [isConverting, setIsConverting] = useState(false)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -266,6 +289,7 @@ export function ScanPagesModal({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         file,
         preview,
+        original: file,
       },
     ])
   }, [])
@@ -287,16 +311,47 @@ export function ScanPagesModal({
     }
   }, [])
 
-  const addImages = useCallback((files: FileList | File[]) => {
-    const newPages: PageImage[] = Array.from(files)
-      .filter((f) => f.type.startsWith("image/"))
-      .map((f) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        file: f,
-        preview: URL.createObjectURL(f),
-      }))
+  const addImages = useCallback(async (files: FileList | File[]) => {
+    // HEIC (iPhone) is converted to JPEG up front so the preview, the
+    // cropper and jsPDF all get something every browser can decode.
+    const picked = Array.from(files).filter(
+      (f) => f.type.startsWith("image/") || isHeic(f)
+    )
+    // Per-file, so one undecodable HEIC skips itself instead of dropping
+    // the whole batch — and the teacher is told which ones were skipped.
+    const results = await Promise.allSettled(
+      picked.map((f) => (isHeic(f) ? compressForUpload(f) : Promise.resolve(f)))
+    )
+    const prepared: File[] = []
+    const skipped: string[] = []
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") prepared.push(r.value)
+      else skipped.push(picked[i].name)
+    })
+    if (skipped.length) {
+      toast.error(
+        `${skipped.length === 1 ? `"${skipped[0]}" was` : `${skipped.length} photos were`} skipped. ${HEIC_UNSUPPORTED_MESSAGE}`
+      )
+    }
+    const newPages: PageImage[] = prepared.map((f) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      file: f,
+      preview: URL.createObjectURL(f),
+      original: f,
+    }))
     setPages((prev) => [...prev, ...newPages])
   }, [])
+
+  const applyCrop = (id: string, cropped: File) => {
+    setPages((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p
+        URL.revokeObjectURL(p.preview)
+        return { ...p, file: cropped, preview: URL.createObjectURL(cropped) }
+      })
+    )
+    setCropping(null)
+  }
 
   const removePage = (id: string) => {
     setPages((prev) => {
@@ -368,6 +423,17 @@ export function ScanPagesModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      {/* Mounted at the modal root (not inside the camera branch) so Crop
+          works from the page-list view, which is where the button lives. */}
+      {cropping && (
+        <ImageCropper
+          key={cropping.id}
+          file={cropping.original}
+          title={`Crop page ${pages.findIndex((p) => p.id === cropping.id) + 1}`}
+          onCancel={() => setCropping(null)}
+          onConfirm={(file) => applyCrop(cropping.id, file)}
+        />
+      )}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={handleClose}
@@ -503,6 +569,7 @@ export function ScanPagesModal({
                             page={page}
                             index={idx}
                             onRemove={() => removePage(page.id)}
+                            onCrop={() => setCropping(page)}
                           />
                         ))}
                       </div>
@@ -567,7 +634,7 @@ export function ScanPagesModal({
               capture="environment"
               className="hidden"
               onChange={(e) => {
-                if (e.target.files) addImages(e.target.files)
+                if (e.target.files) void addImages(e.target.files)
                 e.target.value = ""
               }}
             />
@@ -578,7 +645,7 @@ export function ScanPagesModal({
               multiple
               className="hidden"
               onChange={(e) => {
-                if (e.target.files) addImages(e.target.files)
+                if (e.target.files) void addImages(e.target.files)
                 e.target.value = ""
               }}
             />

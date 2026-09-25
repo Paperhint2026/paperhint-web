@@ -56,55 +56,14 @@ import {
 import { ScanPagesModal } from "../components/scan-pages-modal"
 import { ExamCardsGrid } from "../components/exam-cards-grid"
 import { scoreTone } from "../lib/score"
+import {
+  compressForUpload,
+  isAcceptedUpload,
+  UPLOAD_ACCEPT,
+} from "@/lib/image-upload"
 
-function compressForUpload(file: File): Promise<File> {
-  return new Promise((resolve) => {
-    if (!file.type.startsWith("image/") || file.type === "application/pdf") {
-      resolve(file)
-      return
-    }
-    if (file.size <= 5 * 1024 * 1024) {
-      resolve(file)
-      return
-    }
-
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      const maxDim = 3200
-      const scale =
-        Math.max(img.width, img.height) > maxDim
-          ? maxDim / Math.max(img.width, img.height)
-          : 1
-      const canvas = document.createElement("canvas")
-      canvas.width = Math.round(img.width * scale)
-      canvas.height = Math.round(img.height * scale)
-      const ctx = canvas.getContext("2d")!
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      canvas.toBlob(
-        (blob) => {
-          if (blob && blob.size < file.size) {
-            resolve(
-              new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
-                type: "image/jpeg",
-              })
-            )
-          } else {
-            resolve(file)
-          }
-        },
-        "image/jpeg",
-        0.92
-      )
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      resolve(file)
-    }
-    img.src = url
-  })
-}
+/* Image prep (HEIC → JPEG, large-photo compression) lives in
+   @/lib/image-upload, shared with the exams page and scan modal. */
 
 interface Exam {
   id: string
@@ -153,8 +112,6 @@ const STATE_LABEL: Record<SheetState, string> = {
   failed: "Failed",
   none: "No sheet",
 }
-
-const ACCEPTED = ["application/pdf", "image/jpeg", "image/png", "image/webp"]
 
 function initialsOf(name: string) {
   return name
@@ -365,8 +322,8 @@ export function GradingPage() {
 
   const uploadSheet = async (studentId: string, rawFile: File) => {
     if (!selectedExamId) return
-    if (!ACCEPTED.includes(rawFile.type)) {
-      showError(new Error("Use a PDF or a JPG, PNG or WebP photo"))
+    if (!isAcceptedUpload(rawFile)) {
+      showError(new Error("Use a PDF or a photo (JPG, PNG, WebP or iPhone HEIC)"))
       return
     }
 
@@ -409,7 +366,7 @@ export function GradingPage() {
   const handleUploadClick = (studentId: string) => {
     const input = document.createElement("input")
     input.type = "file"
-    input.accept = ACCEPTED.join(",")
+    input.accept = UPLOAD_ACCEPT
     input.onchange = () => {
       const rawFile = input.files?.[0]
       if (rawFile) void uploadSheet(studentId, rawFile)

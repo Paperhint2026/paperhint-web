@@ -27,6 +27,11 @@ import { toast } from "sonner"
 
 import { showError } from "@/lib/show-error"
 import { useIsMobile } from "@/hooks/use-mobile"
+import {
+  compressForUpload,
+  isAcceptedUpload,
+  UPLOAD_ACCEPT,
+} from "@/lib/image-upload"
 import "katex/dist/katex.min.css"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
@@ -227,47 +232,8 @@ function chapterChipLabel(ch: string): string {
   return trimmed || ch
 }
 
-/* ─── Image compression helper ──────────────────────────── */
-
-function compressForUpload(file: File): Promise<File> {
-  return new Promise((resolve) => {
-    if (!file.type.startsWith("image/") || file.size <= 5 * 1024 * 1024) {
-      resolve(file)
-      return
-    }
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      const maxDim = 3200
-      const scale =
-        Math.max(img.width, img.height) > maxDim
-          ? maxDim / Math.max(img.width, img.height)
-          : 1
-      const canvas = document.createElement("canvas")
-      canvas.width = Math.round(img.width * scale)
-      canvas.height = Math.round(img.height * scale)
-      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height)
-      canvas.toBlob(
-        (blob) =>
-          resolve(
-            blob && blob.size < file.size
-              ? new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
-                  type: "image/jpeg",
-                })
-              : file
-          ),
-        "image/jpeg",
-        0.92
-      )
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      resolve(file)
-    }
-    img.src = url
-  })
-}
+/* Image prep (HEIC → JPEG, large-photo compression) lives in
+   @/lib/image-upload, shared with the grading page. */
 
 /* ─── Main component ─────────────────────────────────────── */
 
@@ -782,10 +748,16 @@ export function ExamsPage() {
   const handleUploadClick = (studentId: string) => {
     const input = document.createElement("input")
     input.type = "file"
-    input.accept = "application/pdf,image/jpeg,image/png,image/webp"
+    input.accept = UPLOAD_ACCEPT
     input.onchange = async () => {
       const rawFile = input.files?.[0]
       if (!rawFile || !selectedExamId) return
+      if (!isAcceptedUpload(rawFile)) {
+        showError(
+          new Error("Use a PDF or a photo (JPG, PNG, WebP or iPhone HEIC)")
+        )
+        return
+      }
       setUploadingSet((prev) => new Set(prev).add(studentId))
       try {
         const file = await compressForUpload(rawFile)
