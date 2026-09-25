@@ -226,10 +226,22 @@ export function BlueprintModal({
                       <Input
                         type="number"
                         min={1}
-                        value={sec.num_questions}
+                        // Blank when 0 so backspace can actually clear the box
+                        // (Number("") is 0, which re-renders as "0" and then
+                        // any digit typed appends: "0" + "5" → "05"). On blur
+                        // we clamp to min so we never save 0.
+                        value={sec.num_questions || ""}
                         onChange={(e) =>
-                          update(idx, "num_questions", Number(e.target.value))
+                          update(
+                            idx,
+                            "num_questions",
+                            e.target.value === "" ? 0 : Number(e.target.value)
+                          )
                         }
+                        onBlur={(e) => {
+                          if (!e.target.value || Number(e.target.value) < 1)
+                            update(idx, "num_questions", 1)
+                        }}
                         className="h-8 text-xs"
                       />
                     </div>
@@ -240,14 +252,19 @@ export function BlueprintModal({
                       <Input
                         type="number"
                         min={1}
-                        value={sec.marks_per_question}
+                        // See "Questions" input above for the empty-string trick.
+                        value={sec.marks_per_question || ""}
                         onChange={(e) =>
                           update(
                             idx,
                             "marks_per_question",
-                            Number(e.target.value)
+                            e.target.value === "" ? 0 : Number(e.target.value)
                           )
                         }
+                        onBlur={(e) => {
+                          if (!e.target.value || Number(e.target.value) < 1)
+                            update(idx, "marks_per_question", 1)
+                        }}
                         className="h-8 text-xs"
                       />
                     </div>

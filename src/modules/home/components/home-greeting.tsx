@@ -37,7 +37,7 @@ export function HomeGreeting({
   const { word, sticker } = partOfDay(useHour())
   return (
     <div className="flex flex-wrap items-center gap-5 sm:gap-6">
-      <div className="flex min-w-0 flex-1 items-center gap-5">
+      <div className="flex min-w-[14rem] flex-1 items-center gap-5">
         <Sticker
           name={sticker}
           size={80}
@@ -58,7 +58,7 @@ export function HomeGreeting({
           ) : null}
         </div>
       </div>
-      {aside ? <div className="shrink-0">{aside}</div> : null}
+      {aside ? <div className="w-full sm:w-auto sm:shrink-0">{aside}</div> : null}
     </div>
   )
 }
@@ -70,11 +70,11 @@ export function StatStrip({
   items: { value: React.ReactNode; label: string; accent?: boolean }[]
 }) {
   return (
-    <div className="flex divide-x divide-border rounded-xl border border-border bg-background">
+    <div className="flex w-full divide-x divide-border rounded-xl border border-border bg-background sm:w-auto">
       {items.map((it) => (
         <div
           key={it.label}
-          className="flex min-w-[5.5rem] flex-col items-center gap-0.5 px-4 py-2.5"
+          className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-2 py-2.5 sm:min-w-[5.5rem] sm:flex-none sm:px-4"
         >
           <span
             className={

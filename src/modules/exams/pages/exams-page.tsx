@@ -26,6 +26,7 @@ import { AnimatePresence, motion } from "motion/react"
 import { toast } from "sonner"
 
 import { showError } from "@/lib/show-error"
+import { useIsMobile } from "@/hooks/use-mobile"
 import "katex/dist/katex.min.css"
 import ReactMarkdown from "react-markdown"
 import rehypeKatex from "rehype-katex"
@@ -387,6 +388,40 @@ function CloneListSkeleton() {
   )
 }
 
+/** The answer-sheets rail. An inline 320px column on desktop; on mobile the
+ *  same content slides in from the right as a sheet, so the paper keeps the
+ *  full width (the always-on rail used to squeeze it to a word per line).
+ *  Children are rendered once either way — nothing is duplicated. */
+function StudentsRail({
+  isMobile,
+  open,
+  onOpenChange,
+  children,
+}: {
+  isMobile: boolean
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  children: React.ReactNode
+}) {
+  if (!isMobile) {
+    return (
+      <div className="flex w-[320px] shrink-0 flex-col bg-sidebar/40">
+        {children}
+      </div>
+    )
+  }
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="flex flex-col gap-0 p-0">
+        <SheetHeader className="sr-only">
+          <SheetTitle>Answer sheets</SheetTitle>
+        </SheetHeader>
+        {children}
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 export function ExamsPage() {
   const { user } = useAuth()
   const { assignments } = useTeacherAssignments()
@@ -437,6 +472,9 @@ export function ExamsPage() {
   const [savedBlueprints, setSavedBlueprints] = useState<Blueprint[]>([])
   const [selectedBlueprintId, setSelectedBlueprintId] = useState("")
   const [blueprintModalOpen, setBlueprintModalOpen] = useState(false)
+  // Mobile: the students rail becomes a slide-over sheet (see StudentsRail).
+  const isMobile = useIsMobile()
+  const [sheetsOpen, setSheetsOpen] = useState(false)
   const [blueprintEdited, setBlueprintEdited] = useState(false)
   const [showBlueprintSections, setShowBlueprintSections] = useState(false)
 
@@ -1116,7 +1154,9 @@ export function ExamsPage() {
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-border">
             {/* Header — fixed h-16 so its bottom border lines up with the
                 students-rail header across the vertical split. */}
-            <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
+            {/* Mobile: two rows (title, then a scrollable action strip with the
+                sheet-count pinned at the right). Desktop: the original single h-16 row. */}
+            <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-2 md:h-16 md:flex-row md:items-center md:justify-between md:gap-3 md:py-0">
               <div className="flex min-w-0 items-center gap-2">
                 <Button
                   variant="ghost"
@@ -1150,7 +1190,11 @@ export function ExamsPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2 md:shrink-0">
+                {/* Actions scroll horizontally within the width left over after
+                    the pinned count (mobile); on desktop they don't scroll and
+                    overflow stays visible so popovers aren't clipped. */}
+                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 md:flex-none md:overflow-visible">
                 <DuplicateExamPopover
                   sourceExam={selectedExam}
                   currentClassSubjectId={classSubjectId ?? null}
@@ -1217,6 +1261,22 @@ export function ExamsPage() {
                     </Button>
                   </>
                 )}
+                </div>
+                {/* Mobile-only, pinned at the right: opens the answer-sheets rail as a sheet */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 md:hidden"
+                  onClick={() => setSheetsOpen(true)}
+                  aria-label="Open answer sheets"
+                >
+                  <UserIcon className="size-3.5" />
+                  {students.length > 0 && !isLoadingStudents && (
+                    <span className="tabular-nums">
+                      {gradedCount}/{students.length}
+                    </span>
+                  )}
+                </Button>
               </div>
             </div>
 
@@ -1527,11 +1587,16 @@ export function ExamsPage() {
             </div>
           </div>
 
-          {/* ── Right panel: students ── */}
-          <div className="flex w-[320px] shrink-0 flex-col bg-sidebar/40">
+          {/* ── Right panel: students — inline rail on desktop, slide-over sheet on mobile ── */}
+          <StudentsRail
+            isMobile={isMobile}
+            open={sheetsOpen}
+            onOpenChange={setSheetsOpen}
+          >
             {/* Same fixed h-16 as the question-pane header so the two bottom
                 borders read as one continuous divider. */}
-            <div className="flex h-16 shrink-0 flex-col justify-center gap-1.5 border-b border-border px-4">
+            {/* pr-12 on mobile clears the Sheet's absolute top-right close (×). */}
+            <div className="flex h-16 shrink-0 flex-col justify-center gap-1.5 border-b border-border pl-4 pr-12 md:pr-4">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-xs font-medium text-secondary-foreground">
                   <UserIcon className="size-3.5 text-muted-foreground" />
@@ -1751,7 +1816,7 @@ export function ExamsPage() {
                 )}
               </LoadingSwap>
             </div>
-          </div>
+          </StudentsRail>
         </div>
       )}
 
@@ -2108,14 +2173,17 @@ export function ExamsPage() {
               </Button>
             </div>
           </DialogFooter>
+          {/* Rendered INSIDE the exam dialog on purpose: as a sibling modal,
+              Radix defers touch "pointer-down-outside" to the next click, which
+              lands after this modal has closed — so the exam dialog saw the
+              Cancel/X tap as outside itself and reset the form (mobile only). */}
+          <BlueprintModal
+            open={blueprintModalOpen}
+            onClose={() => setBlueprintModalOpen(false)}
+            onSaved={handleBlueprintCreated}
+          />
         </DialogContent>
       </Dialog>
-
-      <BlueprintModal
-        open={blueprintModalOpen}
-        onClose={() => setBlueprintModalOpen(false)}
-        onSaved={handleBlueprintCreated}
-      />
 
       <CloneFromSectionSheet
         open={cloneOpen}
