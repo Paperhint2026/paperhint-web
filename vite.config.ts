@@ -9,6 +9,10 @@ import { defineConfig, type Plugin } from "vite"
 // because the dev server needs Vite's inline react-refresh preamble.
 // script-src is the teeth; styles/images/connect stay open (KaTeX injects
 // styles, answer sheets load from signed Supabase URLs).
+//
+// frame-src 'none' means NO <iframe>/<object> PDF previews — they render blank
+// in prod. PDFs are drawn to canvases by components/shared/pdf-pages.tsx
+// (pdf.js, bundled locally so its worker passes script-src 'self').
 function cspMeta(): Plugin {
   return {
     name: "csp-meta",

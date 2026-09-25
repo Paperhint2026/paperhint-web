@@ -8,6 +8,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { Button } from "@/components/ui/button"
+import { PdfPages } from "@/components/shared/pdf-pages"
 import {
   Dialog,
   DialogContent,
@@ -121,14 +122,11 @@ function PreviewBody({ attachment }: { attachment: Attachment }) {
               open={attachment.url}
             />
           ) : (
-            // The browser's own PDF viewer. Cross-origin (storage host), so
-            // the document runs in its own origin, not ours.
-            <iframe
-              src={`${attachment.url}#toolbar=1&view=FitH`}
-              title={attachment.name}
-              referrerPolicy="no-referrer"
-              className="h-[75vh] min-h-[60vh] w-full border-0 bg-white"
-            />
+            // Rendered to canvases with pdf.js — an <iframe> is blank in
+            // prod because the CSP sets frame-src 'none'.
+            <div className="p-4">
+              <PdfPages url={attachment.url} label="PDF" />
+            </div>
           )
         ) : kind === "text" ? (
           textError ? (

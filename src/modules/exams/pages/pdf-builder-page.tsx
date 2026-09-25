@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useAppSelector } from "@/store"
 import { Button } from "@/components/ui/button"
+import { PdfPages } from "@/components/shared/pdf-pages"
 import {
   Tooltip,
   TooltipContent,
@@ -1513,12 +1514,12 @@ export function PdfBuilderPage() {
                   )
                 }
                 if (url) {
+                  // blob: URL from BlobProvider. Not an <iframe>: prod CSP is
+                  // frame-src 'none', so the framed preview rendered blank.
                   return (
-                    <iframe
-                      src={url}
-                      className="h-[80vh] w-full max-w-[595px] rounded-xl border border-border bg-white shadow-lg sm:h-[842px]"
-                      title="PDF preview"
-                    />
+                    <div className="w-full max-w-[595px]">
+                      <PdfPages url={url} label="preview" />
+                    </div>
                   )
                 }
                 return null

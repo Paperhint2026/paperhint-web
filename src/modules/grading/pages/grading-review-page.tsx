@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { tameCaps } from "@/lib/format"
 import { Button } from "@/components/ui/button"
+import { PdfPages } from "@/components/shared/pdf-pages"
 import {
   Tooltip,
   TooltipContent,
@@ -738,13 +739,15 @@ export function GradingReviewPage() {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto bg-sidebar/60 p-4">
+      {/* min-h-0: flex items default to min-height:auto (== content height),
+          which makes the scroll container grow past the viewport on mobile so
+          overflow-auto has nothing to scroll. Applies to both the image path
+          and the PDF iframe (which needs a bounded parent to size h-full). */}
+      <div className="min-h-0 flex-1 overflow-auto bg-sidebar/60 p-4">
         {isPdf ? (
-          <iframe
-            src={sheetUrl}
-            className="h-full w-full rounded-lg border border-border bg-background"
-            title="Answer sheet"
-          />
+          // Not an <iframe>: prod CSP is frame-src 'none' (blank), and iOS
+          // can't scroll framed PDFs. PdfPages renders pages to canvases.
+          <PdfPages url={sheetUrl} label="answer sheet" />
         ) : (
           <img
             src={sheetUrl}
