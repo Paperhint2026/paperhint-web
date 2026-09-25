@@ -336,19 +336,9 @@ export function GradingPage() {
       formData.append("exam_id", selectedExamId)
       formData.append("student_id", studentId)
 
-      const token = localStorage.getItem("access_token")
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-
-      const res = await fetch(`${BASE_URL}/api/grading/upload-answer-sheet`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Upload failed")
-      }
+      // HttpOnly-cookie session via apiClient — the old localStorage Bearer
+      // is gone post-migration and produced "invalid token" here.
+      await apiClient.post("/api/grading/upload-answer-sheet", formData)
 
       toast.success("Answer sheet uploaded! AI grading in progress...")
       fetchStudentsAndSubmissions(classSubjectId ?? "", selectedExamId)
@@ -406,19 +396,7 @@ export function GradingPage() {
       formData.append("exam_id", selectedExamId)
       formData.append("student_id", studentId)
 
-      const token = localStorage.getItem("access_token")
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-
-      const res = await fetch(`${BASE_URL}/api/grading/upload-answer-sheet`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Upload failed")
-      }
+      await apiClient.post("/api/grading/upload-answer-sheet", formData)
 
       toast.success("Answer sheet uploaded! AI grading in progress...")
       fetchStudentsAndSubmissions(classSubjectId ?? "", selectedExamId)

@@ -77,10 +77,13 @@ function doFetch(endpoint: string, options: RequestOptions) {
   })
 }
 
-async function request<T>(
+/** The authed core every request shares: fetch with cookies, one silent
+ *  refresh-and-replay on 401, logout+redirect when the session is truly dead.
+ *  Returns the raw Response (non-401 errors are the caller's to interpret). */
+async function authedFetch(
   endpoint: string,
   options: RequestOptions = {}
-): Promise<T> {
+): Promise<Response> {
   let response = await doFetch(endpoint, options)
 
   // Silent refresh, once. Never on the refresh endpoint itself (that would
@@ -111,6 +114,15 @@ async function request<T>(
     window.location.href = "/login"
     throw new Error("Unauthorized")
   }
+
+  return response
+}
+
+async function request<T>(
+  endpoint: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const response = await authedFetch(endpoint, options)
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
@@ -154,5 +166,11 @@ export const apiClient = {
   },
   delete<T>(endpoint: string, options?: RequestOptions) {
     return request<T>(endpoint, { ...options, method: "DELETE" })
+  },
+  /** Same cookie auth + silent refresh, but hands back the raw Response —
+   *  for streaming (SSE reads), blobs, and callers that interpret status
+   *  codes themselves (e.g. the timetable's 409 conflict payload). */
+  raw(endpoint: string, options?: RequestOptions) {
+    return authedFetch(endpoint, options ?? {})
   },
 }

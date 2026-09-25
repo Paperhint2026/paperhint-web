@@ -41,7 +41,6 @@ export interface ClassAiChat {
   resetChat: () => void
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
 
 /**
  * Class-scoped AI chat state. Lifted out of the sheet so that closing the
@@ -162,19 +161,16 @@ export function useClassAiChat(classSubjectId: string | null): ClassAiChat {
       abortRef.current = controller
 
       try {
-        const token = localStorage.getItem("access_token")
-        const response = await fetch(`${BASE_URL}/api/knowledge/ask-stream`, {
+        // apiClient.raw: cookie session + silent refresh, but hands back the
+        // raw Response so the SSE reader below can stream the body.
+        const response = await apiClient.raw("/api/knowledge/ask-stream", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
+          body: {
             query: trimmed,
             class_subject_id: classSubjectId,
             material_ids: pinnedSnapshot,
             conversation_history: historyForRequest,
-          }),
+          },
           signal: controller.signal,
         })
 

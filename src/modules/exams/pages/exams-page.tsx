@@ -765,17 +765,7 @@ export function ExamsPage() {
         formData.append("file", file)
         formData.append("exam_id", selectedExamId)
         formData.append("student_id", studentId)
-        const token = localStorage.getItem("access_token")
-        const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-        const res = await fetch(`${BASE_URL}/api/grading/upload-answer-sheet`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        })
-        if (!res.ok) {
-          const err = await res.json()
-          throw new Error(err.error || "Upload failed")
-        }
+        await apiClient.post("/api/grading/upload-answer-sheet", formData)
         toast.success("Answer sheet uploaded! AI grading in progress...")
         if (classSubjectId)
           fetchStudentsAndSubmissions(classSubjectId, selectedExamId)
@@ -802,17 +792,7 @@ export function ExamsPage() {
       formData.append("file", pdfFile)
       formData.append("exam_id", selectedExamId)
       formData.append("student_id", studentId)
-      const token = localStorage.getItem("access_token")
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-      const res = await fetch(`${BASE_URL}/api/grading/upload-answer-sheet`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Upload failed")
-      }
+      await apiClient.post("/api/grading/upload-answer-sheet", formData)
       toast.success("Answer sheet uploaded! AI grading in progress...")
       if (classSubjectId)
         fetchStudentsAndSubmissions(classSubjectId, selectedExamId)

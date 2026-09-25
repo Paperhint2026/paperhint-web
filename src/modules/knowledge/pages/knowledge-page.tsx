@@ -226,20 +226,9 @@ export function KnowledgePage() {
       )
       selectedFiles.forEach((f) => formData.append("files", f.file))
 
-      const token = localStorage.getItem("access_token")
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-
-      const uploadRes = await fetch(`${BASE_URL}/api/knowledge/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-
-      if (!uploadRes.ok) throw new Error("Upload failed")
-
-      const uploadData = (await uploadRes.json()) as {
+      const uploadData = await apiClient.post<{
         results: ({ material: Material } | { title: string; error: string })[]
-      }
+      }>("/api/knowledge/upload", formData)
 
       const uploaded: Material[] = []
       for (const r of uploadData.results) {

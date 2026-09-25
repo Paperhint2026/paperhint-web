@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { apiClient } from "@/lib/api-client"
 import {
   CalendarIcon,
   CameraIcon,
@@ -219,18 +220,12 @@ export function AddTeacherDrawer({
       formData.append("image", file)
       formData.append("user_id", teacherId)
 
-      const token = localStorage.getItem("access_token")
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-
-      const res = await fetch(`${BASE_URL}/api/auth/upload-profile`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-
-      if (!res.ok) throw new Error("Upload failed")
-
-      const data = (await res.json()) as { preview_url: string }
+      // Session rides in HttpOnly cookies via apiClient (silent refresh
+      // included) — the old localStorage Bearer went stale post-migration.
+      const data = await apiClient.post<{ preview_url: string }>(
+        "/api/auth/upload-profile",
+        formData
+      )
       setForm((prev) => ({ ...prev, profileUrl: data.preview_url }))
     } catch (err) {
       console.error("Profile upload failed:", err)

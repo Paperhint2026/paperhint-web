@@ -109,15 +109,10 @@ export function ProfileSection({ user }: { user: User }) {
     try {
       const formData = new FormData()
       formData.append("image", file)
-      const token = localStorage.getItem("access_token")
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-      const res = await fetch(`${BASE_URL}/api/auth/upload-profile`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-      if (!res.ok) throw new Error("Upload failed")
-      const data = (await res.json()) as { preview_url: string }
+      const data = await apiClient.post<{ preview_url: string }>(
+        "/api/auth/upload-profile",
+        formData
+      )
       setProfileUrl(data.preview_url)
       setPreviewSrc(data.preview_url)
       dispatch(updateUser({ profile_url: data.preview_url }))

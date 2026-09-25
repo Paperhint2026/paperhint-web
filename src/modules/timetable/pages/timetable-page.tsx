@@ -1024,17 +1024,12 @@ function SectionBuilder({
           block_id: s.block_id ?? null,
         }
       })
-      const raw = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/timetable/${classId}/slots`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-          body: JSON.stringify({ slots }),
-        }
-      )
+      // apiClient.raw (cookie auth + refresh) — this caller reads the 409
+      // conflict payload itself, so it needs the raw Response.
+      const raw = await apiClient.raw(`/api/timetable/${classId}/slots`, {
+        method: "PUT",
+        body: { slots },
+      })
       const body = await raw.json().catch(() => ({}))
       if (raw.status === 409 && Array.isArray(body.conflicts)) {
         const map = new Map<string, string>()

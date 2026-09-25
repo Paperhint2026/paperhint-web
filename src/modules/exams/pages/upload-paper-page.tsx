@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner"
 
 import { showError } from "@/lib/show-error"
+import { apiClient } from "@/lib/api-client"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -94,30 +95,16 @@ export function UploadPaperPage() {
       formData.append("exam_id", examId)
       formData.append("file", file)
 
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/exams/upload-paper`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
-          },
-          body: formData,
-        }
-      )
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Upload failed")
-      }
-
-      const data = await res.json()
+      const data = await apiClient.post<{
+        questions?: { questions?: unknown[] } | unknown[]
+      }>("/api/exams/upload-paper", formData)
 
       clearInterval(stepInterval)
       setCurrentStep(PROCESSING_STEPS.length - 1)
       setIsDone(true)
 
-      const qCount =
-        data.questions?.questions?.length ?? data.questions?.length ?? 0
+      const q = data.questions
+      const qCount = Array.isArray(q) ? q.length : (q?.questions?.length ?? 0)
       toast.success(`${qCount} questions extracted successfully!`)
 
       setTimeout(() => {

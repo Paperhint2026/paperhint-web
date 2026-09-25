@@ -1202,17 +1202,9 @@ function UploadDialog({
       )
       files.forEach((f) => formData.append("files", f.file))
 
-      const token = localStorage.getItem("access_token")
-      const BASE_URL = import.meta.env.VITE_API_BASE_URL as string
-      const res = await fetch(`${BASE_URL}/api/knowledge/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-      if (!res.ok) throw new Error("Upload failed")
-      const json = (await res.json()) as {
+      const json = await apiClient.post<{
         results: ({ material: Material } | { title: string; error: string })[]
-      }
+      }>("/api/knowledge/upload", formData)
 
       const uploaded: Material[] = []
       for (const r of json.results) {
