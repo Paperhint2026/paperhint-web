@@ -101,7 +101,13 @@ async function authedFetch(
     }
   }
 
-  if (response.status === 401) {
+  if (
+    response.status === 401 &&
+    !endpoint.startsWith("/api/auth/oauth-complete") &&
+    !endpoint.startsWith("/api/auth/confirm-signup") &&
+    !endpoint.startsWith("/api/auth/login") &&
+    !endpoint.startsWith("/api/auth/refresh")
+  ) {
     const { store } = await import("@/store")
     const { logout } = await import("@/store/auth-slice")
     store.dispatch(logout())
