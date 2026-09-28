@@ -94,6 +94,16 @@ const authSlice = createSlice({
         localStorage.setItem("user", JSON.stringify(state.user))
       }
     },
+    // Populate the store from an already-authenticated response (OAuth
+    // callback / email confirmation). Matches what login.fulfilled does,
+    // minus the credentials round-trip.
+    hydrateUser(state, action: { payload: User }) {
+      state.user = action.payload
+      state.isLoading = false
+      state.error = null
+      localStorage.setItem("user", JSON.stringify(state.user))
+      localStorage.removeItem("access_token")
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -118,5 +128,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { logout, clearError, updateUser } = authSlice.actions
+export const { logout, clearError, updateUser, hydrateUser } = authSlice.actions
 export default authSlice.reducer

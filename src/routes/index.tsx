@@ -7,6 +7,10 @@ import { LoginPage } from "@/modules/auth/pages/login-page"
 import { ForgotPasswordPage } from "@/modules/auth/pages/forgot-password-page"
 import { ResetPasswordPage } from "@/modules/auth/pages/reset-password-page"
 import { SetPasswordPage } from "@/modules/auth/pages/set-password-page"
+import { SignupPage } from "@/modules/auth/pages/signup-page"
+import { AuthCallbackPage } from "@/modules/auth/pages/auth-callback-page"
+import { ConfirmSignupPage } from "@/modules/auth/pages/confirm-signup-page"
+import { OnboardingPage } from "@/modules/onboarding/pages/onboarding-page"
 import { HomePage } from "@/modules/home/pages/home-page"
 import { ClassesPage } from "@/modules/classes/pages/classes-page"
 import { ClassHomePage } from "@/modules/classes/pages/class-home-page"
@@ -59,6 +63,23 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
   },
   {
+    path: "signup",
+    element: <SignupPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    // Landing route for Google / Microsoft OAuth (Supabase redirects here).
+    path: "auth/callback",
+    element: <AuthCallbackPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    // Landing route for the email-signup confirmation link.
+    path: "confirm",
+    element: <ConfirmSignupPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
     path: "forgot-password",
     element: <ForgotPasswordPage />,
     errorElement: <RouteErrorPage />,
@@ -77,6 +98,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     errorElement: <RouteErrorPage />,
     children: [
+      { path: "onboarding", element: <OnboardingPage /> },
       {
         element: <AppLayout />,
         children: [

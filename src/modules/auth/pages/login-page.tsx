@@ -11,6 +11,8 @@ import {
 import { toast } from "sonner"
 
 import { useAuth } from "@/lib/auth"
+import { supabase } from "@/lib/supabase"
+import { GoogleGlyph, MicrosoftGlyph } from "@/modules/auth/pages/signup-page"
 import { cn } from "@/lib/utils"
 import { PaperhintMark } from "@/components/shared/paperhint-mark"
 import { PaperhintWordmark } from "@/components/shared/paperhint-wordmark"
@@ -78,6 +80,7 @@ export function LoginPage() {
   const [phase, setPhase] = useState<"form" | "sending" | "success">("form")
   const [found, setFound] = useState(false)
   const [logoSpin, setLogoSpin] = useState(0)
+  const [oauthBusy, setOauthBusy] = useState<null | "google" | "microsoft">(null)
   const taps = useRef(0)
 
   useEffect(() => {
@@ -107,6 +110,29 @@ export function LoginPage() {
                 ? "email"
                 : "idle"
 
+  const startOAuth = async (provider: "google" | "azure") => {
+    setError("")
+    setOauthBusy(provider === "azure" ? "microsoft" : "google")
+    try {
+      // No intent stashed here — this is a login page, not signup. A brand
+      // new Google identity that has never been provisioned will get the
+      // OAUTH_NEEDS_KIND error on /auth/callback and be told to sign up.
+      const { error: oErr } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+      if (oErr) throw oErr
+      // Browser is now redirecting; nothing else to do.
+    } catch (err) {
+      setOauthBusy(null)
+      setError(
+        err instanceof Error ? err.message : "Couldn't start sign-in — try again."
+      )
+    }
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError("")
@@ -131,7 +157,12 @@ export function LoginPage() {
         /invalid.*credential/i.test(msg) ||
         /request failed.*40[01]/i.test(msg)
       ) {
-        setError("That email and password don't match. Try again.")
+        // Google-only accounts have no password — a wrong-password attempt
+        // returns the same "invalid credentials" as a genuinely wrong
+        // password, so we hint at both possibilities without enumerating.
+        setError(
+          "That email and password don't match. If you signed up with Google, use Continue with Google above."
+        )
       } else if (/email.*not.*confirmed/i.test(msg)) {
         setError("Your email isn't confirmed yet. Check your inbox.")
       } else if (/too many/i.test(msg) || /rate/i.test(msg)) {
@@ -154,7 +185,7 @@ export function LoginPage() {
     }
   }
 
-  const busy = isLoading || phase !== "form"
+  const busy = isLoading || phase !== "form" || oauthBusy !== null
 
   return (
     <div className="grid min-h-svh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
@@ -238,6 +269,42 @@ export function LoginPage() {
                     {MOOD_LINE[mood]}
                   </motion.p>
                 </AnimatePresence>
+              </div>
+            </motion.div>
+
+            {/* Social sign-in — surfaced above the form so Google-signup
+                 users don't confuse themselves poking at password. */}
+            <motion.div variants={ENTER} className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => void startOAuth("google")}
+                disabled={busy}
+                className="flex h-11 items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-input bg-background px-4 text-[14.5px] font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {oauthBusy === "google" ? (
+                  <CircleNotchIcon className="size-4 animate-spin" />
+                ) : (
+                  <GoogleGlyph className="size-4" />
+                )}
+                Continue with Google
+              </button>
+              <button
+                type="button"
+                onClick={() => void startOAuth("azure")}
+                disabled={busy}
+                className="flex h-11 items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-input bg-background px-4 text-[14.5px] font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {oauthBusy === "microsoft" ? (
+                  <CircleNotchIcon className="size-4 animate-spin" />
+                ) : (
+                  <MicrosoftGlyph className="size-4" />
+                )}
+                Continue with Microsoft
+              </button>
+              <div className="flex items-center gap-3 py-1 text-[11px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                <span className="h-px flex-1 bg-border" />
+                <span>or with email</span>
+                <span className="h-px flex-1 bg-border" />
               </div>
             </motion.div>
 
