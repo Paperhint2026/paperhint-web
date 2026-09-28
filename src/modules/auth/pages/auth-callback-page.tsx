@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { SIGNUP_INTENT_STORAGE_KEY } from "@/modules/auth/pages/signup-page"
 import { useAppDispatch } from "@/store"
 import { hydrateUser, type User } from "@/store/auth-slice"
-import { fetchSchool } from "@/store/school-slice"
 
 /**
  * `/auth/callback` — returned to by Supabase after Google/Microsoft OAuth.
@@ -80,17 +79,19 @@ export function AuthCallbackPage() {
         // and the next authed call would 401 → bounce to /login.
         await supabase.auth.signOut({ scope: "local" }).catch(() => {})
 
-        // Populate Redux so ProtectedRoute sees an authenticated user; the
-        // school-slice fetch mirrors what the email/password login flow does.
+        // Populate Redux + localStorage before we navigate. The next page
+        // load reads the seeded localStorage on init, which is why we use a
+        // full location.replace below rather than react-router navigate:
+        // it sidesteps any race between the dispatch commit and the route
+        // transition, and ensures no in-flight fetch survives to 401.
         dispatch(hydrateUser(res.user))
-        dispatch(fetchSchool())
 
-        navigate(res.onboarding_required ? "/onboarding" : "/", { replace: true })
+        window.location.replace(res.onboarding_required ? "/onboarding" : "/")
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
       }
     })()
-  }, [navigate, dispatch])
+  }, [dispatch])
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
