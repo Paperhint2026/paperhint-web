@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { Outlet, useParams } from "react-router-dom"
+import { useAppDispatch, useAppSelector } from "@/store"
+import { fetchSchool } from "@/store/school-slice"
 import { SparkleIcon } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { useViewRole } from "@/lib/view-role"
@@ -38,6 +40,17 @@ function AppLayoutInner() {
   const { classSubjectId } = useParams()
   const { assignments } = useTeacherAssignments()
   const { isMobile } = useSidebar()
+
+  // Solo/coaching signup flows never call fetchSchool (auth-callback does a
+  // full-page location.replace, so Redux boots clean). Ensure the school row
+  // is loaded once the user is inside the shell — the sidebar and other
+  // consumers key off school.kind.
+  const dispatch = useAppDispatch()
+  const school = useAppSelector((st) => st.school.school)
+  const schoolLoading = useAppSelector((st) => st.school.isLoading)
+  useEffect(() => {
+    if (!school && !schoolLoading) dispatch(fetchSchool())
+  }, [school, schoolLoading, dispatch])
   const [aiChatOpen, setAiChatOpen] = useState(false)
   const help = useHelpDialog()
 

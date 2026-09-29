@@ -16,6 +16,7 @@ import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
+import { useAppSelector } from "@/store"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
@@ -134,6 +135,8 @@ function fmtTime(t: string | null) {
 export function AttendancePage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
+  const workspaceKind = useAppSelector((st) => st.school.school?.kind)
+  const isSolo = workspaceKind === "solo" || workspaceKind === "coaching"
   return (
     <div className={cn("flex flex-col gap-5 pb-12", PAGE_GUTTER, PAGE_TOP)}>
       <PageHeader
@@ -142,7 +145,9 @@ export function AttendancePage() {
         description={
           isAdmin
             ? "The day's roll across the school — every section, every period, and the registers still to come in."
-            : "Your periods today. Open one and take the roll."
+            : isSolo
+              ? "Mark yourself in, take the roll for your classes."
+              : "Your periods today. Open one and take the roll."
         }
       />
       {isAdmin ? <AdminAttendance /> : <TeacherToday />}
@@ -339,6 +344,10 @@ function AdminTeacherRoll() {
 /* ── Teacher: my periods today ──────────────────────────────────────────── */
 
 function TeacherToday() {
+  // Workspace kind drives the solo trim below (no leave, no borrow).
+  const workspaceKind = useAppSelector((st) => st.school.school?.kind)
+  const isSolo = workspaceKind === "solo" || workspaceKind === "coaching"
+
   const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()))
   const [periods, setPeriods] = useState<TodayPeriod[] | null>(null)
   const [self, setSelf] = useState<SelfAttendance>(null)
@@ -447,6 +456,7 @@ function TeacherToday() {
           </div>
           <CheckInCard
             bare
+            isSolo={isSolo}
             method={checkinMethod}
             self={self}
             date={date}
@@ -582,11 +592,16 @@ function TeacherToday() {
         </div>
       )}
 
-      {/* Requests — side by side; whichever opens its form takes the row */}
-      <div className="grid gap-3 lg:grid-cols-2 lg:[&>[data-expanded=true]]:col-span-2">
-        <LeaveCard />
-        <BorrowCard onChanged={() => load(date)} />
-      </div>
+      {/* Requests — side by side; whichever opens its form takes the row.
+          Skipped entirely in a solo/coaching workspace where there is
+          neither a manager to grant leave nor a colleague to borrow a
+          period from. */}
+      {!isSolo && (
+        <div className="grid gap-3 lg:grid-cols-2 lg:[&>[data-expanded=true]]:col-span-2">
+          <LeaveCard />
+          <BorrowCard onChanged={() => load(date)} />
+        </div>
+      )}
     </div>
   )
 }
@@ -611,6 +626,7 @@ function CheckInCard({
   date,
   onChecked,
   bare = false,
+  isSolo = false,
 }: {
   method: CheckinMethod
   self: SelfAttendance
@@ -618,24 +634,29 @@ function CheckInCard({
   onChecked: (s: SelfAttendance) => void
   /** Inline inside the day strip — no card chrome, status as a pill. */
   bare?: boolean
+  /** Solo/coaching workspace: swap the "Came in late" button for
+   *  "On leave" so the owner can record their own leave day without
+   *  the school leave-request flow (there's no manager to approve). */
+  isSolo?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [photo, setPhoto] = useState<File | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
 
-  const checkIn = async (status: "present" | "late") => {
+  const checkIn = async (status: "present" | "late" | "leave") => {
     setBusy(true)
     try {
       const form = new FormData()
       form.append("date", date)
       form.append("status", status)
-      if (method === "geo" || method === "photo_geo") {
+      // On leave = not at school by definition; skip photo/geo requirements.
+      if (status !== "leave" && (method === "geo" || method === "photo_geo")) {
         const pos = await getPosition()
         form.append("latitude", String(pos.coords.latitude))
         form.append("longitude", String(pos.coords.longitude))
         form.append("accuracy_m", String(Math.round(pos.coords.accuracy ?? 0)))
       }
-      if (method === "photo_geo") {
+      if (status !== "leave" && method === "photo_geo") {
         if (!photo) throw new Error("Take a photo first")
         form.append("photo", photo)
       }
@@ -646,11 +667,13 @@ function CheckInCard({
       onChecked({ status, marked_at: new Date().toISOString() })
       setPhoto(null)
       toast.success(
-        r.out_of_range
-          ? "Checked in — you appear to be away from school; the office will see that"
-          : status === "present"
-            ? "Marked present"
-            : "Marked late"
+        status === "leave"
+          ? "Marked on leave"
+          : r.out_of_range
+            ? "Checked in — you appear to be away from school; the office will see that"
+            : status === "present"
+              ? "Marked present"
+              : "Marked late"
       )
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not check in")
@@ -732,10 +755,10 @@ function CheckInCard({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => checkIn("late")}
-            disabled={busy || (method === "photo_geo" && !photo)}
+            onClick={() => checkIn(isSolo ? "leave" : "late")}
+            disabled={busy || (!isSolo && method === "photo_geo" && !photo)}
           >
-            Came in late
+            {isSolo ? "On leave" : "Came in late"}
           </Button>
         </div>
       )}

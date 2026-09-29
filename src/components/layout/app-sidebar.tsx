@@ -8,9 +8,10 @@ import {
   NotePencilIcon,
   UsersIcon,
 } from "@phosphor-icons/react"
-import { isNavItemActive, navForRole } from "@/data/nav"
+import { isNavItemActive, navForWorkspace } from "@/data/nav"
 import { useViewRole } from "@/lib/view-role"
 import { useAuth } from "@/lib/auth"
+import { useAppSelector } from "@/store"
 import { useFeatures } from "@/hooks/use-features"
 import {
   useTeacherAssignments,
@@ -61,6 +62,9 @@ export function AppSidebar() {
   const isTeacher = viewRole === "teacher"
   // PaperHint team accounts see only the console — they have no school.
   const isPlatform = user?.role === "platform"
+  // Sidebar trims to a workspace's shape: solo/coaching drop staff-directory
+  // rows the owner doesn't need. See navForWorkspace + soloHidden in nav.ts.
+  const school = useAppSelector((s) => s.school.school)
   const { isEnabled } = useFeatures()
 
   const closeMobileThen = (fn: () => void) => {
@@ -85,7 +89,10 @@ export function AppSidebar() {
 
   // The menu is per role; the shell is shared. See src/data/nav.ts.
   // Rows behind a plan feature disappear when the school's plan lacks it.
-  const navGroups = navForRole(isPlatform ? "platform" : viewRole)
+  const navGroups = navForWorkspace(
+    isPlatform ? "platform" : viewRole,
+    isPlatform ? undefined : school?.kind
+  )
     .map((group) => ({
       label: group.label,
       items: group.items

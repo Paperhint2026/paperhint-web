@@ -53,6 +53,15 @@ export type NavItem = {
   code?: string
   /** One-paragraph description from the handoff — placeholder page body. */
   blurb?: string
+  /** Hide this row when the workspace kind is solo or coaching — items that
+   *  only exist in a multi-teacher school context (staff directory, cross-
+   *  teacher library sharing, etc.). Nothing else keys off this — it's a
+   *  pure UX hint. Leave undefined for items that apply everywhere. */
+  soloHidden?: true
+  /** Optional alternate title for solo/coaching workspaces where the row
+   *  IS shown but its label reads oddly (e.g. "circulars" implies an
+   *  admin-to-staff broadcast that doesn't exist in a one-person setup). */
+  soloTitle?: string
 }
 
 export type NavGroup = {
@@ -315,6 +324,7 @@ export const TEACHER_NAV: NavGroup[] = [
         icon: BellIcon,
         path: "/notifications",
         status: "live",
+        soloTitle: "Notifications",
       },
       {
         key: "teachers",
@@ -322,6 +332,7 @@ export const TEACHER_NAV: NavGroup[] = [
         icon: IdentificationCardIcon,
         path: "/teachers",
         status: "live",
+        soloHidden: true,
       },
       {
         key: "students",
@@ -365,6 +376,7 @@ export const TEACHER_NAV: NavGroup[] = [
         icon: BooksIcon,
         path: "/library/bank",
         status: "live",
+        soloHidden: true,
       },
     ],
   },
@@ -388,6 +400,29 @@ export const PLATFORM_NAV: NavGroup[] = [
 export function navForRole(role: string | undefined): NavGroup[] {
   if (role === "platform") return PLATFORM_NAV
   return role === "teacher" ? TEACHER_NAV : ADMIN_NAV
+}
+
+/**
+ * Trim + relabel a role's nav for a specific workspace kind. Solo and
+ * coaching workspaces drop the school-specific rows (Teachers, Shared
+ * Library) and rewrite labels that assume an admin/staff structure. A
+ * missing kind (school not yet loaded, or pre-migration data) is treated
+ * as "school" so nothing disappears surprise.
+ */
+export function navForWorkspace(
+  role: string | undefined,
+  kind: "school" | "solo" | "coaching" | undefined
+): NavGroup[] {
+  const groups = navForRole(role)
+  if (!kind || kind === "school") return groups
+  return groups
+    .map((g) => ({
+      label: g.label,
+      items: g.items
+        .filter((i) => !i.soloHidden)
+        .map((i) => (i.soloTitle ? { ...i, title: i.soloTitle } : i)),
+    }))
+    .filter((g) => g.items.length > 0)
 }
 
 /** Placeholder lookup for /soon/:slug — searches both menus. */

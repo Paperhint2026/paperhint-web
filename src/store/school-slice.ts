@@ -1,11 +1,16 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
 import { apiClient } from "@/lib/api-client"
 
+export type WorkspaceKind = "school" | "solo" | "coaching"
+
 export interface School {
   id: string
   name: string
   board_id: string
   boardName: string
+  /** Workspace kind (schools.kind since migration 047). Drives sidebar
+   *  trimming for solo/coaching where staff-directory nav items are noise. */
+  kind: WorkspaceKind
 }
 
 interface SchoolState {
@@ -20,6 +25,7 @@ interface SchoolApiResponse {
     board_id: string
     boards: { id: string; name: string }
     created_at: string
+    kind?: WorkspaceKind
   }
 }
 
@@ -41,6 +47,7 @@ export const fetchSchool = createAsyncThunk<
       name: s.name,
       board_id: s.board_id,
       boardName: s.boards?.name ?? "",
+      kind: s.kind ?? "school",
     }
   } catch (err) {
     return rejectWithValue(
