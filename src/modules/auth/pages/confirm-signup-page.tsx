@@ -5,6 +5,7 @@ import { CircleNotchIcon, WarningCircleIcon } from "@phosphor-icons/react"
 import { apiClient } from "@/lib/api-client"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useAppDispatch } from "@/store"
 import { hydrateUser, type User } from "@/store/auth-slice"
 
@@ -19,6 +20,8 @@ export function ConfirmSignupPage() {
   const dispatch = useAppDispatch()
   const ran = useRef(false)
   const [error, setError] = useState<string | null>(null)
+  const [resendEmail, setResendEmail] = useState("")
+  const [resent, setResent] = useState<null | "sending" | "sent">(null)
 
   useEffect(() => {
     if (ran.current) return
@@ -79,6 +82,18 @@ export function ConfirmSignupPage() {
     })()
   }, [dispatch])
 
+  const resendConfirmation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resendEmail.trim() || resent === "sending") return
+    setResent("sending")
+    try {
+      await apiClient.post("/api/auth/resend-confirmation", { email: resendEmail.trim() })
+      setResent("sent")
+    } catch {
+      setResent(null)
+    }
+  }
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
       {error ? (
@@ -88,7 +103,38 @@ export function ConfirmSignupPage() {
             <p className="text-base font-semibold">We couldn't confirm your account</p>
             <p className="mt-1 text-sm text-muted-foreground">{error}</p>
           </div>
-          <Button onClick={() => navigate("/signup", { replace: true })}>
+          <form
+            onSubmit={resendConfirmation}
+            className="flex w-full max-w-xs flex-col gap-2 pt-2 text-left"
+          >
+            <label className="text-xs font-medium text-secondary-foreground">
+              Enter your email and we'll send a fresh link
+            </label>
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+                disabled={resent === "sending" || resent === "sent"}
+              />
+              <Button
+                type="submit"
+                disabled={!resendEmail.trim() || resent === "sending" || resent === "sent"}
+              >
+                {resent === "sending" ? "Sending…" : resent === "sent" ? "Sent ✓" : "Resend"}
+              </Button>
+            </div>
+            {resent === "sent" && (
+              <p className="text-xs text-muted-foreground">
+                Sent — check your inbox in a minute. If nothing arrives, try
+                signing up again with a different address.
+              </p>
+            )}
+          </form>
+          <Button variant="ghost" onClick={() => navigate("/signup", { replace: true })}>
             Start over
           </Button>
         </>

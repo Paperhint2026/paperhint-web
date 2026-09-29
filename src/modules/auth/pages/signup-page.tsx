@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { supabase } from "@/lib/supabase"
 import { showError } from "@/lib/show-error"
+import { isDisposableEmail, suggestEmailFix } from "@/lib/email-validation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -154,6 +155,8 @@ function SignupForm({ kind, onBack }: { kind: Kind; onBack: () => void }) {
   const [showPw, setShowPw] = useState(false)
   const [busy, setBusy] = useState<null | "email" | "google" | "microsoft">(null)
   const [sentTo, setSentTo] = useState<string | null>(null)
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null)
+  const [resent, setResent] = useState<null | "sending" | "sent">(null)
 
   // OAuth: stash the intent, launch Supabase's redirect. On return the
   // /auth/callback route reads the intent back and trades tokens for cookies.
@@ -181,11 +184,30 @@ function SignupForm({ kind, onBack }: { kind: Kind; onBack: () => void }) {
   const submitEmail = async (e: React.FormEvent) => {
     e.preventDefault()
     if (busy) return
+    const trimmed = email.trim()
+
+    // Hard block on known disposable providers — a signup that self-
+    // destructs in 10 minutes is a signup that never reaches onboarding.
+    if (isDisposableEmail(trimmed)) {
+      toast.error("Please use a permanent email address — that provider is disposable.")
+      return
+    }
+
+    // Soft warn on a likely typo. First submit shows the suggestion; if
+    // the user submits again without changing anything we take them at
+    // their word and proceed.
+    const fix = suggestEmailFix(trimmed)
+    if (fix && fix !== emailSuggestion) {
+      setEmailSuggestion(fix)
+      return
+    }
+
     setBusy("email")
+    setEmailSuggestion(null)
     try {
       const res = await apiClient.post<{ message: string; email: string }>(
         "/api/auth/signup",
-        { kind, email: email.trim(), name: name.trim(), password, workspaceName: workspaceName.trim() }
+        { kind, email: trimmed, name: name.trim(), password, workspaceName: workspaceName.trim() }
       )
       setSentTo(res.email)
       toast.success(res.message)
@@ -193,6 +215,19 @@ function SignupForm({ kind, onBack }: { kind: Kind; onBack: () => void }) {
       showError(err, "Couldn't create your account")
     } finally {
       setBusy(null)
+    }
+  }
+
+  const resendConfirmation = async () => {
+    if (!sentTo || resent === "sending") return
+    setResent("sending")
+    try {
+      await apiClient.post("/api/auth/resend-confirmation", { email: sentTo })
+      setResent("sent")
+      toast.success("Sent — check your inbox again in a minute.")
+    } catch (err) {
+      setResent(null)
+      showError(err, "Couldn't resend the confirmation link")
     }
   }
 
@@ -208,17 +243,26 @@ function SignupForm({ kind, onBack }: { kind: Kind; onBack: () => void }) {
             it on this device to finish setting up.
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Didn't arrive? Check spam, or{" "}
+        <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>Didn't arrive? Check spam, or</span>
+            <button
+              type="button"
+              disabled={resent === "sending" || resent === "sent"}
+              className="font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-60"
+              onClick={() => void resendConfirmation()}
+            >
+              {resent === "sending" ? "Sending…" : resent === "sent" ? "Resent ✓" : "resend the link"}
+            </button>
+          </div>
           <button
             type="button"
-            className="font-medium text-primary hover:underline"
-            onClick={() => setSentTo(null)}
+            className="font-medium text-muted-foreground hover:underline"
+            onClick={() => { setSentTo(null); setResent(null) }}
           >
-            try a different email
+            Use a different email
           </button>
-          .
-        </p>
+        </div>
       </div>
     )
   }
@@ -301,9 +345,30 @@ function SignupForm({ kind, onBack }: { kind: Kind; onBack: () => void }) {
             required
             autoComplete="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              // Any keystroke clears the suggestion; if the fix still
+              // applies on submit it'll surface again.
+              if (emailSuggestion) setEmailSuggestion(null)
+            }}
             placeholder="you@school.edu"
           />
+          {emailSuggestion && (
+            <p className="text-xs text-muted-foreground">
+              Did you mean{" "}
+              <button
+                type="button"
+                className="font-medium text-primary hover:underline"
+                onClick={() => {
+                  setEmail(emailSuggestion)
+                  setEmailSuggestion(null)
+                }}
+              >
+                {emailSuggestion}
+              </button>
+              ? Submit again to keep {email.trim()}.
+            </p>
+          )}
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="su-pw">Password</Label>
