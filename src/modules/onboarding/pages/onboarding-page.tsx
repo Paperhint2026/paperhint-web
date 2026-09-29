@@ -8,6 +8,7 @@ import {
   ClockIcon,
   ExamIcon,
   UsersIcon,
+  XIcon,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
 
@@ -17,15 +18,23 @@ import { showError } from "@/lib/show-error"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 /**
  * `/onboarding` — the four-step wizard the solo owner runs once after
  * signup:
  *
  *   1. Subjects (mandatory) — a curated K-12 list + custom.
- *   2. Classes (mandatory) — grade chips × section chips; each pair
- *      becomes a `classes` row paired with every subject as a
- *      `class_subject`, with a `teacher_assignments` row on the owner.
+ *   2. Classes (mandatory) — row builder: grade + section + one of the
+ *      step-1 subjects per row. Rows sharing a grade+section collapse into
+ *      one `classes` row with a `class_subject` per chosen subject, each
+ *      with a `teacher_assignments` row on the owner.
  *   3. Bell schedule (skip-able) — 8 sensible periods pre-filled.
  *   4. Students (skip-able) — paste a list, one per line.
  *
@@ -41,7 +50,6 @@ const CURATED_SUBJECTS = [
 ]
 
 const GRADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-const SECTIONS = ["A", "B", "C", "D"]
 
 const DEFAULT_PERIODS = [
   { name: "Period 1", start_time: "09:00", end_time: "09:40", is_break: false },
@@ -64,6 +72,7 @@ type Status = {
 }
 
 type StudentInput = { full_name: string; class: string }
+type ClassRow = { grade: number; section: string; subject: string }
 type PeriodInput = { name: string; start_time: string; end_time: string; is_break?: boolean }
 
 export function OnboardingPage() {
@@ -73,7 +82,7 @@ export function OnboardingPage() {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0)
   const [subjects, setSubjects] = useState<string[]>([])
   const [customSubject, setCustomSubject] = useState("")
-  const [classes, setClasses] = useState<{ grade: number; section: string }[]>([])
+  const [classes, setClasses] = useState<ClassRow[]>([])
   const [periods, setPeriods] = useState<PeriodInput[]>(DEFAULT_PERIODS)
   const [includePeriods, setIncludePeriods] = useState(true)
   const [studentsRaw, setStudentsRaw] = useState("")
@@ -97,29 +106,40 @@ export function OnboardingPage() {
     if (!subjects.some((s) => s.toLowerCase() === t.toLowerCase())) setSubjects((c) => [...c, t])
     setCustomSubject("")
   }
-  const toggleClass = (grade: number, section: string) => {
-    const key = `${grade}-${section}`
+  const addClassRow = (row: ClassRow): boolean => {
+    const key = `${row.grade}|${row.section}|${row.subject.toLowerCase()}`
+    let added = false
     setClasses((cur) => {
-      const seen = new Set(cur.map((c) => `${c.grade}-${c.section}`))
-      if (seen.has(key)) return cur.filter((c) => `${c.grade}-${c.section}` !== key)
-      return [...cur, { grade, section }].sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section))
+      if (cur.some((c) => `${c.grade}|${c.section}|${c.subject.toLowerCase()}` === key)) return cur
+      added = true
+      return [...cur, row].sort(
+        (a, b) => a.grade - b.grade || a.section.localeCompare(b.section) || a.subject.localeCompare(b.subject)
+      )
     })
+    return added
   }
+  const removeClassRow = (idx: number) =>
+    setClasses((cur) => cur.filter((_, i) => i !== idx))
+
+  const classLabels = useMemo(
+    () => [...new Set(classes.map((c) => `${c.grade}${c.section}`))],
+    [classes]
+  )
 
   const parsedStudents = useMemo<StudentInput[]>(() => {
-    if (!studentsRaw.trim() || classes.length === 0) return []
-    const defaultClass = `${classes[0].grade}${classes[0].section}`
+    if (!studentsRaw.trim() || classLabels.length === 0) return []
+    const defaultClass = classLabels[0]
     // Each line: "Full Name" or "Full Name, 6A" or "Full Name — 6A"
     return studentsRaw
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean)
       .map((line) => {
-        const m = line.match(/^(.+?)[\s,—-]+((\d{1,2})([A-D]))$/i)
-        if (m) return { full_name: m[1].trim(), class: (m[3] + m[4]).toUpperCase() }
+        const m = line.match(/^(.+?)[\s,—-]+(\d{1,2})\s*([A-Za-z0-9])$/)
+        if (m) return { full_name: m[1].trim(), class: (m[2] + m[3]).toUpperCase() }
         return { full_name: line, class: defaultClass }
       })
-  }, [studentsRaw, classes])
+  }, [studentsRaw, classLabels])
 
   const submit = async () => {
     if (busy) return
@@ -127,7 +147,7 @@ export function OnboardingPage() {
     try {
       const payload: {
         subjects: string[]
-        classes: { grade: number; section: string }[]
+        classes: ClassRow[]
         periods?: PeriodInput[]
         students?: StudentInput[]
       } = { subjects, classes }
@@ -188,7 +208,14 @@ export function OnboardingPage() {
             onAddCustom={addCustom}
           />
         )}
-        {step === 1 && <StepClasses classes={classes} onToggle={toggleClass} />}
+        {step === 1 && (
+          <StepClasses
+            classes={classes}
+            subjects={subjects}
+            onAdd={addClassRow}
+            onRemove={removeClassRow}
+          />
+        )}
         {step === 2 && (
           <StepPeriods
             include={includePeriods}
@@ -199,7 +226,7 @@ export function OnboardingPage() {
         )}
         {step === 3 && (
           <StepStudents
-            classes={classes}
+            classLabels={classLabels}
             raw={studentsRaw}
             setRaw={setStudentsRaw}
             parsed={parsedStudents}
@@ -369,66 +396,137 @@ function StepSubjects({
 
 function StepClasses({
   classes,
-  onToggle,
+  subjects,
+  onAdd,
+  onRemove,
 }: {
-  classes: { grade: number; section: string }[]
-  onToggle: (grade: number, section: string) => void
+  classes: ClassRow[]
+  subjects: string[]
+  onAdd: (row: ClassRow) => boolean
+  onRemove: (idx: number) => void
 }) {
-  const active = (g: number, s: string) => classes.some((c) => c.grade === g && c.section === s)
+  const single = subjects.length === 1
+  const [grade, setGrade] = useState<string>("")
+  const [section, setSection] = useState("")
+  const [subject, setSubject] = useState<string>(single ? subjects[0] : "")
+
+  // If the user went back and changed subjects, keep the draft coherent.
+  useEffect(() => {
+    if (single) setSubject(subjects[0])
+    else if (subject && !subjects.includes(subject)) setSubject("")
+  }, [subjects, single, subject])
+
+  const canAdd = grade !== "" && section.trim() !== "" && subject !== ""
+
+  const add = () => {
+    if (!canAdd) return
+    const row = {
+      grade: Number(grade),
+      section: section.trim().toUpperCase(),
+      subject,
+    }
+    if (!onAdd(row)) {
+      toast.info(`${row.grade}${row.section} — ${row.subject} is already added`)
+      return
+    }
+    // Keep grade + subject sticky (fast entry of 6A, 6B, 6C…), clear section.
+    setSection("")
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div>
         <h2 className="text-lg font-semibold">Which classes do you teach?</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Every combination becomes its own class, with all the subjects you
-          picked. E.g. picking 6A + 6B and Science + Maths creates four
-          class-subjects.
+          Add one row per class and subject you actually teach — e.g. 6A
+          Science and 7B Maths. Same class with two subjects? Add it twice,
+          once per subject.
         </p>
       </div>
-      <div className="rounded-lg border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Grade</th>
-              {SECTIONS.map((s) => (
-                <th key={s} className="px-2 py-2 text-center font-medium">{s}</th>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-secondary-foreground">Grade</span>
+          <Select value={grade} onValueChange={setGrade}>
+            <SelectTrigger className="w-24">
+              <SelectValue placeholder="Grade" />
+            </SelectTrigger>
+            <SelectContent>
+              {GRADES.map((g) => (
+                <SelectItem key={g} value={String(g)}>
+                  {g}
+                </SelectItem>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {GRADES.map((g) => (
-              <tr key={g} className="border-t">
-                <td className="px-3 py-1.5 text-sm font-medium">{g}</td>
-                {SECTIONS.map((s) => {
-                  const on = active(g, s)
-                  return (
-                    <td key={s} className="px-1 py-1.5 text-center">
-                      <button
-                        type="button"
-                        onClick={() => onToggle(g, s)}
-                        aria-pressed={on}
-                        aria-label={`Grade ${g} section ${s}`}
-                        className={cn(
-                          "size-8 rounded-md border text-xs font-medium transition-colors",
-                          on
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-transparent text-muted-foreground hover:border-border hover:bg-muted"
-                        )}
-                      >
-                        {s}
-                      </button>
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-secondary-foreground">Section</span>
+          <Input
+            value={section}
+            onChange={(e) => setSection(e.target.value.slice(-1).toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                add()
+              }
+            }}
+            placeholder="A"
+            maxLength={1}
+            className="w-16 text-center uppercase"
+            aria-label="Section"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-secondary-foreground">Subject</span>
+          {single ? (
+            <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+              {subjects[0]}
+            </div>
+          ) : (
+            <Select value={subject} onValueChange={setSubject}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Subject" />
+              </SelectTrigger>
+              <SelectContent>
+                {subjects.map((sub) => (
+                  <SelectItem key={sub} value={sub}>
+                    {sub}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <Button type="button" onClick={add} disabled={!canAdd}>
+          Add class
+        </Button>
       </div>
-      {classes.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Selected: {classes.map((c) => `${c.grade}${c.section}`).join(", ")}
+
+      {classes.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nothing added yet — you need at least one class to continue.
         </p>
+      ) : (
+        <ul className="flex flex-col divide-y rounded-lg border">
+          {classes.map((c, i) => (
+            <li key={`${c.grade}${c.section}-${c.subject}`} className="flex items-center gap-3 px-3 py-2">
+              <span className="w-12 shrink-0 text-sm font-semibold">
+                {c.grade}
+                {c.section}
+              </span>
+              <span className="flex-1 truncate text-sm text-muted-foreground">{c.subject}</span>
+              <button
+                type="button"
+                onClick={() => onRemove(i)}
+                aria-label={`Remove ${c.grade}${c.section} ${c.subject}`}
+                className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <XIcon className="size-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
@@ -504,12 +602,12 @@ function StepPeriods({
 }
 
 function StepStudents({
-  classes,
+  classLabels,
   raw,
   setRaw,
   parsed,
 }: {
-  classes: { grade: number; section: string }[]
+  classLabels: string[]
   raw: string
   setRaw: (v: string) => void
   parsed: StudentInput[]
@@ -532,8 +630,8 @@ function StepStudents({
         value={raw}
         onChange={(e) => setRaw(e.target.value)}
         placeholder={
-          classes.length
-            ? `Aarav Sharma\nPriya Iyer, ${classes[0].grade}${classes[0].section}\n…`
+          classLabels.length
+            ? `Aarav Sharma\nPriya Iyer, ${classLabels[0]}\n…`
             : "Aarav Sharma\nPriya Iyer\n…"
         }
         className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/40"
