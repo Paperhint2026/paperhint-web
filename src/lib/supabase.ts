@@ -5,8 +5,9 @@ import { createClient } from "@supabase/supabase-js"
  * and the confirmation-link token extraction on /confirm. Ordinary session
  * auth lives in the server's HttpOnly cookies (api-client.ts). The PKCE
  * flow needs localStorage for its code_verifier, so persistSession is on;
- * the callback pages call supabase.auth.signOut() right after trading the
- * tokens for our cookies, so nothing lingers past the handshake.
+ * the callback pages delete the sb-* localStorage keys right after trading
+ * the tokens for our cookies (never auth.signOut() — even scope "local"
+ * revokes the session server-side), so nothing lingers past the handshake.
  */
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string

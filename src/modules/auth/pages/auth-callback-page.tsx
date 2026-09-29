@@ -73,11 +73,20 @@ export function AuthCallbackPage() {
           workspaceName,
         })
 
-        // Local-only signOut: clears the SDK's localStorage entries so the
-        // JS session doesn't linger, WITHOUT hitting Supabase's revoke endpoint —
-        // that would kill the very access + refresh tokens we just cookied,
-        // and the next authed call would 401 → bounce to /login.
-        await supabase.auth.signOut({ scope: "local" }).catch(() => {})
+        // Purge supabase-js's stored session by deleting its localStorage
+        // keys directly. Never supabase.auth.signOut() here — even with
+        // scope "local" it still calls GoTrue's /logout and REVOKES the
+        // current session server-side, killing the very tokens we just put
+        // in the HttpOnly cookies (next authed call: "Invalid token" → 401
+        // → bounced to /login). "local" means "this session, not all
+        // devices", not "client-side only".
+        try {
+          for (const k of Object.keys(localStorage)) {
+            if (k.startsWith("sb-")) localStorage.removeItem(k)
+          }
+        } catch {
+          /* storage unavailable — nothing was persisted anyway */
+        }
 
         // Populate Redux + localStorage before we navigate. The next page
         // load reads the seeded localStorage on init, which is why we use a

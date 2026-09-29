@@ -24,7 +24,17 @@ let refreshInFlight: Promise<boolean> | null = null
 // limit (or the login one, when they used to share a budget).
 function hasSessionHint(): boolean {
   if (typeof document === "undefined") return false
-  return /(?:^|;\s*)ph_uid=/.test(document.cookie)
+  // ph_uid is host-scoped to the API origin, so in prod (app.paperhint.com
+  // vs api.paperhint.com) document.cookie here never contains it — only on
+  // localhost, where ports don't split the cookie jar. The SPA's own
+  // localStorage user blob is the cross-origin-safe "we have a session"
+  // signal, so accept either.
+  if (/(?:^|;\s*)ph_uid=/.test(document.cookie)) return true
+  try {
+    return !!localStorage.getItem("user")
+  } catch {
+    return false
+  }
 }
 
 async function tryRefresh(): Promise<boolean> {
