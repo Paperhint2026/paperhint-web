@@ -243,12 +243,17 @@ export function LoginPage() {
               <div className="flex flex-col gap-1.5">
                 <p className="text-sm text-muted-foreground">{partOfDay()}</p>
                 <h1 className="text-[2rem] leading-[1.05] font-medium tracking-[-0.04em] text-foreground">
-                  Sign in to your{" "}
-                  <span className="text-primary">
+                  {/* Kind-neutral: /login is public, we can't know whether the
+                      returning user is a solo teacher, a coaching institute
+                      or a school admin. "Sign in to PaperHint" uses the
+                      brand wordmark's own styling (hint in primary, 'h'
+                      italic serif) so nothing about the copy assumes a
+                      school context. */}
+                  Sign in to Paper<span className="text-primary">
                     <em className="font-serif font-medium tracking-normal italic">
-                      s
+                      h
                     </em>
-                    chool
+                    int
                   </span>
                   .
                 </h1>
@@ -419,8 +424,14 @@ export function LoginPage() {
                 )}
               </Button>
               <p className="text-center text-xs text-muted-foreground">
-                New here? Your school admin sends the invite. Check your inbox
-                for one.
+                {/* Kind-neutral: two ways in — a solo/coaching teacher signs
+                    up themselves at /signup, a school teacher waits for
+                    an admin's invite. Cover both without picking one. */}
+                New here?{" "}
+                <Link to="/signup" className="font-medium text-primary hover:underline">
+                  Sign up
+                </Link>
+                , or check your inbox for an invite from your admin.
               </p>
             </motion.div>
           </motion.form>

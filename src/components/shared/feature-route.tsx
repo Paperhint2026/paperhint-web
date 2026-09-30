@@ -32,11 +32,11 @@ export function FeatureRoute({
       <Sticker name="peek" size={96} />
       <div className="flex max-w-[360px] flex-col items-center gap-1 text-center">
         <p className="text-base font-medium text-secondary-foreground">
-          Not part of your school's plan
+          Not part of your plan
         </p>
         <p className="text-sm text-muted-foreground">
-          This module isn't enabled for your school. Reach out to PaperHint to
-          add it to your plan.
+          This module isn't enabled for your workspace. Reach out to PaperHint
+          to add it to your plan.
         </p>
       </div>
     </div>
