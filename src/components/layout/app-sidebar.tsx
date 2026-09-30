@@ -24,6 +24,7 @@ import { NotificationsBell } from "@/components/layout/notifications-bell"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { NavViewRole } from "@/components/nav-view-role"
+import { TrialPill } from "@/components/layout/trial-pill"
 import { NavWorkspaces } from "@/components/nav-workspaces"
 import {
   Sidebar,
@@ -215,6 +216,11 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <NavViewRole />
+        {/* Active-trial pill sits above the user card. Hides itself when
+            the workspace isn't trialing, when the amber/teal banner is
+            handling the last-3-days / expired states, or when the sidebar
+            is collapsed to icon-mode (the pill's copy needs room). */}
+        {!iconMode && <TrialPill variant="sidebar" />}
         {user ? (
           <NavUser
             user={{

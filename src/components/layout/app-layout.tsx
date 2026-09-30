@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 import { Outlet, useParams } from "react-router-dom"
 import { useAppDispatch, useAppSelector } from "@/store"
 import { fetchSchool } from "@/store/school-slice"
+import { fetchTrialStatus } from "@/store/trial-slice"
+import { TrialBanner } from "@/components/layout/trial-banner"
 import { SparkleIcon } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { useViewRole } from "@/lib/view-role"
@@ -51,6 +53,14 @@ function AppLayoutInner() {
   useEffect(() => {
     if (!school && !schoolLoading) dispatch(fetchSchool())
   }, [school, schoolLoading, dispatch])
+
+  // Poll the trial status on mount and again on route change so the banner
+  // reflects post-write state (e.g. we just hit the last quota slot). Cheap:
+  // the server caches for 30s per workspace.
+  const trialStatus = useAppSelector((st) => st.trial.status)
+  useEffect(() => {
+    if (!trialStatus) dispatch(fetchTrialStatus())
+  }, [trialStatus, dispatch])
   const [aiChatOpen, setAiChatOpen] = useState(false)
   const help = useHelpDialog()
 
@@ -97,6 +107,9 @@ function AppLayoutInner() {
 
         <div className="relative min-h-0 flex-1">
           <PageTransition className={cn(isMobile && MOBILE_TOP_BAR_PAD)}>
+            <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-4 pt-3 sm:px-6">
+              <TrialBanner />
+            </div>
             <Outlet />
           </PageTransition>
         </div>

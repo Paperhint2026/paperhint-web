@@ -42,7 +42,12 @@ export function SettingsNav({
   return (
     <nav
       aria-label="Settings sections"
-      className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
+      // -mx-2 px-2 gives the active pill's outer ring 8px of gutter on each
+      // side so its 1px border never clips at the scroll-container edge.
+      // ph-no-scrollbar hides the WebKit scrollbar chrome that shows as a
+      // hairline on mobile even when the three tabs fit horizontally
+      // (utility lives in src/index.css).
+      className="-mx-2 flex gap-1 overflow-x-auto px-2 pb-1 ph-no-scrollbar lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
       onMouseLeave={() => setHovered(null)}
     >
       {sections.map((s) => {

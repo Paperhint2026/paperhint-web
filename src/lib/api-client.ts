@@ -154,6 +154,14 @@ async function request<T>(
     }
     err.status = response.status
     if (typeof error.field === "string") err.field = error.field
+    // Trial gate: 402 carries either TRIAL_EXPIRED or TRIAL_QUOTA_EXCEEDED.
+    // Refresh the trial slice so the banner picks up the new state; let
+    // the error bubble up so the caller's own showError() UI still fires.
+    if (response.status === 402 && typeof error.code === "string") {
+      const { store } = await import("@/store")
+      const { fetchTrialStatus } = await import("@/store/trial-slice")
+      store.dispatch(fetchTrialStatus())
+    }
     // The server sanitizes 5xx bodies to a generic message + request_id
     // (server-side error hygiene); the request_id is the thread support
     // uses to grep the actual error out of the log. Fall back to the

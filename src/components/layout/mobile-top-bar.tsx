@@ -1,12 +1,12 @@
 import { useNavigate } from "react-router-dom"
 
 import { cn } from "@/lib/utils"
-import { useAuth } from "@/lib/auth"
-import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import { PaperhintMark } from "@/components/shared/paperhint-mark"
 import { PaperhintWordmark } from "@/components/shared/paperhint-wordmark"
 import { NotificationsBell } from "@/components/layout/notifications-bell"
+import { TrialPill } from "@/components/layout/trial-pill"
+import { MobileUserMenu } from "@/components/layout/mobile-user-menu"
 
 /** Bar is 3.5rem, plus the phone's top inset ONLY in standalone (PWA) mode —
  *  see .ph-topbar in index.css. The page scroller pads by the same amount
@@ -22,15 +22,6 @@ export const MOBILE_TOP_BAR_PAD = "ph-topbar-pad"
  */
 export function MobileTopBar() {
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const { setOpenMobile } = useSidebar()
-
-  const initials = (user?.full_name ?? "")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join("")
 
   return (
     <header
@@ -51,21 +42,16 @@ export function MobileTopBar() {
         <PaperhintWordmark className="min-w-0 truncate text-base text-foreground" />
       </button>
 
+      {/* Compact trial chip — appears only during active trial, days 14→4.
+          The amber/teal top-banner variants take over once the trial is
+          nearly done or over. */}
+      <TrialPill variant="mobile" />
+
       <NotificationsBell />
 
-      {user && (
-        <button
-          type="button"
-          onClick={() => setOpenMobile(true)}
-          aria-label="Account and menu"
-          className="ml-0.5 shrink-0 rounded-full"
-        >
-          <Avatar className="size-7">
-            {user.profile_url && <AvatarImage src={user.profile_url} alt="" />}
-            <AvatarFallback className="text-[11px]">{initials || "?"}</AvatarFallback>
-          </Avatar>
-        </button>
-      )}
+      {/* Avatar opens the profile dropdown (identity, Settings, theme,
+          Log out). Navigation lives on the hamburger. */}
+      <MobileUserMenu />
     </header>
   )
 }
