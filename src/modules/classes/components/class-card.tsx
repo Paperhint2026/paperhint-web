@@ -22,7 +22,12 @@ export interface SubjectInfo {
 }
 
 export interface GroupedGrade {
+  /** Grade number as a string — or, for coaching, the batch label. */
   grade: string
+  /** True when `grade` is a batch label (coaching workspaces). */
+  isBatch?: boolean
+  /** The underlying grade number when `grade` is a batch label. */
+  numericGrade?: string | number
   academicYear: string
   sections: ClassRecord[]
   subjects?: SubjectInfo[]
@@ -45,7 +50,9 @@ export function ClassCard({
   const isCurrent =
     activeAcademicYear != null && data.academicYear === activeAcademicYear
   const subjects = data.subjects ?? []
-  const palette = coverFor(data.grade)
+  const palette = coverFor(
+    data.isBatch ? String(data.numericGrade ?? data.grade) : data.grade
+  )
 
   return (
     <div
@@ -59,13 +66,16 @@ export function ClassCard({
       <div
         className={`relative h-28 shrink-0 overflow-hidden ${palette.cover}`}
       >
-        {/* Giant watermark grade number, clipped by the cover */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute right-2 -bottom-9 text-[7rem] leading-none font-bold tracking-tighter text-white/15 transition-transform duration-300 select-none group-hover:scale-105"
-        >
-          {data.grade}
-        </span>
+        {/* Giant watermark grade number, clipped by the cover — skipped
+            for batch cards where the key is a label, not a numeral */}
+        {!data.isBatch && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-2 -bottom-9 text-[7rem] leading-none font-bold tracking-tighter text-white/15 transition-transform duration-300 select-none group-hover:scale-105"
+          >
+            {data.grade}
+          </span>
+        )}
 
         <div className="relative flex h-full flex-col justify-between p-4">
           <div className="flex items-start justify-between gap-2">
@@ -92,8 +102,8 @@ export function ClassCard({
             )}
           </div>
 
-          <p className="text-xl font-semibold tracking-tight text-white drop-shadow-sm">
-            Grade {data.grade}
+          <p className="truncate text-xl font-semibold tracking-tight text-white drop-shadow-sm">
+            {data.isBatch ? data.grade : `Grade ${data.grade}`}
           </p>
         </div>
       </div>
@@ -110,22 +120,25 @@ export function ClassCard({
 
       {/* Body */}
       <div className="flex flex-1 flex-col gap-3 px-4 pt-3 pb-4">
-        {/* Sections — single letters, never truncate */}
-        <div className="flex items-center gap-1.5 pr-14">
-          <span className="text-xs text-muted-foreground">Sections</span>
-          {data.sections.length > 0 ? (
-            data.sections.map((section) => (
-              <span
-                key={section.id}
-                className="flex size-6 items-center justify-center rounded-md border border-border bg-background text-xs font-semibold text-secondary-foreground"
-              >
-                {section.section}
-              </span>
-            ))
-          ) : (
-            <span className="text-xs text-muted-foreground">None yet</span>
-          )}
-        </div>
+        {/* Sections — single letters, never truncate. Batch cards skip
+            this row: the synthesized B01/B02 codes mean nothing to the owner. */}
+        {!data.isBatch && (
+          <div className="flex items-center gap-1.5 pr-14">
+            <span className="text-xs text-muted-foreground">Sections</span>
+            {data.sections.length > 0 ? (
+              data.sections.map((section) => (
+                <span
+                  key={section.id}
+                  className="flex size-6 items-center justify-center rounded-md border border-border bg-background text-xs font-semibold text-secondary-foreground"
+                >
+                  {section.section}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-muted-foreground">None yet</span>
+            )}
+          </div>
+        )}
 
         {/* Subjects — full names on one line; the line ellipsis is honest,
             unlike per-pill truncation which chopped words mid-way. */}

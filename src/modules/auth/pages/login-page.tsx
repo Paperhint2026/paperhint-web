@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner"
 
 import { useAuth } from "@/lib/auth"
+import { apiClient } from "@/lib/api-client"
 import { supabase } from "@/lib/supabase"
 import { GoogleGlyph, MicrosoftGlyph } from "@/modules/auth/pages/signup-page"
 import { cn } from "@/lib/utils"
@@ -148,6 +149,17 @@ export function LoginPage() {
         sessionStorage.removeItem("post_login_redirect")
       } catch {
         /* storage unavailable */
+      }
+      // Solo/coaching owner who signed up but never finished the wizard:
+      // an empty home is a dead end, so land them back on it. Best-effort —
+      // a status hiccup must never block login.
+      try {
+        const st = await apiClient.get<{ needs_onboarding: boolean }>(
+          "/api/onboarding/status"
+        )
+        if (st.needs_onboarding) dest = "/onboarding"
+      } catch {
+        /* not an owner, or status unavailable — proceed to dest as-is */
       }
       setTimeout(() => navigate(dest, { replace: true }), reduceMotion ? 0 : 700)
     } catch (err) {

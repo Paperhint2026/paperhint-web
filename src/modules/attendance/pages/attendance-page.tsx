@@ -146,7 +146,7 @@ export function AttendancePage() {
           isAdmin
             ? "The day's roll across the school — every section, every period, and the registers still to come in."
             : isSolo
-              ? "Mark yourself in, take the roll for your classes."
+              ? `Mark yourself in, take the roll for your ${workspaceKind === "coaching" ? "batches" : "classes"}.`
               : "Your periods today. Open one and take the roll."
         }
       />
@@ -1145,11 +1145,13 @@ function MyClassStrip({
   classes: { class_id: string; label: string }[]
   onOpen: (c: { class_id: string; label: string }) => void
 }) {
+  const isCoaching = useAppSelector((st) => st.school.school?.kind === "coaching")
   if (classes.length === 0) return null
+  const noun = isCoaching ? "batch" : "class"
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
       <span className="text-xs font-medium text-foreground">
-        Your class{classes.length > 1 ? "es" : ""} (class teacher):
+        Your {noun}{classes.length > 1 ? "es" : ""}{isCoaching ? "" : " (class teacher)"}:
       </span>
       {classes.map((c) => (
         <button

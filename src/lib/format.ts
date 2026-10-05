@@ -6,7 +6,8 @@ export function countSummary(
   filtering: boolean
 ) {
   if (filtering) return `${shown} of ${total}`
-  return `${total} ${total === 1 ? noun : `${noun}s`}`
+  const plural = /(s|sh|ch|x|z)$/.test(noun) ? `${noun}es` : `${noun}s`
+  return `${total} ${total === 1 ? noun : plural}`
 }
 
 /**

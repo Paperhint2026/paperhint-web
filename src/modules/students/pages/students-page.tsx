@@ -115,6 +115,7 @@ interface StudentWithClass extends Omit<
 > {
   grade: number
   section: string
+  class_name?: string | null
   academic_year: string
 }
 
@@ -247,6 +248,7 @@ export function StudentsPage() {
                 ...s,
                 grade: c.grade,
                 section: c.section,
+                class_name: c.name ?? null,
                 academic_year: c.academic_year,
               }))
             )
@@ -367,7 +369,13 @@ export function StudentsPage() {
     return [...groups.entries()]
       .map(([key, items]) => {
         const [grade, section] = key.split("|")
-        return { key, grade: Number(grade), section, items }
+        return {
+          key,
+          grade: Number(grade),
+          section,
+          name: items[0]?.class_name ?? null,
+          items,
+        }
       })
       .sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section))
   }, [paginatedStudents])
@@ -926,7 +934,7 @@ export function StudentsPage() {
               <ListGroup
                 key={group.key}
                 icon={ChalkboardIcon}
-                label={`Grade ${group.grade} · Section ${group.section}`}
+                label={group.name || `Grade ${group.grade} · Section ${group.section}`}
                 count={group.items.length}
               >
                 {/* Seating chart: one desk per student, roll number in the

@@ -62,6 +62,10 @@ export type NavItem = {
    *  IS shown but its label reads oddly (e.g. "circulars" implies an
    *  admin-to-staff broadcast that doesn't exist in a one-person setup). */
   soloTitle?: string
+  /** Optional alternate title specifically for coaching workspaces
+   *  (batches instead of classes). Overrides `soloTitle` when the kind is
+   *  coaching. */
+  coachingTitle?: string
 }
 
 export type NavGroup = {
@@ -310,6 +314,7 @@ export const TEACHER_NAV: NavGroup[] = [
         icon: ChalkboardIcon,
         path: "/classes",
         status: "live",
+        coachingTitle: "Batches",
       },
       {
         key: "attendance",
@@ -420,7 +425,11 @@ export function navForWorkspace(
       label: g.label,
       items: g.items
         .filter((i) => !i.soloHidden)
-        .map((i) => (i.soloTitle ? { ...i, title: i.soloTitle } : i)),
+        .map((i) => {
+          if (kind === "coaching" && i.coachingTitle) return { ...i, title: i.coachingTitle }
+          if (i.soloTitle) return { ...i, title: i.soloTitle }
+          return i
+        }),
     }))
     .filter((g) => g.items.length > 0)
 }

@@ -64,8 +64,7 @@ export function SignupPage() {
               icon={BuildingsIcon}
               title="I run tuition or coaching classes"
               hint="Multiple batches, your own schedule, per-batch attendance."
-              badge="Coming soon"
-              disabled
+              onClick={() => setPicked("coaching")}
             />
             <PlanCard
               icon={BuildingsIcon}
@@ -396,7 +395,7 @@ function SignupForm({ kind, onBack }: { kind: Kind; onBack: () => void }) {
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="su-ws">
-            School you work at{" "}
+            {kind === "coaching" ? "Your coaching centre's name" : "School you work at"}{" "}
             <span className="font-normal text-muted-foreground">
               (optional)
             </span>
@@ -405,7 +404,7 @@ function SignupForm({ kind, onBack }: { kind: Kind; onBack: () => void }) {
             id="su-ws"
             value={workspaceName}
             onChange={(e) => setWorkspaceName(e.target.value)}
-            placeholder="e.g. St Mary's – 6th Science"
+            placeholder={kind === "coaching" ? "e.g. Sharma Coaching Centre" : "e.g. St Mary's – 6th Science"}
           />
           <p className="text-[11px] text-muted-foreground">
             We use this as the name of your Paperhint workspace. You can rename

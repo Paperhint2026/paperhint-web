@@ -40,24 +40,31 @@ interface GroupedClassesResponse {
   gradeSubjects?: Record<string, SubjectInfo[]>
   studentCounts?: Record<string, number>
   active_academic_year?: string | null
+  /** "batch" for coaching workspaces — keys are batch labels, not grades. */
+  grouping?: "grade" | "batch"
 }
 
 function toGroupedGrades(
   grouped: Record<string, ClassRecord[]>,
   gradeSubjects?: Record<string, SubjectInfo[]>,
-  studentCounts?: Record<string, number>
+  studentCounts?: Record<string, number>,
+  isBatch?: boolean
 ): GroupedGrade[] {
-  return Object.entries(grouped)
-    .map(([grade, records]) => ({
-      grade,
-      academicYear: records[0]?.academic_year ?? "",
-      // Neither the API nor the grouping orders these, so the card would
-      // otherwise render section chips as "B A".
-      sections: [...records].sort((a, b) => a.section.localeCompare(b.section)),
-      subjects: gradeSubjects?.[grade] ?? [],
-      studentCount: studentCounts?.[grade] ?? 0,
-    }))
-    .sort((a, b) => Number(a.grade) - Number(b.grade))
+  const items = Object.entries(grouped).map(([grade, records]) => ({
+    grade,
+    isBatch,
+    // For palette + grade-overview navigation when the key is a batch label.
+    numericGrade: records[0]?.grade ?? "0",
+    academicYear: records[0]?.academic_year ?? "",
+    // Neither the API nor the grouping orders these, so the card would
+    // otherwise render section chips as "B A".
+    sections: [...records].sort((a, b) => a.section.localeCompare(b.section)),
+    subjects: gradeSubjects?.[grade] ?? [],
+    studentCount: studentCounts?.[grade] ?? 0,
+  }))
+  return isBatch
+    ? items.sort((a, b) => a.grade.localeCompare(b.grade))
+    : items.sort((a, b) => Number(a.grade) - Number(b.grade))
 }
 
 /** Placeholder in the shape of a ClassCard — cover with its two pills and
@@ -112,6 +119,7 @@ export function ClassesPage() {
 
   const dispatch = useAppDispatch()
   const { subjects: subjectRecords } = useAppSelector((state) => state.subjects)
+  const isCoaching = useAppSelector((s) => s.school.school?.kind === "coaching")
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [grades, setGrades] = useState<GroupedGrade[]>([])
@@ -128,7 +136,7 @@ export function ClassesPage() {
     if (!q) return grades
     return grades.filter(
       (g) =>
-        `grade ${g.grade}`.includes(q) ||
+        (g.isBatch ? g.grade.toLowerCase() : `grade ${g.grade}`).includes(q) ||
         g.subjects?.some((sub) => sub.subject_name.toLowerCase().includes(q))
     )
   }, [grades, search])
@@ -146,7 +154,12 @@ export function ClassesPage() {
         "/api/classes/grouped"
       )
       setGrades(
-        toGroupedGrades(res.classes ?? {}, res.gradeSubjects, res.studentCounts)
+        toGroupedGrades(
+          res.classes ?? {},
+          res.gradeSubjects,
+          res.studentCounts,
+          res.grouping === "batch"
+        )
       )
       setActiveAcademicYear(res.active_academic_year ?? null)
     } catch (err) {
@@ -234,8 +247,12 @@ export function ClassesPage() {
     >
       <PageHeader
         icon={ChalkboardIcon}
-        title="Classes"
-        description="Grades, sections and the subjects taught in each."
+        title={isCoaching ? "Batches" : "Classes"}
+        description={
+          isCoaching
+            ? "Your batches and the subjects taught in each."
+            : "Grades, sections and the subjects taught in each."
+        }
       >
         {isLoading && <PageToolbarSkeleton filters={false} />}
         {!isLoading && !error && grades.length > 0 && (
@@ -244,12 +261,14 @@ export function ClassesPage() {
             search={{
               value: search,
               onChange: setSearch,
-              placeholder: "Search by grade or subject…",
+              placeholder: isCoaching
+                ? "Search by batch or subject…"
+                : "Search by grade or subject…",
             }}
             summary={countSummary(
               visibleGrades.length,
               grades.length,
-              "grade",
+              isCoaching ? "batch" : "grade",
               search.trim().length > 0
             )}
           />
@@ -298,11 +317,11 @@ export function ClassesPage() {
             <Sticker name="lost" size={120} />
             <div className="flex max-w-[360px] flex-col items-center gap-1 text-center">
               <p className="text-base font-medium text-secondary-foreground">
-                No grade matches that
+                {isCoaching ? "No batch matches that" : "No grade matches that"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Nothing called "{search.trim()}" here. Try a grade number or a
-                subject name.
+                Nothing called "{search.trim()}" here. Try a{" "}
+                {isCoaching ? "batch" : "grade number"} or a subject name.
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => setSearch("")}>
@@ -316,7 +335,11 @@ export function ClassesPage() {
                 key={grade.grade}
                 data={grade}
                 activeAcademicYear={activeAcademicYear}
-                onClick={() => navigate(`/classes/${grade.grade}/overview`)}
+                onClick={() =>
+                  navigate(
+                    `/classes/${grade.isBatch ? grade.numericGrade : grade.grade}/overview`
+                  )
+                }
               />
             ))}
           </div>

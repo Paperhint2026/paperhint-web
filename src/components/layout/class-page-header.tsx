@@ -2,7 +2,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { ArrowLeftIcon, type Icon } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
-import { useTeacherAssignments } from "@/hooks/use-teacher-assignments"
+import { classBadge, useTeacherAssignments } from "@/hooks/use-teacher-assignments"
 import { Button } from "@/components/ui/button"
 import { coverFor } from "@/modules/classes/lib/grade-palette"
 
@@ -32,9 +32,7 @@ export function ClassPageHeader({
     (a) => a.class_subject_id === classSubjectId
   )
   const grade = assignment?.class ? String(assignment.class.grade) : "?"
-  const code = assignment?.class
-    ? `${assignment.class.grade}${assignment.class.section}`
-    : "—"
+  const code = assignment?.class ? classBadge(assignment.class) : "—"
   const palette = coverFor(grade)
 
   return (
@@ -65,9 +63,10 @@ export function ClassPageHeader({
           </span>
           {assignment?.subject?.subject_name ?? "Class"}
           {assignment?.class && (
-            <span className="text-muted-foreground">
-              · Grade {assignment.class.grade}, Section{" "}
-              {assignment.class.section}
+            <span className="max-w-48 truncate text-muted-foreground">
+              ·{" "}
+              {assignment.class.name?.trim() ||
+                `Grade ${assignment.class.grade}, Section ${assignment.class.section}`}
             </span>
           )}
         </button>

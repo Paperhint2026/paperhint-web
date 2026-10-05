@@ -111,7 +111,7 @@ export function NavWorkspaces({
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Your classes</SidebarGroupLabel>
+      <SidebarGroupLabel>{workspaces[0]?.name ?? "Your classes"}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {allPages.map((page) => (

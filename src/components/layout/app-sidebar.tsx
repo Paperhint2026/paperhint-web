@@ -112,7 +112,7 @@ export function AppSidebar() {
     isTeacher && !isPlatform && assignments.length > 0
       ? [
           {
-            name: "Your classes",
+            name: school?.kind === "coaching" ? "Your batches" : "Your classes",
             pages: assignments.map((a) => {
               const base = `/class/${a.class_subject_id}`
               return {

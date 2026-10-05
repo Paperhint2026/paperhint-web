@@ -7,7 +7,7 @@ import {
 } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
-import { classLabel, type Assignment } from "@/hooks/use-teacher-assignments"
+import { classCode, classLabel, type Assignment } from "@/hooks/use-teacher-assignments"
 import {
   Tooltip,
   TooltipContent,
@@ -44,7 +44,7 @@ export function ClassDoorCard({
 }) {
   const navigate = useNavigate()
   const grade = a.class ? String(a.class.grade) : "?"
-  const code = a.class ? `${a.class.grade}${a.class.section}` : "—"
+  const code = a.class ? classCode(a.class) : "—"
   const palette = coverFor(grade)
   const base = `/class/${a.class_subject_id}`
 
@@ -65,13 +65,16 @@ export function ClassDoorCard({
         className="absolute inset-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-inset"
       />
 
-      {/* Watermark grade number */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -right-1 -bottom-7 text-[6.5rem] leading-none font-bold tracking-tighter text-white/15 transition-transform duration-300 select-none group-hover:-translate-y-6 group-hover:scale-105"
-      >
-        {grade}
-      </span>
+      {/* Watermark grade number — skipped for named (coaching) batches,
+          where the grade may be 0/mixed and the label already tops the card */}
+      {!a.class?.name && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -right-1 -bottom-7 text-[6.5rem] leading-none font-bold tracking-tighter text-white/15 transition-transform duration-300 select-none group-hover:-translate-y-6 group-hover:scale-105"
+        >
+          {grade}
+        </span>
+      )}
 
       {/* Top row: class code + waiting badge */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-3">

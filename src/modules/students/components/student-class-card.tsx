@@ -6,6 +6,8 @@ export interface ClassItem {
   school_id: string
   grade: number
   section: string
+  /** Coaching batch label; null for school/solo. */
+  name?: string | null
   academic_year: string
   created_at?: string
 }

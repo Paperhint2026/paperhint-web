@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth"
 
 export interface Assignment {
   class_subject_id: string
-  class: { id: string; grade: number; section: string } | null
+  class: { id: string; grade: number; section: string; name?: string | null } | null
   subject: { id: string; subject_name: string } | null
 }
 
@@ -12,14 +12,32 @@ interface TeacherOverview {
   assignments: Assignment[]
 }
 
+/** Short label for a class row. Coaching workspaces store a batch label on
+ *  classes.name — prefer it when present so "6B01" never leaks to the UI. */
+export function classCode(c: { grade: number; section: string; name?: string | null } | null | undefined): string {
+  if (!c) return ""
+  return (c.name && c.name.trim()) || `${c.grade}${c.section}`
+}
+
+/** What fits in the small square badge: "6A" for school/solo; for a named
+ *  batch, a two-letter monogram from the name ("Weekend JEE 10th" → "WJ"). */
+export function classBadge(c: { grade: number; section: string; name?: string | null } | null | undefined): string {
+  if (!c) return ""
+  const name = c.name?.trim()
+  if (!name) return `${c.grade}${c.section}`
+  const words = name.split(/\s+/).filter((w) => /[a-zA-Z0-9]/.test(w))
+  const initials = words.slice(0, 2).map((w) => w[0].toUpperCase()).join("")
+  return initials || name.slice(0, 2).toUpperCase()
+}
+
 export function classLabel(a: Assignment) {
   if (!a.class || !a.subject) return a.class_subject_id
-  return `${a.class.grade}${a.class.section} - ${a.subject.subject_name}`
+  return `${classCode(a.class)} - ${a.subject.subject_name}`
 }
 
 export function classSlug(a: Assignment) {
   if (!a.class || !a.subject) return a.class_subject_id
-  return `${a.class.grade}${a.class.section}-${a.subject.subject_name}`.replace(
+  return `${classCode(a.class)}-${a.subject.subject_name}`.replace(
     /\s+/g,
     "-"
   )

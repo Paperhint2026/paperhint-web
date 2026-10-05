@@ -24,9 +24,11 @@ import { apiClient } from "@/lib/api-client"
 import { timeAgo } from "@/lib/time"
 import { tameCaps } from "@/lib/format"
 import { useAuth } from "@/lib/auth"
+import { useAppSelector } from "@/store"
 import {
   useTeacherAssignments,
   classLabel,
+  classBadge,
 } from "@/hooks/use-teacher-assignments"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -293,10 +295,9 @@ export function ClassHomePage() {
     flagged_sheets: 0,
   }
   const base = `/class/${classSubjectId}`
+  const isCoaching = useAppSelector((s) => s.school.school?.kind === "coaching")
   const grade = assignment?.class ? String(assignment.class.grade) : "?"
-  const code = assignment?.class
-    ? `${assignment.class.grade}${assignment.class.section}`
-    : "—"
+  const code = assignment?.class ? classBadge(assignment.class) : "—"
   const palette = coverFor(grade)
   // Actual SHEETS awaiting someone: queued/failed with the AI, or flagged
   // for the teacher. (Previously this summed in-progress EXAM counts, so two
@@ -431,7 +432,8 @@ export function ClassHomePage() {
               </h1>
               <p className="text-sm text-muted-foreground">
                 {assignment
-                  ? `Grade ${assignment.class?.grade} · Section ${assignment.class?.section}`
+                  ? assignment.class?.name ||
+                    `Grade ${assignment.class?.grade} · Section ${assignment.class?.section}`
                   : classLabel({
                       class_subject_id: classSubjectId,
                       class: null,
@@ -480,7 +482,7 @@ export function ClassHomePage() {
           >
             <div className="flex items-baseline justify-between">
               <h2 className="text-sm font-medium text-foreground">
-                How this class works
+                How this {isCoaching ? "batch" : "class"} works
               </h2>
               <span className="text-xs text-muted-foreground">
                 Sources feed papers, papers get graded, grades become results.

@@ -12,7 +12,8 @@ import {
 
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import { classLabel, type Assignment } from "@/hooks/use-teacher-assignments"
+import { classCode, classLabel, type Assignment } from "@/hooks/use-teacher-assignments"
+import { useAppSelector } from "@/store"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
@@ -111,6 +112,11 @@ export function TeacherHome({
   assignmentsLoading: boolean
 }) {
   const navigate = useNavigate()
+  const workspaceKind = useAppSelector((s) => s.school.school?.kind)
+  const isCoaching = workspaceKind === "coaching"
+  const isOwnWorkspace = workspaceKind === "solo" || workspaceKind === "coaching"
+  const groupWord = isCoaching ? "batches" : "classes"
+  const groupWordTitle = isCoaching ? "Your batches" : "Your classes"
   const [fetched, setFetched] = useState<Map<string, ExamCardsResponse> | null>(
     null
   )
@@ -192,7 +198,9 @@ export function TeacherHome({
   const summary = isLoading ? (
     <Skeleton className="h-4 w-72" />
   ) : assignments.length === 0 ? (
-    "No classes assigned yet. Your admin will set you up."
+    isOwnWorkspace
+      ? `No ${groupWord} yet — add one from ${isCoaching ? "Batches" : "Classes"} in the sidebar.`
+      : "No classes assigned yet. Your admin will set you up."
   ) : totals.sheetsWaiting > 0 ? (
     <>
       <span className="font-medium text-foreground">
@@ -202,7 +210,7 @@ export function TeacherHome({
       {openExams.length} {openExams.length === 1 ? "exam" : "exams"}.
     </>
   ) : (
-    "Nothing is waiting on you. Open a class to build a paper or check results."
+    `Nothing is waiting on you. Open a ${isCoaching ? "batch" : "class"} to build a paper or check results.`
   )
 
   return (
@@ -215,7 +223,7 @@ export function TeacherHome({
             <LoadingSwap loading={isLoading} skeleton={<StatStripSkeleton />}>
               <StatStrip
                 items={[
-                  { value: classes.length, label: "Classes" },
+                  { value: classes.length, label: isCoaching ? "Batches" : "Classes" },
                   { value: totals.students, label: "Students" },
                   { value: totals.exams, label: "Exams" },
                   {
@@ -236,7 +244,7 @@ export function TeacherHome({
           <ChalkboardIcon className="size-4 text-muted-foreground" />
           <span className="flex items-baseline gap-1.5">
             <h2 className="text-sm font-medium text-foreground">
-              Your classes
+              {groupWordTitle}
             </h2>
             {!isLoading && (
               <span className="text-xs text-muted-foreground tabular-nums">
@@ -261,11 +269,12 @@ export function TeacherHome({
               <Sticker name="peek" size={56} />
               <div className="flex flex-col gap-0.5">
                 <p className="text-sm font-medium text-foreground">
-                  No classes yet
+                  {isCoaching ? "No batches yet" : "No classes yet"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Once an admin assigns you a class and subject it shows up
-                  here.
+                  {isOwnWorkspace
+                    ? `Add a ${isCoaching ? "batch" : "class"} from the sidebar and it shows up here.`
+                    : "Once an admin assigns you a class and subject it shows up here."}
                 </p>
               </div>
             </div>
@@ -375,7 +384,7 @@ export function TeacherHome({
               <PanelEmpty
                 sticker={<Sticker name="idea" size={56} />}
                 title="No exams yet"
-                body="Open a class and build your first paper."
+                body={isCoaching ? "Open a batch and build your first paper." : "Open a class and build your first paper."}
               />
             ) : (
               <div className="divide-y divide-border">
@@ -385,9 +394,7 @@ export function TeacherHome({
                   const pct = total > 0 ? Math.round((graded / total) * 100) : 0
                   const done = total > 0 && graded === total
                   const when = dayjs(exam.created_at)
-                  const code = assignment.class
-                    ? `${assignment.class.grade}${assignment.class.section}`
-                    : "—"
+                  const code = assignment.class ? classCode(assignment.class) : "—"
                   const palette = coverFor(
                     assignment.class ? String(assignment.class.grade) : "?"
                   )
