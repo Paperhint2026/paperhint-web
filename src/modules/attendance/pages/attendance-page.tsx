@@ -57,6 +57,7 @@ type TodayPeriod = {
   class_id: string
   period_id: string | null
   class_label: string
+  room?: string | null
   period_number: number | null
   period_name: string
   start_time: string | null
@@ -535,6 +536,7 @@ function TeacherToday() {
                   <span className="flex min-w-0 flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-medium text-foreground">
                       {p.class_label} · {p.subject}
+                      {p.room ? <span className="text-muted-foreground"> · {p.room}</span> : null}
                     </span>
                     {isNow && (
                       <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">

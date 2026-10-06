@@ -11,6 +11,7 @@ import {
   CheckCircleIcon,
   CircleNotchIcon,
   CopyIcon,
+  DoorOpenIcon,
   GearSixIcon,
   InfoIcon,
   PlusIcon,
@@ -29,6 +30,7 @@ import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { classCode } from "@/hooks/use-teacher-assignments"
+import { useAppSelector } from "@/store"
 import { PageHeader } from "@/components/layout/page-header"
 import { useHeaderActions } from "@/components/layout/header-actions-context"
 import { LoadingSwap } from "@/components/shared/loading-swap"
@@ -79,6 +81,7 @@ interface ReadinessSection {
   id: string
   grade: number
   section: string
+  name?: string | null
   academic_year: string
   subject_count: number
   missing_teacher: { subject_name: string; subject_type: string }[]
@@ -89,6 +92,12 @@ interface ReadinessSection {
 export interface WeekSettings {
   week_start: "monday" | "sunday"
   working_days: 5 | 6 | 7
+}
+
+interface Room {
+  id: string
+  name: string
+  is_archived: boolean
 }
 
 interface BuilderSubject {
@@ -120,11 +129,12 @@ interface SlotDraft {
   elective_label?: string
   teacher_id?: string | null
   teacher_name?: string | null
+  room_id?: string | null
   block_id?: string | null
 }
 
 interface TimetableResponse {
-  class: { id: string; grade: number; section: string; academic_year: string }
+  class: { id: string; grade: number; section: string; name?: string | null; academic_year: string }
   slots: (SlotDraft & {
     id: string
     day_of_week: number
@@ -189,6 +199,13 @@ function PageSkeleton() {
 export function TimetablePage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
+  // Solo/coaching owners build their own timetable — the server's editor
+  // endpoints already pass isWorkspaceAdmin for them.
+  const isOwnWorkspace = useAppSelector((s) => {
+    const kind = s.school.school?.kind
+    return kind === "solo" || kind === "coaching"
+  })
+  const canEdit = isAdmin || isOwnWorkspace
   const { setHeaderActions } = useHeaderActions()
 
   const [periods, setPeriods] = useState<Period[]>([])
@@ -233,7 +250,7 @@ export function TimetablePage() {
   }, [fetchAll])
 
   useEffect(() => {
-    if (!isAdmin || periods.length === 0) {
+    if (!canEdit || periods.length === 0) {
       setHeaderActions(null)
       return
     }
@@ -253,9 +270,9 @@ export function TimetablePage() {
       </div>
     )
     return () => setHeaderActions(null)
-  }, [isAdmin, periods.length, setHeaderActions])
+  }, [canEdit, periods.length, setHeaderActions])
 
-  if (!isAdmin) {
+  if (!canEdit) {
     return (
       <div
         className={cn(
@@ -766,7 +783,7 @@ function ReadinessStrip({
               ) : (
                 <WarningIcon className="size-3.5 text-amber-600" />
               )}
-              {s.grade}-{s.section}
+              {classCode(s)}
             </button>
           )
         })}
@@ -776,7 +793,7 @@ function ReadinessStrip({
           <WarningIcon className="size-3" />
           {sections
             .filter((s) => s.subject_count === 0)
-            .map((s) => `${s.grade}-${s.section}: no subjects yet`)
+            .map((s) => `${classCode(s)}: no subjects yet`)
             .join(" · ")}
         </p>
       )}
@@ -836,6 +853,23 @@ function SectionBuilder({
   } | null>(null)
   const [orientation, setOrientation] = useState<"periods-rows" | "days-rows">(
     "days-rows"
+  )
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [roomsOpen, setRoomsOpen] = useState(false)
+
+  const fetchRooms = useCallback(() => {
+    apiClient
+      .get<{ rooms: Room[] }>("/api/rooms")
+      .then((r) => setRooms(r.rooms ?? []))
+      .catch(() => setRooms([]))
+  }, [])
+  useEffect(() => {
+    fetchRooms()
+  }, [fetchRooms])
+  const liveRooms = useMemo(() => rooms.filter((r) => !r.is_archived), [rooms])
+  const roomNameById = useMemo(
+    () => new Map(rooms.map((r) => [r.id, r.name])),
+    [rooms]
   )
 
   const days = workingDayNumbers(weekSettings)
@@ -915,6 +949,7 @@ function SectionBuilder({
             elective_label: s.elective_label ?? undefined,
             teacher_id: s.teacher_id,
             teacher_name: s.teacher_name,
+            room_id: s.room_id ?? null,
             block_id: s.block_id,
           })
         }
@@ -1022,6 +1057,7 @@ function SectionBuilder({
           elective_group_id: s.elective_group_id,
           elective_label: s.elective_label,
           teacher_id: s.teacher_id ?? null,
+          room_id: s.room_id ?? null,
           block_id: s.block_id ?? null,
         }
       })
@@ -1242,6 +1278,7 @@ function SectionBuilder({
           elective_group_id: s.elective_group_id,
           elective_label: s.elective_label,
           teacher_id: s.teacher_id ?? null,
+          room_id: s.room_id ?? null,
           block_id: s.block_id ?? null,
         }
       })
@@ -1348,7 +1385,7 @@ function SectionBuilder({
     return (
       <div className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold text-foreground">
-          Grade {cls?.grade} - {cls?.section}{" "}
+          {cls?.name?.trim() || `Grade ${cls?.grade} - ${cls?.section}`}{" "}
           <span className="font-normal text-muted-foreground">
             ({cls?.academic_year})
           </span>
@@ -1362,7 +1399,7 @@ function SectionBuilder({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold text-foreground">
-          Grade {cls?.grade} - {cls?.section}{" "}
+          {cls?.name?.trim() || `Grade ${cls?.grade} - ${cls?.section}`}{" "}
           <span className="font-normal text-muted-foreground">
             ({cls?.academic_year})
           </span>
@@ -1420,6 +1457,15 @@ function SectionBuilder({
           >
             <InfoIcon className="size-3.5" />
             Summary
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-full text-xs"
+            onClick={() => setRoomsOpen(true)}
+          >
+            <DoorOpenIcon className="size-3.5" />
+            Rooms
           </Button>
           <Button
             variant="outline"
@@ -1551,6 +1597,11 @@ function SectionBuilder({
                                 {slot.teacher_name}
                               </span>
                             ) : null}
+                            {slot.room_id && roomNameById.get(slot.room_id) && (
+                              <span className="truncate text-[9px] text-muted-foreground/70">
+                                {roomNameById.get(slot.room_id)}
+                              </span>
+                            )}
                             {isDoubleStart && (
                               <span className="text-[9px] text-muted-foreground/60">
                                 double
@@ -1677,6 +1728,11 @@ function SectionBuilder({
                                   {slot.teacher_name}
                                 </span>
                               ) : null}
+                              {slot.room_id && roomNameById.get(slot.room_id) && (
+                                <span className="truncate text-[9px] text-muted-foreground/70">
+                                  {roomNameById.get(slot.room_id)}
+                                </span>
+                              )}
                               {isDoubleStart && (
                                 <span className="text-[9px] text-muted-foreground/60">
                                   double
@@ -1841,6 +1897,7 @@ function SectionBuilder({
           teachers={data.teachers}
           gradeTeacherIds={data.grade_teacher_ids}
           grade={data.class.grade}
+          rooms={liveRooms}
           onClose={() => setEditorCell(null)}
           onClear={() => {
             setCell(editorCell.day, editorCell.periodId, null)
@@ -1873,12 +1930,20 @@ function SectionBuilder({
         />
       )}
 
+      {roomsOpen && (
+        <ManageRoomsDialog
+          rooms={rooms}
+          onClose={() => setRoomsOpen(false)}
+          onChanged={fetchRooms}
+        />
+      )}
+
       {summaryOpen && (
         <TimetableSummaryDialog
           draft={draft}
           days={days}
           teachable={teachable}
-          gradeLabel={`Grade ${cls?.grade} - ${cls?.section}`}
+          gradeLabel={cls?.name?.trim() || `Grade ${cls?.grade} - ${cls?.section}`}
           onClose={() => setSummaryOpen(false)}
         />
       )}
@@ -2425,6 +2490,7 @@ function CellEditor({
   teachers,
   gradeTeacherIds,
   grade,
+  rooms,
   existingCustomLabels,
   customLabelCount,
   onClose,
@@ -2441,6 +2507,7 @@ function CellEditor({
   teachers: TeacherOption[]
   gradeTeacherIds: string[]
   grade: number
+  rooms: Room[]
   existingCustomLabels: string[]
   customLabelCount: (label: string) => number
   onClose: () => void
@@ -2458,6 +2525,7 @@ function CellEditor({
     current?.class_subject_id ?? ""
   )
   const [teacherId, setTeacherId] = useState<string>(current?.teacher_id ?? "")
+  const [roomId, setRoomId] = useState<string>(current?.room_id ?? "")
   const [customLabel, setCustomLabel] = useState(current?.custom_label ?? "PT")
   const [applyAll, setApplyAll] = useState(true)
   const [electiveGroupId, setElectiveGroupId] = useState(
@@ -2497,6 +2565,7 @@ function CellEditor({
           teacher_id: teacherId || null,
           teacher_name:
             teachers.find((t) => t.id === teacherId)?.full_name ?? null,
+          room_id: roomId || null,
         },
         asDouble && nextPeriodFree
       )
@@ -2513,6 +2582,7 @@ function CellEditor({
           teacher_id: teacherId || null,
           teacher_name:
             teachers.find((t) => t.id === teacherId)?.full_name ?? null,
+          room_id: roomId || null,
         },
         asDouble && nextPeriodFree,
         applyAll && others > 0
@@ -2534,6 +2604,7 @@ function CellEditor({
           elective_label: g.elective_group_name,
           teacher_id: null,
           teacher_name: null,
+          room_id: roomId || null,
         },
         false
       )
@@ -2732,6 +2803,31 @@ function CellEditor({
                 </>
               )}
             </>
+          )}
+
+          {rooms.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs">
+                Room{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Select
+                value={roomId || "none"}
+                onValueChange={(v) => setRoomId(v === "none" ? "" : v)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="No room" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No room</SelectItem>
+                  {rooms.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           {kind !== "elective" && nextPeriodFree && (
@@ -3408,6 +3504,123 @@ function TimetableSummaryDialog({
 // Copy-day dialog
 // ─────────────────────────────────────────────────────────────────────────────
 
+function ManageRoomsDialog({
+  rooms,
+  onClose,
+  onChanged,
+}: {
+  rooms: Room[]
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const [name, setName] = useState("")
+  const [busy, setBusy] = useState(false)
+
+  const add = async () => {
+    const t = name.trim()
+    if (!t || busy) return
+    setBusy(true)
+    try {
+      await apiClient.post("/api/rooms", { name: t })
+      setName("")
+      onChanged()
+    } catch (err) {
+      showError(err, "Couldn't add the room")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const setArchived = async (room: Room, is_archived: boolean) => {
+    try {
+      await apiClient.patch(`/api/rooms/${room.id}`, { is_archived })
+      onChanged()
+    } catch (err) {
+      showError(err, "Couldn't update the room")
+    }
+  }
+
+  const live = rooms.filter((r) => !r.is_archived)
+  const archived = rooms.filter((r) => r.is_archived)
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Rooms</DialogTitle>
+          <DialogDescription>
+            The physical rooms a period can be held in. Assign one per slot in
+            the cell editor; double-booking a room is flagged on save.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="e.g. Room 1, Hall A"
+              value={name}
+              maxLength={60}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  void add()
+                }
+              }}
+            />
+            <Button type="button" onClick={() => void add()} disabled={!name.trim() || busy}>
+              Add
+            </Button>
+          </div>
+
+          {live.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No rooms yet — slots work fine without one.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y rounded-lg border">
+              {live.map((r) => (
+                <li key={r.id} className="flex items-center gap-2 px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate text-sm">{r.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => void setArchived(r, true)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Archive
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {archived.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <p className="text-[11px] text-muted-foreground">Archived</p>
+              <ul className="flex flex-col divide-y rounded-lg border">
+                {archived.map((r) => (
+                  <li key={r.id} className="flex items-center gap-2 px-3 py-2">
+                    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                      {r.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void setArchived(r, false)}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Restore
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function CopyDayDialog({
   days,
   onClose,
@@ -3626,6 +3839,7 @@ function CustomLabelCombobox({
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface MyScheduleSlot {
+  room?: string | null
   day_of_week: number
   period_id: string
   kind: string
@@ -3872,6 +4086,11 @@ function TeacherTimetableView() {
                           <span className="block text-[10px] text-muted-foreground">
                             {classCode(slot.class)}
                           </span>
+                          {slot.room && (
+                            <span className="block text-[9px] text-muted-foreground/70">
+                              {slot.room}
+                            </span>
+                          )}
                         </td>
                       )
                     })}
