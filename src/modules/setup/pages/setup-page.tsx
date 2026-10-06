@@ -250,6 +250,7 @@ function WorkingWeekCard() {
               <SelectContent>
                 <SelectItem value="5">5 days</SelectItem>
                 <SelectItem value="6">6 days</SelectItem>
+                <SelectItem value="7">7 days (all week)</SelectItem>
               </SelectContent>
             </Select>
           </div>

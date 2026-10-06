@@ -28,6 +28,7 @@ import { apiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
+import { classCode } from "@/hooks/use-teacher-assignments"
 import { PageHeader } from "@/components/layout/page-header"
 import { useHeaderActions } from "@/components/layout/header-actions-context"
 import { LoadingSwap } from "@/components/shared/loading-swap"
@@ -87,7 +88,7 @@ interface ReadinessSection {
 
 export interface WeekSettings {
   week_start: "monday" | "sunday"
-  working_days: 5 | 6
+  working_days: 5 | 6 | 7
 }
 
 interface BuilderSubject {
@@ -157,7 +158,7 @@ const cellKey = (day: number, periodId: string) => `${day}|${periodId}`
 
 function workingDayNumbers(settings?: WeekSettings): number[] {
   const start = settings?.week_start === "sunday" ? 0 : 1
-  const count = settings?.working_days === 5 ? 5 : 6
+  const count = [5, 6, 7].includes(settings?.working_days ?? 0) ? (settings!.working_days as number) : 6
   return Array.from({ length: count }, (_, i) => (start + i) % 7)
 }
 
@@ -3629,7 +3630,7 @@ interface MyScheduleSlot {
   period_id: string
   kind: string
   label: string
-  class: { id: string; grade: number; section: string }
+  class: { id: string; grade: number; section: string; name?: string | null }
 }
 
 interface ClassGridData {
@@ -3651,7 +3652,7 @@ function TeacherTimetableView() {
   const [weekSettings, setWeekSettings] = useState<WeekSettings | undefined>()
   const [mySlots, setMySlots] = useState<MyScheduleSlot[] | null>(null)
   const [classes, setClasses] = useState<
-    { id: string; grade: number; section: string }[]
+    { id: string; grade: number; section: string; name?: string | null }[]
   >([])
   const [view, setView] = useState<"mine" | "class">("mine")
   const [classId, setClassId] = useState("")
@@ -3665,7 +3666,7 @@ function TeacherTimetableView() {
       apiClient.get<{ periods: Period[] }>("/api/timetable/periods"),
       apiClient.get<{ slots: MyScheduleSlot[] }>("/api/timetable/my-schedule"),
       apiClient.get<{
-        classes: { id: string; grade: number; section: string }[]
+        classes: { id: string; grade: number; section: string; name?: string | null }[]
       }>("/api/classes"),
       apiClient
         .get<{ week_settings?: WeekSettings }>("/api/calendar")
@@ -3782,7 +3783,7 @@ function TeacherTimetableView() {
                   : "border-border bg-background text-secondary-foreground hover:bg-muted"
               )}
             >
-              {c.grade}-{c.section}
+              {classCode(c)}
             </button>
           ))}
         </div>
@@ -3869,7 +3870,7 @@ function TeacherTimetableView() {
                             {slot.label}
                           </span>
                           <span className="block text-[10px] text-muted-foreground">
-                            {slot.class.grade}-{slot.class.section}
+                            {classCode(slot.class)}
                           </span>
                         </td>
                       )

@@ -133,7 +133,7 @@ interface CalendarEvent {
 
 interface WeekSettings {
   week_start: "monday" | "sunday"
-  working_days: 5 | 6
+  working_days: 5 | 6 | 7
 }
 
 interface CalendarResponse {
@@ -208,7 +208,7 @@ function academicYearMonths(academicYear: string): Date[] {
  *  Sun..Thu; etc. */
 function workingDaySet(settings?: WeekSettings): Set<number> {
   const start = settings?.week_start === "sunday" ? 0 : 1
-  const days = settings?.working_days === 5 ? 5 : 6
+  const days = [5, 6, 7].includes(settings?.working_days ?? 0) ? (settings!.working_days as number) : 6
   const set = new Set<number>()
   for (let i = 0; i < days; i++) set.add((start + i) % 7)
   return set
