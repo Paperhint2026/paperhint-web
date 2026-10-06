@@ -15,7 +15,7 @@ import {
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { countSummary } from "@/lib/format"
 import { useAppDispatch, useAppSelector } from "@/store"
-import { fetchSubjects } from "@/store/subjects-slice"
+import { clearSubjects, fetchSubjects } from "@/store/subjects-slice"
 import { Button } from "@/components/ui/button"
 import { ModuleAction } from "@/components/ui/module-action"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -29,6 +29,8 @@ import {
   AddClassDrawer,
   type ClassFormData,
 } from "@/modules/classes/components/add-class-drawer"
+import { AddBatchDrawer } from "@/modules/classes/components/add-batch-drawer"
+import { invalidateTeacherAssignments } from "@/hooks/use-teacher-assignments"
 
 interface SubjectInfo {
   id: string
@@ -177,15 +179,17 @@ export function ClassesPage() {
   }, [fetchClasses, dispatch])
 
   useEffect(() => {
-    if (!isAdmin) return
+    // Coaching owners (role=teacher) add batches; school admins add class
+    // rooms. The batch endpoint enforces ownership server-side.
+    if (!isAdmin && !isCoaching) return
     setHeaderActions(
       <ModuleAction onClick={() => setDrawerOpen(true)}>
         <PlusIcon className="size-3.5" />
-        <span className="hidden sm:inline">Add Class Room</span>
+        <span className="hidden sm:inline">{isCoaching ? "Add batch" : "Add Class Room"}</span>
       </ModuleAction>
     )
     return () => setHeaderActions(null)
-  }, [isAdmin, setHeaderActions])
+  }, [isAdmin, isCoaching, setHeaderActions])
 
   const handleSaveClass = async (data: ClassFormData) => {
     setIsSaving(true)
@@ -346,15 +350,31 @@ export function ClassesPage() {
         )}
       </LoadingSwap>
 
-      {isAdmin && (
-        <AddClassDrawer
+      {isCoaching ? (
+        <AddBatchDrawer
           open={drawerOpen}
           onOpenChange={setDrawerOpen}
-          onSave={handleSaveClass}
-          availableSubjects={subjects}
-          existingGrades={grades.map((g) => Number(g.grade))}
-          isSaving={isSaving}
+          availableSubjects={subjectRecords.map((s) => s.subject_name)}
+          onCreated={() => {
+            fetchClasses()
+            invalidateTeacherAssignments()
+            // The batch may have created new subjects by name — drop the
+            // cached slice so the next drawer open offers them as chips.
+            dispatch(clearSubjects())
+            dispatch(fetchSubjects())
+          }}
         />
+      ) : (
+        isAdmin && (
+          <AddClassDrawer
+            open={drawerOpen}
+            onOpenChange={setDrawerOpen}
+            onSave={handleSaveClass}
+            availableSubjects={subjects}
+            existingGrades={grades.map((g) => Number(g.grade))}
+            isSaving={isSaving}
+          />
+        )
       )}
     </div>
   )

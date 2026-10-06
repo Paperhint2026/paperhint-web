@@ -46,6 +46,16 @@ export function classSlug(a: Assignment) {
 let cachedAssignments: Assignment[] | null = null
 let cacheUserId: string | null = null
 
+// Live hook instances, so a mutation elsewhere (e.g. the Add-batch drawer)
+// can drop the cache and make every mounted consumer — sidebar included —
+// refetch without a page reload.
+const refetchListeners = new Set<() => void>()
+export function invalidateTeacherAssignments() {
+  cachedAssignments = null
+  cacheUserId = null
+  for (const refetch of [...refetchListeners]) refetch()
+}
+
 export function useTeacherAssignments() {
   const { user } = useAuth()
   const [assignments, setAssignments] = useState<Assignment[]>(
@@ -98,6 +108,13 @@ export function useTeacherAssignments() {
       fetchAssignments()
     }
   }, [user, fetchAssignments])
+
+  useEffect(() => {
+    refetchListeners.add(fetchAssignments)
+    return () => {
+      refetchListeners.delete(fetchAssignments)
+    }
+  }, [fetchAssignments])
 
   return { assignments, isLoading, refetch: fetchAssignments }
 }
