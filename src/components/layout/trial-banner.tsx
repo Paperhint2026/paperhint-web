@@ -42,7 +42,7 @@ export function TrialBanner() {
           <span className="font-semibold">
             {days === 1 ? "1 day" : `${days} days`}
           </span>
-          . <button className="underline underline-offset-2 hover:no-underline" onClick={openSupport}>Get in touch</button> before then to keep editing.
+          . <button className="underline underline-offset-2 hover:no-underline" onClick={() => openSupport()}>Get in touch</button> before then to keep editing.
         </span>
         <button
           type="button"
@@ -91,7 +91,7 @@ export function TrialBanner() {
       </div>
       <button
         type="button"
-        onClick={openSupport}
+        onClick={() => openSupport()}
         className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
       >
         <EnvelopeIcon className="size-3.5" />

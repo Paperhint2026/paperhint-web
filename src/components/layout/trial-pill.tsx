@@ -151,7 +151,7 @@ export function TrialPill({ variant = "sidebar" }: { variant?: Variant }) {
         <div className="border-t p-3">
           <button
             type="button"
-            onClick={openSupport}
+            onClick={() => openSupport()}
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <EnvelopeIcon className="size-4" />
