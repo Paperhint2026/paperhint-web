@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import {
   CheckCircleIcon,
@@ -127,12 +127,36 @@ function Requirement({ met, children }: { met: boolean; children: string }) {
   )
 }
 
+interface ProvidersResponse {
+  providers: string[]
+  has_password: boolean
+}
+
+const PROVIDER_LABEL: Record<string, string> = {
+  google: "Google",
+  azure: "Microsoft",
+  email: "email + password",
+}
+
 export function SecuritySection() {
   const reduceMotion = useReducedMotion()
   const [current, setCurrent] = useState("")
   const [next, setNext] = useState("")
   const [confirm, setConfirm] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [state, setState] = useState<ProvidersResponse | null>(null)
+  const hasPassword = state?.has_password ?? true
+  const oauthProvidersLabel = (state?.providers ?? [])
+    .filter((p) => p !== "email")
+    .map((p) => PROVIDER_LABEL[p] ?? p)
+    .join(" and ")
+
+  useEffect(() => {
+    apiClient
+      .get<ProvidersResponse>("/api/auth/me/providers")
+      .then(setState)
+      .catch(() => setState({ providers: [], has_password: true }))
+  }, [])
 
   const strength = strengthOf(next)
   const longEnough = next.length >= MIN_LENGTH
@@ -141,17 +165,24 @@ export function SecuritySection() {
   const matches = confirm.length > 0 && next === confirm
   const mismatch = confirm.length > 0 && next !== confirm
   const canSubmit =
-    !isSaving && current.length > 0 && longEnough && matches && next !== current
+    !isSaving &&
+    longEnough &&
+    matches &&
+    (!hasPassword || (current.length > 0 && next !== current))
 
   const submit = async () => {
     if (!canSubmit) return
     setIsSaving(true)
     try {
       await apiClient.post("/api/auth/change-password", {
-        current_password: current,
         new_password: next,
+        ...(hasPassword ? { current_password: current } : {}),
       })
-      toast.success("Password changed")
+      toast.success(
+        hasPassword
+          ? "Password changed"
+          : "Password set — you can now sign in with email and password too"
+      )
       setCurrent("")
       setNext("")
       setConfirm("")
@@ -165,12 +196,18 @@ export function SecuritySection() {
   return (
     <SectionMotion>
       <SettingsCard
-        title="Password"
-        description="Use something you don't use anywhere else. You stay signed in here after changing it."
+        title={hasPassword ? "Password" : "Set a password"}
+        description={
+          hasPassword
+            ? "Use something you don't use anywhere else. You stay signed in here after changing it."
+            : oauthProvidersLabel
+              ? `You signed up with ${oauthProvidersLabel}. Set a password to also sign in by email — ${oauthProvidersLabel} keeps working either way.`
+              : "Set a password to sign in by email in addition to any linked logins."
+        }
         footer={
           <>
             <span className="text-xs text-muted-foreground">
-              {next && next === current
+              {hasPassword && next && next === current
                 ? "New password must differ from the current one."
                 : mismatch
                   ? "The two new passwords don't match yet."
@@ -182,24 +219,28 @@ export function SecuritySection() {
               ) : (
                 <KeyIcon className="size-4" />
               )}
-              {isSaving ? "Changing…" : "Change password"}
+              {isSaving
+                ? hasPassword ? "Changing…" : "Setting…"
+                : hasPassword ? "Change password" : "Set password"}
             </Button>
           </>
         }
       >
-        <SettingsRow
-          label="Current password"
-          hint="Confirms it's really you."
-          htmlFor="settings-current-password"
-        >
-          <PasswordInput
-            id="settings-current-password"
-            value={current}
-            onChange={setCurrent}
-            placeholder="Your current password"
-            autoComplete="current-password"
-          />
-        </SettingsRow>
+        {hasPassword && (
+          <SettingsRow
+            label="Current password"
+            hint="Confirms it's really you."
+            htmlFor="settings-current-password"
+          >
+            <PasswordInput
+              id="settings-current-password"
+              value={current}
+              onChange={setCurrent}
+              placeholder="Your current password"
+              autoComplete="current-password"
+            />
+          </SettingsRow>
+        )}
 
         <SettingsRow
           label="New password"
