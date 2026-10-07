@@ -6,11 +6,17 @@ export type AudienceType =
   | "grades"
   | "class_teachers_grades"
   | "teachers"
+  | "parents"
+
+export type CircularKind = "circular" | "activity" | "report" | "announcement"
 
 export interface Audience {
   type: AudienceType
   grades: number[]
   teacher_ids: string[]
+  /** Parents lane — rides along with any type, or stands alone as type
+   *  "parents". class_ids empty = all the sender is allowed to reach. */
+  parents?: { enabled: boolean; class_ids: string[] }
 }
 
 export interface Attachment {
@@ -33,6 +39,10 @@ export interface Attachment {
 export interface CircularSummary {
   id: string
   subject: string
+  kind?: CircularKind
+  relay_to_parents?: boolean
+  public_token?: string | null
+  i_sent_this?: boolean
   excerpt: string
   audience: Audience
   audience_label: string
@@ -52,6 +62,10 @@ export interface CircularDetail {
   id: string
   subject: string
   body_md: string
+  kind?: CircularKind
+  relay_to_parents?: boolean
+  public_token?: string | null
+  parent_recipients_total?: number
   audience: Audience
   audience_label: string
   attachments: Attachment[]
@@ -84,6 +98,8 @@ export interface AudiencePreview {
   label: string
   count: number
   teachers: { id: string; full_name: string }[]
+  parent_count?: number
+  parent_languages?: string[]
 }
 
 export const circularsApi = {
@@ -100,6 +116,32 @@ export const circularsApi = {
     ),
   create: (form: FormData) =>
     apiClient.post<{ circular: CircularDetail }>("/api/circulars", form),
+  forwardToParents: (id: string) =>
+    apiClient.post<{ parents_added: number; parents_total: number; public_token: string }>(
+      `/api/circulars/${id}/forward-to-parents`
+    ),
+}
+
+export const KIND_LABEL: Record<CircularKind, string> = {
+  circular: "Circular",
+  activity: "Class activity",
+  report: "Report",
+  announcement: "Announcement",
+}
+
+export const PARENT_LANGUAGE_LABEL: Record<string, string> = {
+  hi: "Hindi", ta: "Tamil", te: "Telugu", kn: "Kannada", ml: "Malayalam",
+  mr: "Marathi", bn: "Bengali", gu: "Gujarati", pa: "Punjabi", or: "Odia",
+  as: "Assamese", ur: "Urdu", en: "English",
+}
+
+/** The wa.me share text for a sent circular with a public link. */
+export function whatsappShareUrl(subject: string, token: string) {
+  const link = `${window.location.origin}/c/${token}`
+  const text = `*${subject}*
+
+${link}`
+  return `https://wa.me/?text=${encodeURIComponent(text)}`
 }
 
 export const AUDIENCE_TYPE_LABEL: Record<AudienceType, string> = {
@@ -108,4 +150,5 @@ export const AUDIENCE_TYPE_LABEL: Record<AudienceType, string> = {
   grades: "Teachers of selected grades",
   class_teachers_grades: "Class teachers of selected grades",
   teachers: "Specific teachers",
+  parents: "Parents",
 }

@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ErrorState } from "@/components/shared/error-state"
 import {
   circularsApi,
+  KIND_LABEL,
   type CircularSummary,
 } from "@/modules/notifications/lib/circulars-api"
 
@@ -51,14 +52,12 @@ export function CircularsTab({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {isAdmin && (
-        <div className="flex justify-end">
-          <Button onClick={() => navigate("/notifications/circulars/new")}>
-            <PlusIcon className="size-4" />
-            New circular
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-end">
+        <Button onClick={() => navigate("/notifications/circulars/new")}>
+          <PlusIcon className="size-4" />
+          {isAdmin ? "New circular" : "Message parents"}
+        </Button>
+      </div>
 
       {loadError ? (
         <ErrorState size="page" title="Couldn't load circulars" error={loadError} onRetry={load} />
@@ -76,17 +75,15 @@ export function CircularsTab({ isAdmin }: { isAdmin: boolean }) {
               ? "Write one to reach all teachers, class teachers, or a set of grades — with attachments, and read receipts."
               : "Circulars from the office will appear here, and you'll get a notification when one arrives."}
           </p>
-          {isAdmin && (
-            <Button className="mt-2" onClick={() => navigate("/notifications/circulars/new")}>
-              <PlusIcon className="size-4" />
-              Write the first circular
-            </Button>
-          )}
+          <Button className="mt-2" onClick={() => navigate("/notifications/circulars/new")}>
+            <PlusIcon className="size-4" />
+            {isAdmin ? "Write the first circular" : "Message your parents"}
+          </Button>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {items.map((c) => {
-            const unread = !isAdmin && !c.my_read_at
+            const unread = !isAdmin && !c.my_read_at && !c.i_sent_this
             const total = c.recipients_total ?? 0
             const read = c.read_count ?? 0
             const acked = c.acknowledged_count ?? 0
@@ -122,6 +119,8 @@ export function CircularsTab({ isAdmin }: { isAdmin: boolean }) {
                     <Badge variant="secondary" className="gap-1 font-normal">
                       <UsersThreeIcon className="size-3" />
                       {c.audience_label}
+                      {c.kind && c.kind !== "circular" ? ` · ${KIND_LABEL[c.kind]}` : ""}
+                      {c.i_sent_this ? " · sent by you" : ""}
                     </Badge>
                     {c.attachment_count > 0 && (
                       <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">

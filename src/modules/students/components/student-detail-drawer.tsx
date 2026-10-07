@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Sticker } from "@/components/shared/sticker"
+import { GuardianSection } from "@/modules/students/components/guardian-section"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import {
   Sheet,
@@ -86,6 +87,7 @@ interface StudentDetail {
     id: string
     grade: number
     section: string
+    name?: string | null
     academic_year?: string
   } | null
 }
@@ -395,7 +397,7 @@ export function StudentDetailDrawer({
                           </SheetTitle>
                           <SheetDescription className="truncate text-sm text-muted-foreground">
                             {cls
-                              ? `Grade ${cls.grade} · Section ${cls.section}`
+                              ? cls.name?.trim() || `Grade ${cls.grade} · Section ${cls.section}`
                               : "No class"}
                             {cls?.academic_year && (
                               <>
@@ -533,7 +535,7 @@ export function StudentDetailDrawer({
                         label="Class"
                         value={
                           cls
-                            ? `Grade ${cls.grade} · Section ${cls.section}`
+                            ? cls.name?.trim() || `Grade ${cls.grade} · Section ${cls.section}`
                             : null
                         }
                       />
@@ -553,6 +555,16 @@ export function StudentDetailDrawer({
                         value={student.register_number}
                       />
                     </div>
+                  </motion.div>
+
+                  {/* Parents / guardians (migration 053) */}
+                  <motion.div
+                    variants={ENTER}
+                    transition={stagger}
+                    className="flex flex-col gap-3 px-6 py-5"
+                  >
+                    <SectionHeading>Parents &amp; guardians</SectionHeading>
+                    <GuardianSection studentId={student.id} canManage />
                   </motion.div>
 
                   {/* Emergency contact */}

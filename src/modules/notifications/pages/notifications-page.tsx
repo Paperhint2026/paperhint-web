@@ -124,9 +124,8 @@ export function CircularsListRoute() {
 }
 
 export function CircularComposerRoute() {
-  const { user } = useAuth()
-  // Teachers have no composer — back to the list, no dead end.
-  if (user?.role !== "admin") return <Navigate to="/notifications/circulars" replace />
+  // Everyone composes now: admins/owners send to anyone; teachers get the
+  // parents-only composer scoped to their own classes (server-enforced).
   return <CircularComposer />
 }
 

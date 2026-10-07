@@ -23,6 +23,8 @@ import { ErrorState } from "@/components/shared/error-state"
 import { NotesMarkdown } from "@/modules/notes/components/notes-markdown"
 import {
   circularsApi,
+  whatsappShareUrl,
+  KIND_LABEL,
   type Attachment,
   type CircularDetail as Circular,
   type Recipient,
@@ -49,6 +51,8 @@ export function CircularDetailView({
   const [circular, setCircular] = useState<Circular | null>(null)
   const [loadError, setLoadError] = useState<unknown | null>(null)
   const [acking, setAcking] = useState(false)
+  const [forwarding, setForwarding] = useState(false)
+  const [forwarded, setForwarded] = useState(false)
   const [preview, setPreview] = useState<Attachment | null>(null)
 
   const load = useCallback(() => {
@@ -65,6 +69,23 @@ export function CircularDetailView({
   useEffect(() => {
     load()
   }, [load])
+
+  const forwardToParents = async () => {
+    if (!circular || forwarding) return
+    setForwarding(true)
+    try {
+      const r = await circularsApi.forwardToParents(circular.id)
+      setForwarded(true)
+      setCircular({ ...circular, public_token: r.public_token })
+      toast.success(
+        `Forwarded to ${r.parents_added} parent${r.parents_added === 1 ? "" : "s"} of your class`
+      )
+    } catch (err) {
+      showError(err, "Could not forward to parents")
+    } finally {
+      setForwarding(false)
+    }
+  }
 
   const acknowledge = async () => {
     if (!circular || acking) return
@@ -113,7 +134,42 @@ export function CircularDetailView({
                   <UsersThreeIcon className="size-3" />
                   To: {circular.audience_label}
                 </Badge>
+                {circular.kind && circular.kind !== "circular" && (
+                  <Badge variant="outline" className="font-normal">
+                    {KIND_LABEL[circular.kind]}
+                  </Badge>
+                )}
               </div>
+              {(circular.public_token || (circular.relay_to_parents && !isAdmin)) && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {circular.relay_to_parents && !isAdmin && (
+                    <Button
+                      size="sm"
+                      variant={forwarded ? "outline" : "default"}
+                      disabled={forwarding || forwarded}
+                      onClick={() => void forwardToParents()}
+                    >
+                      {forwarding ? (
+                        <CircleNotchIcon className="size-3.5 animate-spin" />
+                      ) : (
+                        <UsersThreeIcon className="size-3.5" />
+                      )}
+                      {forwarded ? "Forwarded to your class's parents" : "Forward to my class's parents"}
+                    </Button>
+                  )}
+                  {circular.public_token && (
+                    <Button size="sm" variant="outline" asChild>
+                      <a
+                        href={whatsappShareUrl(circular.subject, circular.public_token)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Share on WhatsApp
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              )}
             </header>
 
             <div className="px-5 py-4">
@@ -156,7 +212,9 @@ export function CircularDetailView({
               </div>
             )}
 
-            {!isAdmin && (
+            {/* Acknowledge belongs to RECIPIENTS — a teacher viewing her own
+                parents-send has no receipt row (my_read_at is absent). */}
+            {!isAdmin && circular.my_read_at !== undefined && (
               <footer className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/30 px-5 py-3">
                 <p className="text-xs text-muted-foreground">
                   {circular.my_acknowledged_at

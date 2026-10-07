@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router-dom"
+import { PublicCircularPage } from "@/modules/notifications/pages/public-circular-page"
 
 import { AppLayout } from "@/components/layout/app-layout"
 import { ProtectedRoute } from "@/components/layout/protected-route"
@@ -92,6 +93,13 @@ export const router = createBrowserRouter([
   {
     path: "set-password",
     element: <SetPasswordPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    // The tokenized public circular page parents open from WhatsApp — no
+    // login, no app shell. The uuid token is the whole credential.
+    path: "c/:token",
+    element: <PublicCircularPage />,
     errorElement: <RouteErrorPage />,
   },
   {

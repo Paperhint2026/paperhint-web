@@ -22,12 +22,26 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { RichTextEditor } from "@/components/shared/rich-text-editor"
 import {
   AUDIENCE_TYPE_LABEL,
+  KIND_LABEL,
+  PARENT_LANGUAGE_LABEL,
   circularsApi,
   type Audience,
   type AudienceOptions,
   type AudiencePreview,
   type AudienceType,
+  type CircularKind,
 } from "@/modules/notifications/lib/circulars-api"
+import { useAuth } from "@/lib/auth"
+import { useAppSelector } from "@/store"
+import { apiClient } from "@/lib/api-client"
+import { classCode, useTeacherAssignments } from "@/hooks/use-teacher-assignments"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const MAX_FILES = 10
 const MAX_FILE_MB = 15
@@ -40,9 +54,24 @@ const MAX_FILE_MB = 15
  */
 export function CircularComposer() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const workspaceKind = useAppSelector((s) => s.school.school?.kind)
+  // Coaching/solo owners are workspace admins server-side; a plain school
+  // teacher composes in parents-only mode scoped to her classes.
+  const isSenderAdmin =
+    user?.role === "admin" || workspaceKind === "solo" || workspaceKind === "coaching"
+  const isCoaching = workspaceKind === "coaching"
+  const groupNoun = isCoaching ? "batch" : "class"
+  const { assignments } = useTeacherAssignments()
 
   const [options, setOptions] = useState<AudienceOptions | null>(null)
-  const [type, setType] = useState<AudienceType>("all_teachers")
+  const [type, setType] = useState<AudienceType>(isSenderAdmin ? "all_teachers" : "parents")
+  const [kind, setKind] = useState<CircularKind>("circular")
+  const [relayToParents, setRelayToParents] = useState(false)
+  const [parentClassIds, setParentClassIds] = useState<string[]>([])
+  const [allClasses, setAllClasses] = useState<
+    { id: string; grade: number; section: string; name?: string | null }[]
+  >([])
   const [grades, setGrades] = useState<number[]>([])
   const [teacherIds, setTeacherIds] = useState<string[]>([])
   const [teacherSearch, setTeacherSearch] = useState("")
@@ -84,17 +113,47 @@ export function CircularComposer() {
   }
 
   useEffect(() => {
+    if (!isSenderAdmin) return
     circularsApi
       .options()
       .then(setOptions)
       .catch((err) => showError(err, "Could not load the school's teachers"))
-  }, [])
+  }, [isSenderAdmin])
+
+  // The parents picker's class list: admins pick from the whole school,
+  // teachers from their own classes (the server enforces the same scope).
+  useEffect(() => {
+    if (isSenderAdmin) {
+      apiClient
+        .get<{ classes: { id: string; grade: number; section: string; name?: string | null }[] }>(
+          "/api/classes"
+        )
+        .then((r) => setAllClasses(r.classes ?? []))
+        .catch(() => setAllClasses([]))
+    } else {
+      const seen = new Map<string, { id: string; grade: number; section: string; name?: string | null }>()
+      for (const a of assignments) {
+        if (a.class && !seen.has(a.class.id)) seen.set(a.class.id, { ...a.class })
+      }
+      setAllClasses([...seen.values()])
+    }
+  }, [isSenderAdmin, assignments])
 
   const audience = useMemo<Audience>(
-    () => ({ type, grades, teacher_ids: teacherIds }),
-    [type, grades, teacherIds]
+    () => ({
+      type,
+      grades,
+      teacher_ids: teacherIds,
+      ...(type === "parents"
+        ? { parents: { enabled: true, class_ids: parentClassIds } }
+        : {}),
+    }),
+    [type, grades, teacherIds, parentClassIds]
   )
   const needsGrades = type === "grades" || type === "class_teachers_grades"
+  const canRelay =
+    isSenderAdmin &&
+    (type === "all_teachers" || type === "class_teachers" || type === "class_teachers_grades")
   const audienceReady =
     (!needsGrades || grades.length > 0) && (type !== "teachers" || teacherIds.length > 0)
 
@@ -150,8 +209,9 @@ export function CircularComposer() {
   const toggleTeacher = (id: string) =>
     setTeacherIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
+  const reachTotal = (preview?.count ?? 0) + (preview?.parent_count ?? 0)
   const canSend =
-    audienceReady && subject.trim().length > 0 && bodyMd.trim().length > 0 && !sending && (preview?.count ?? 0) > 0
+    audienceReady && subject.trim().length > 0 && bodyMd.trim().length > 0 && !sending && reachTotal > 0
 
   const send = async () => {
     if (!canSend) return
@@ -160,6 +220,8 @@ export function CircularComposer() {
       const form = new FormData()
       form.append("subject", subject.trim())
       form.append("audience", JSON.stringify(audience))
+      form.append("kind", kind)
+      if (canRelay && relayToParents) form.append("relay_to_parents", "true")
       for (const f of files) form.append("files", f, f.name)
       // Swap each still-referenced inline image's blob: src for a stable cid
       // and ship the file alongside; images deleted from the editor are
@@ -175,7 +237,12 @@ export function CircularComposer() {
       }
       form.append("body_md", body)
       const r = await circularsApi.create(form)
-      toast.success(`Sent to ${r.circular.recipients_total ?? preview?.count ?? ""} teachers`)
+      const nT = r.circular.recipients_total ?? preview?.count ?? 0
+      const nP = r.circular.parent_recipients_total ?? preview?.parent_count ?? 0
+      const parts = []
+      if (nT > 0) parts.push(`${nT} teacher${nT === 1 ? "" : "s"}`)
+      if (nP > 0) parts.push(`${nP} parent${nP === 1 ? "" : "s"}`)
+      toast.success(`Sent to ${parts.join(" and ") || "the audience"}`)
       navigate(`/notifications/circulars/${r.circular.id}`, { replace: true })
     } catch (err) {
       showError(err, "Could not send the circular")
@@ -200,6 +267,21 @@ export function CircularComposer() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* ── Message ── */}
         <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5">
+          <div className="flex flex-col gap-1.5">
+            <Label>Type</Label>
+            <Select value={kind} onValueChange={(v) => setKind(v as CircularKind)}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(KIND_LABEL) as CircularKind[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {KIND_LABEL[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="circular-subject">Subject</Label>
             <Input
@@ -289,17 +371,24 @@ export function CircularComposer() {
             <p className="text-sm font-medium">Send to</p>
           </div>
 
-          {options === null ? (
+          {isSenderAdmin && options === null ? (
             <Skeleton className="h-40 w-full rounded-lg" />
           ) : (
             <>
+              {!isSenderAdmin && (
+                <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-secondary-foreground">
+                  Goes to the parents of your {groupNoun}es. Pick specific ones
+                  below, or leave all selected.
+                </p>
+              )}
+              {isSenderAdmin && (
               <div className="flex flex-col gap-1">
                 {(Object.keys(AUDIENCE_TYPE_LABEL) as AudienceType[]).map((t) => {
                   const hint =
                     t === "all_teachers"
-                      ? `${options.teacher_count} teachers`
+                      ? `${options?.teacher_count ?? 0} teachers`
                       : t === "class_teachers"
-                        ? `${options.class_teacher_count} class teachers`
+                        ? `${options?.class_teacher_count ?? 0} class teachers`
                         : null
                   return (
                     <button
@@ -318,12 +407,63 @@ export function CircularComposer() {
                   )
                 })}
               </div>
+              )}
 
-              {needsGrades && (
+              {canRelay && (
+                <label className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-xs text-secondary-foreground">
+                  <Checkbox
+                    checked={relayToParents}
+                    onCheckedChange={(v) => setRelayToParents(!!v)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Ask these teachers to <span className="font-medium">forward this to their {groupNoun}'s parents</span> —
+                    each gets a one-tap forward on the circular.
+                  </span>
+                </label>
+              )}
+
+              {type === "parents" && (
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    {isCoaching ? "Batches" : "Classes"}{" "}
+                    <span className="font-normal">(none picked = all)</span>
+                  </Label>
+                  <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto">
+                    {allClasses.map((c) => {
+                      const active = parentClassIds.includes(c.id)
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() =>
+                            setParentClassIds((cur) =>
+                              cur.includes(c.id) ? cur.filter((x) => x !== c.id) : [...cur, c.id]
+                            )
+                          }
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border hover:bg-muted"
+                          )}
+                        >
+                          {classCode(c)}
+                        </button>
+                      )
+                    })}
+                    {allClasses.length === 0 && (
+                      <span className="text-xs text-muted-foreground">No {groupNoun}es yet</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isSenderAdmin && needsGrades && (
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">Grades</Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {options.grades.map((g) => (
+                    {(options?.grades ?? []).map((g) => (
                       <button
                         key={g}
                         type="button"
@@ -339,9 +479,9 @@ export function CircularComposer() {
                       </button>
                     ))}
                   </div>
-                  {options.grades.length > 1 && (
+                  {(options?.grades.length ?? 0) > 1 && (
                     <div className="flex gap-2 text-[11px]">
-                      <button type="button" className="text-primary hover:underline" onClick={() => setGrades([...options.grades])}>
+                      <button type="button" className="text-primary hover:underline" onClick={() => setGrades([...(options?.grades ?? [])])}>
                         All grades
                       </button>
                       <button type="button" className="text-muted-foreground hover:underline" onClick={() => setGrades([])}>
@@ -352,6 +492,7 @@ export function CircularComposer() {
                 </div>
               )}
 
+              {isSenderAdmin && type !== "parents" && (
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs text-muted-foreground">
                   {type === "teachers" ? "Teachers" : "Also include specific teachers"}
@@ -377,6 +518,7 @@ export function CircularComposer() {
                   )}
                 </ul>
               </div>
+              )}
 
               {/* Live reach */}
               <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
@@ -397,11 +539,33 @@ export function CircularComposer() {
                       onClick={() => setPreviewOpen((o) => !o)}
                     >
                       <span>
-                        Reaches <span className="font-semibold">{preview.count}</span> teacher
-                        {preview.count === 1 ? "" : "s"}
+                        Reaches{" "}
+                        {preview.count > 0 && (
+                          <>
+                            <span className="font-semibold">{preview.count}</span> teacher
+                            {preview.count === 1 ? "" : "s"}
+                          </>
+                        )}
+                        {preview.count > 0 && (preview.parent_count ?? 0) > 0 && " · "}
+                        {(preview.parent_count ?? 0) > 0 && (
+                          <>
+                            <span className="font-semibold">{preview.parent_count}</span> parent
+                            {preview.parent_count === 1 ? "" : "s"}
+                          </>
+                        )}
+                        {reachTotal === 0 && <span className="text-muted-foreground">nobody yet</span>}
                       </span>
                       <span className="text-[11px] text-primary">{previewOpen ? "hide" : "show"}</span>
                     </button>
+                    {(preview.parent_languages?.length ?? 0) > 0 && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Will also be translated to{" "}
+                        {(preview.parent_languages ?? [])
+                          .map((l) => PARENT_LANGUAGE_LABEL[l] ?? l)
+                          .join(", ")}
+                        .
+                      </p>
+                    )}
                     {previewOpen && (
                       <ul className="mt-2 max-h-40 overflow-y-auto text-xs text-muted-foreground">
                         {preview.teachers.map((t) => (
@@ -409,8 +573,10 @@ export function CircularComposer() {
                         ))}
                       </ul>
                     )}
-                    {preview.count === 0 && (
-                      <p className="mt-1 text-xs text-destructive">Nobody matches — adjust the audience.</p>
+                    {reachTotal === 0 && (
+                      <p className="mt-1 text-xs text-destructive">
+                        Nobody matches — {type === "parents" ? "add guardians on the students first" : "adjust the audience"}.
+                      </p>
                     )}
                   </>
                 )}
@@ -427,7 +593,7 @@ export function CircularComposer() {
             ) : (
               <>
                 <PaperPlaneTiltIcon className="size-4" />
-                Send circular
+                Send
               </>
             )}
           </Button>
@@ -444,7 +610,7 @@ export function CircularComposer() {
             ) : (
               <>
                 <PaperPlaneTiltIcon className="size-4" />
-                Send circular{preview?.count ? ` to ${preview.count}` : ""}
+                Send{reachTotal ? ` to ${reachTotal}` : ""}
               </>
             )}
           </Button>
