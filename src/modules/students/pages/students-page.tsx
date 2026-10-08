@@ -15,8 +15,10 @@ import {
   IdentificationBadgeIcon,
   PencilIcon,
   PhoneIcon,
+  FileArrowUpIcon,
   PlusIcon,
   SignOutIcon,
+  TagIcon,
   TrashIcon,
 } from "@phosphor-icons/react"
 import { toast } from "sonner"
@@ -53,6 +55,10 @@ import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { ModuleAction } from "@/components/ui/module-action"
+import { ImportStudentsDialog } from "@/modules/students/components/import-students-dialog"
+import { useAppSelector } from "@/store"
+import { classCode } from "@/hooks/use-teacher-assignments"
+import { useCustomFieldDefs } from "@/components/shared/custom-fields"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
@@ -183,6 +189,18 @@ function RosterSkeleton() {
 export function StudentsPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
+  // Solo/coaching owners manage students too — the server endpoints are
+  // school-scoped, not admin-gated, so the UI shouldn't be stricter.
+  const workspaceKind = useAppSelector((s) => s.school.school?.kind)
+  const isOwnWorkspace = workspaceKind === "solo" || workspaceKind === "coaching"
+  // Coaching students live in named batches, not grade/section rooms — the
+  // filters and labels speak that language.
+  const isCoaching = workspaceKind === "coaching"
+  const canManage = isAdmin || isOwnWorkspace
+  // Coaching cards show the owner's own fields (Settings → Student form)
+  // where school cards show admission / register / phone.
+  const customDefs = useCustomFieldDefs("student")
+  const [importOpen, setImportOpen] = useState(false)
   const { setHeaderActions } = useHeaderActions()
 
   const [classes, setClasses] = useState<ClassItem[]>([])
@@ -193,6 +211,7 @@ export function StudentsPage() {
   const [search, setSearch] = useState("")
   const [selectedGrades, setSelectedGrades] = useState<string[]>([])
   const [selectedSections, setSelectedSections] = useState<string[]>([])
+  const [selectedBatches, setSelectedBatches] = useState<string[]>([])
   const [selectedGenders, setSelectedGenders] = useState<string[]>([])
   const [selectedBloodGroups, setSelectedBloodGroups] = useState<string[]>([])
 
@@ -311,6 +330,8 @@ export function StudentsPage() {
   // Filtered students
   const filtered = useMemo(() => {
     let list = allStudents
+    if (selectedBatches.length > 0)
+      list = list.filter((s) => selectedBatches.includes(s.class_id))
     if (selectedGrades.length > 0)
       list = list.filter((s) => selectedGrades.includes(String(s.grade)))
     if (selectedSections.length > 0)
@@ -334,6 +355,7 @@ export function StudentsPage() {
     return list
   }, [
     allStudents,
+    selectedBatches,
     selectedGrades,
     selectedSections,
     selectedGenders,
@@ -346,6 +368,7 @@ export function StudentsPage() {
     setPage(1)
   }, [
     search,
+    selectedBatches,
     selectedGrades,
     selectedSections,
     selectedGenders,
@@ -380,20 +403,30 @@ export function StudentsPage() {
       .sort((a, b) => a.grade - b.grade || a.section.localeCompare(b.section))
   }, [paginatedStudents])
 
-  // Header Add Students button — always visible for admins
+  // Header actions — admins and solo/coaching owners both manage students.
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canManage) {
       setHeaderActions(null)
       return
     }
     setHeaderActions(
-      <ModuleAction onClick={() => setDrawerOpen(true)}>
-        <PlusIcon className="size-3.5" />
-        <span className="hidden sm:inline">Add Students</span>
-      </ModuleAction>
+      <div className="flex items-center gap-2">
+        <ModuleAction
+          variant="outline"
+          aria-label="Import students from a file"
+          onClick={() => setImportOpen(true)}
+        >
+          <FileArrowUpIcon className="size-3.5" />
+          <span className="hidden sm:inline">Import</span>
+        </ModuleAction>
+        <ModuleAction aria-label="Add students" onClick={() => setDrawerOpen(true)}>
+          <PlusIcon className="size-3.5" />
+          <span className="hidden sm:inline">Add Students</span>
+        </ModuleAction>
+      </div>
     )
     return () => setHeaderActions(null)
-  }, [isAdmin, setHeaderActions])
+  }, [canManage, setHeaderActions])
 
   const resolveClassId = (entry: StudentEntry): string | null => {
     if (entry.grade && entry.section) {
@@ -632,12 +665,14 @@ export function StudentsPage() {
   }
 
   const activeCount =
+    selectedBatches.length +
     selectedGrades.length +
     selectedSections.length +
     selectedGenders.length +
     selectedBloodGroups.length
 
   const clearAllFilters = () => {
+    setSelectedBatches([])
     setSelectedGrades([])
     setSelectedSections([])
     setSelectedGenders([])
@@ -655,7 +690,11 @@ export function StudentsPage() {
       <PageHeader
         icon={GraduationCapIcon}
         title="Students"
-        description="Everyone enrolled, across every class."
+        description={
+          isCoaching
+            ? "Everyone enrolled, across every batch."
+            : "Everyone enrolled, across every class."
+        }
       >
         {isLoading && <PageToolbarSkeleton />}
         {!isLoading && !error && classes.length > 0 && (
@@ -679,12 +718,14 @@ export function StudentsPage() {
             }
             trailing={
               <div className="flex items-center gap-2">
+                {/* Page size is a desktop nicety; on a phone the search box
+                    needs the room more than a "50 per page" picker does. */}
                 <Select
                   value={String(pageSize)}
                   onValueChange={(v) => setPageSize(Number(v))}
                 >
                   <SelectTrigger
-                    className="h-9 w-[7.5rem] text-xs"
+                    className="hidden h-9 w-[7.5rem] text-xs sm:flex"
                     aria-label="Students per page"
                   >
                     <SelectValue />
@@ -732,34 +773,52 @@ export function StudentsPage() {
               resultLabel: `${filtered.length} of ${allStudents.length} students`,
               children: (
                 <>
-                  <MultiSelectField
-                    icon={ChalkboardIcon}
-                    label="Grade"
-                    placeholder="Any grade"
-                    options={grades.map((g) => ({
-                      value: g,
-                      label: `Grade ${g}`,
-                    }))}
-                    selected={selectedGrades}
-                    onToggle={(v) => toggleArrayValue(setSelectedGrades, v)}
-                    onClear={() => setSelectedGrades([])}
-                    searchable={grades.length > 8}
-                  />
-                  <MultiSelectField
-                    icon={ArrowsSplitIcon}
-                    label="Section"
-                    placeholder={
-                      sections.length === 0 ? "No sections yet" : "Any section"
-                    }
-                    options={sections.map((sec) => ({
-                      value: sec,
-                      label: `Section ${sec}`,
-                    }))}
-                    selected={selectedSections}
-                    onToggle={(v) => toggleArrayValue(setSelectedSections, v)}
-                    onClear={() => setSelectedSections([])}
-                    searchable={sections.length > 8}
-                  />
+                  {isCoaching ? (
+                    <MultiSelectField
+                      icon={ChalkboardIcon}
+                      label="Batch"
+                      placeholder="Any batch"
+                      options={classes.map((c) => ({
+                        value: c.id,
+                        label: classCode(c),
+                      }))}
+                      selected={selectedBatches}
+                      onToggle={(v) => toggleArrayValue(setSelectedBatches, v)}
+                      onClear={() => setSelectedBatches([])}
+                      searchable={classes.length > 8}
+                    />
+                  ) : (
+                    <>
+                      <MultiSelectField
+                        icon={ChalkboardIcon}
+                        label="Grade"
+                        placeholder="Any grade"
+                        options={grades.map((g) => ({
+                          value: g,
+                          label: `Grade ${g}`,
+                        }))}
+                        selected={selectedGrades}
+                        onToggle={(v) => toggleArrayValue(setSelectedGrades, v)}
+                        onClear={() => setSelectedGrades([])}
+                        searchable={grades.length > 8}
+                      />
+                      <MultiSelectField
+                        icon={ArrowsSplitIcon}
+                        label="Section"
+                        placeholder={
+                          sections.length === 0 ? "No sections yet" : "Any section"
+                        }
+                        options={sections.map((sec) => ({
+                          value: sec,
+                          label: `Section ${sec}`,
+                        }))}
+                        selected={selectedSections}
+                        onToggle={(v) => toggleArrayValue(setSelectedSections, v)}
+                        onClear={() => setSelectedSections([])}
+                        searchable={sections.length > 8}
+                      />
+                    </>
+                  )}
                   <div className="flex flex-col gap-2">
                     <FilterFieldHeader
                       icon={GenderIntersexIcon}
@@ -805,6 +864,17 @@ export function StudentsPage() {
             }}
             chips={
               <>
+                {selectedBatches.length > 0 && (
+                  <FilterChipGroup icon={ChalkboardIcon} label="Batch">
+                    {selectedBatches.map((id) => (
+                      <FilterChip
+                        key={`batch-${id}`}
+                        label={classCode(classes.find((c) => c.id === id)) || "Batch"}
+                        onRemove={() => toggleArrayValue(setSelectedBatches, id)}
+                      />
+                    ))}
+                  </FilterChipGroup>
+                )}
                 {selectedGrades.length > 0 && (
                   <FilterChipGroup icon={ChalkboardIcon} label="Grade">
                     {selectedGrades.map((g) => (
@@ -905,8 +975,10 @@ export function StudentsPage() {
               <p className="text-sm text-muted-foreground">
                 {activeCount > 0 || search
                   ? "Try a different name or drop a filter."
-                  : isAdmin
-                    ? "Add students to a class and they'll appear here, grouped by section."
+                  : canManage
+                    ? isCoaching
+                      ? "Add students one by one, or import a whole batch list from a spreadsheet."
+                      : "Add students to a class and they'll appear here, grouped by section."
                     : "Once students are enrolled they'll appear here."}
               </p>
             </div>
@@ -921,11 +993,17 @@ export function StudentsPage() {
               >
                 Clear filters
               </Button>
-            ) : isAdmin ? (
-              <Button onClick={() => setDrawerOpen(true)}>
-                <PlusIcon className="size-3.5" />
-                Add students
-              </Button>
+            ) : canManage ? (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button variant="outline" onClick={() => setImportOpen(true)}>
+                  <FileArrowUpIcon className="size-3.5" />
+                  Import from file
+                </Button>
+                <Button onClick={() => setDrawerOpen(true)}>
+                  <PlusIcon className="size-3.5" />
+                  Add students
+                </Button>
+              </div>
             ) : null}
           </div>
         ) : (
@@ -1008,31 +1086,58 @@ export function StudentsPage() {
                         </div>
 
                         {/* Records */}
+                        {(() => {
+                          const rows = isCoaching
+                            ? customDefs.slice(0, 3).map((d) => {
+                                const raw = student.custom_fields?.[d.field_key]
+                                return {
+                                  icon:
+                                    d.field_type === "phone"
+                                      ? PhoneIcon
+                                      : d.field_type === "number"
+                                        ? HashIcon
+                                        : TagIcon,
+                                  label: d.label,
+                                  value:
+                                    typeof raw === "boolean"
+                                      ? raw
+                                        ? "Yes"
+                                        : "No"
+                                      : raw != null
+                                        ? String(raw)
+                                        : null,
+                                }
+                              })
+                            : [
+                                {
+                                  icon: IdentificationBadgeIcon,
+                                  label: "Admission",
+                                  value: student.admission_number,
+                                },
+                                {
+                                  icon: HashIcon,
+                                  label: "Register",
+                                  value: student.register_number,
+                                },
+                                {
+                                  icon: PhoneIcon,
+                                  label: "Phone",
+                                  value: student.contact_number,
+                                },
+                              ]
+                          if (rows.length === 0) return <div className="pb-3" />
+                          return (
                         <dl className="mt-3 flex flex-col gap-1.5 border-t border-dashed border-border px-4 py-3 text-left text-[11px]">
-                          {[
-                            {
-                              icon: IdentificationBadgeIcon,
-                              label: "Admission",
-                              value: student.admission_number,
-                            },
-                            {
-                              icon: HashIcon,
-                              label: "Register",
-                              value: student.register_number,
-                            },
-                            {
-                              icon: PhoneIcon,
-                              label: "Phone",
-                              value: student.contact_number,
-                            },
-                          ].map((row) => (
+                          {/* Two-up cards on a phone are too narrow for
+                              label + value side by side; stack them there. */}
+                          {rows.map((row) => (
                             <div
                               key={row.label}
-                              className="flex items-center justify-between gap-3"
+                              className="flex min-w-0 flex-col gap-0.5 @md:flex-row @md:items-center @md:justify-between @md:gap-3"
                             >
-                              <dt className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
-                                <row.icon className="size-3.5" />
-                                {row.label}
+                              <dt className="flex min-w-0 shrink-0 items-center gap-1.5 text-muted-foreground">
+                                <row.icon className="size-3.5 shrink-0" />
+                                <span className="truncate">{row.label}</span>
                               </dt>
                               <dd className="truncate text-secondary-foreground tabular-nums">
                                 {row.value || "—"}
@@ -1040,8 +1145,10 @@ export function StudentsPage() {
                             </div>
                           ))}
                         </dl>
+                          )
+                        })()}
 
-                        {isAdmin && (
+                        {canManage && (
                           <div
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
@@ -1052,7 +1159,9 @@ export function StudentsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon-sm"
-                                  className="size-7 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                                  // No hover on a phone: the menu stays visible
+                                  // there and only hides-until-hover with a pointer.
+                                  className="size-7 text-muted-foreground transition-opacity focus-visible:opacity-100 data-[state=open]:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                                   aria-label="Student actions"
                                 >
                                   <DotsThreeIcon
@@ -1076,7 +1185,7 @@ export function StudentsPage() {
                                   }}
                                 >
                                   <ArrowsLeftRightIcon className="size-3.5" />
-                                  Transfer class
+                                  {isCoaching ? "Move to batch" : "Transfer class"}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onSelect={(e) => {
@@ -1112,7 +1221,16 @@ export function StudentsPage() {
         )}
       </LoadingSwap>
 
-      {isAdmin && (
+      {canManage && (
+        <ImportStudentsDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          classes={classes}
+          onImported={fetchAll}
+        />
+      )}
+
+      {canManage && (
         <AddStudentDrawer
           open={drawerOpen}
           onOpenChange={(open) => {
@@ -1126,7 +1244,7 @@ export function StudentsPage() {
         />
       )}
 
-      {isAdmin && (
+      {canManage && (
         <AddStudentDrawer
           open={!!editStudentId}
           onOpenChange={(open) => {
@@ -1149,7 +1267,7 @@ export function StudentsPage() {
         studentId={selectedStudentId}
         open={detailDrawerOpen}
         onOpenChange={setDetailDrawerOpen}
-        canManage={isAdmin}
+        canManage={canManage}
         onEdit={(student) => {
           setDetailDrawerOpen(false)
           handleEditStudent(student.id)
@@ -1172,32 +1290,43 @@ export function StudentsPage() {
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Transfer student</DialogTitle>
+            <DialogTitle>{isCoaching ? "Move student" : "Transfer student"}</DialogTitle>
             <DialogDescription>
               Move{" "}
               <span className="font-medium text-foreground">
                 {studentToTransfer?.full_name}
               </span>{" "}
-              from Grade {studentToTransfer?.grade} -{" "}
-              {studentToTransfer?.section} to another class. Their history is
+              from{" "}
+              {studentToTransfer
+                ? isCoaching
+                  ? classCode({
+                      grade: studentToTransfer.grade,
+                      section: studentToTransfer.section,
+                      name: studentToTransfer.class_name,
+                    })
+                  : `Grade ${studentToTransfer.grade} - ${studentToTransfer.section}`
+                : ""}{" "}
+              to another {isCoaching ? "batch" : "class"}. Their history is
               preserved.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-1.5 px-6 py-4">
-            <Label className="text-xs">Target class</Label>
+          <div className="flex flex-col gap-1.5 py-2">
+            <Label className="text-xs">{isCoaching ? "Move to" : "Target class"}</Label>
             <Select
               value={transferTargetId || undefined}
               onValueChange={setTransferTargetId}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select class…" />
+                <SelectValue placeholder={isCoaching ? "Pick a batch…" : "Select class…"} />
               </SelectTrigger>
               <SelectContent>
                 {classes
                   .filter((c) => c.id !== studentToTransfer?.class_id)
                   .map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      Grade {c.grade} - {c.section} ({c.academic_year})
+                      {isCoaching
+                        ? classCode(c)
+                        : `Grade ${c.grade} - ${c.section} (${c.academic_year})`}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -1218,12 +1347,12 @@ export function StudentsPage() {
               {isTransferring ? (
                 <>
                   <CircleNotchIcon className="size-3.5 animate-spin" />
-                  Transferring…
+                  {isCoaching ? "Moving…" : "Transferring…"}
                 </>
               ) : (
                 <>
                   <ArrowsLeftRightIcon className="size-3.5" />
-                  Transfer
+                  {isCoaching ? "Move" : "Transfer"}
                 </>
               )}
             </Button>
@@ -1243,7 +1372,7 @@ export function StudentsPage() {
               <span className="font-medium text-foreground">
                 {studentToWithdraw?.full_name}
               </span>{" "}
-              will be removed from their class and marked as withdrawn. Their
+              will be removed from their {isCoaching ? "batch" : "class"} and marked as withdrawn. Their
               records, marks, and history are kept — this is not a delete.
             </AlertDialogDescription>
           </AlertDialogHeader>

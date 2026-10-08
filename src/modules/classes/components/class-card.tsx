@@ -146,7 +146,9 @@ export function ClassCard({
           <BookOpenTextIcon className="size-4 shrink-0 text-muted-foreground" />
           {subjects.length > 0 ? (
             <p className="min-w-0 truncate text-xs text-secondary-foreground">
-              <span className="font-medium">{subjects.length} subjects</span>
+              <span className="font-medium">
+                {subjects.length} subject{subjects.length === 1 ? "" : "s"}
+              </span>
               <span className="text-muted-foreground">
                 {" · "}
                 {subjects.map((s) => s.subject_name).join(", ")}
@@ -167,7 +169,7 @@ export function ClassCard({
               <span className="font-semibold text-foreground">
                 {data.studentCount ?? 0}
               </span>{" "}
-              students
+              {(data.studentCount ?? 0) === 1 ? "student" : "students"}
             </span>
           </span>
           <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100">

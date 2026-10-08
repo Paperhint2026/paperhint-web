@@ -183,7 +183,10 @@ export function ClassesPage() {
     // rooms. The batch endpoint enforces ownership server-side.
     if (!isAdmin && !isCoaching) return
     setHeaderActions(
-      <ModuleAction onClick={() => setDrawerOpen(true)}>
+      <ModuleAction
+        aria-label={isCoaching ? "Add batch" : "Add class room"}
+        onClick={() => setDrawerOpen(true)}
+      >
         <PlusIcon className="size-3.5" />
         <span className="hidden sm:inline">{isCoaching ? "Add batch" : "Add Class Room"}</span>
       </ModuleAction>
@@ -341,7 +344,11 @@ export function ClassesPage() {
                 activeAcademicYear={activeAcademicYear}
                 onClick={() =>
                   navigate(
-                    `/classes/${grade.isBatch ? grade.numericGrade : grade.grade}/overview`
+                    grade.isBatch
+                      ? // A batch is one class row; the overview page reads
+                        // `?class=` and shows that batch alone, by its name.
+                        `/classes/${grade.numericGrade}/overview?class=${grade.sections[0]?.id ?? ""}`
+                      : `/classes/${grade.grade}/overview`
                   )
                 }
               />

@@ -102,7 +102,7 @@ export function AddBatchDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!saving) onOpenChange(o) }}>
-      <SheetContent className="flex w-full flex-col gap-0 sm:max-w-md">
+      <SheetContent className="flex w-full flex-col gap-0 data-[side=right]:w-full sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Add a batch</SheetTitle>
           <SheetDescription>

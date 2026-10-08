@@ -29,6 +29,8 @@ export interface Student {
   emergency_contact_name?: string | null
   emergency_contact_relationship?: string | null
   emergency_contact_phone?: string | null
+  /** Owner-defined fields (migration 026), keyed by field_key. */
+  custom_fields?: Record<string, string | number | boolean> | null
   created_at?: string
 }
 

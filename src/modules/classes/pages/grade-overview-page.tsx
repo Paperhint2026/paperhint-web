@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import {
   ArrowLeftIcon,
@@ -38,6 +38,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Sticker } from "@/components/shared/sticker"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { coverFor } from "@/modules/classes/lib/grade-palette"
+import { classBadge, classCode } from "@/hooks/use-teacher-assignments"
+import { useAppSelector } from "@/store"
 import { StudentDetailDrawer } from "@/modules/students/components/student-detail-drawer"
 import { TeacherDetailDrawer } from "@/modules/teachers/components/teacher-detail-drawer"
 
@@ -76,6 +78,8 @@ interface Section {
   id: string
   grade: string
   section: string
+  /** Coaching batch label (classes.name); null for school/solo rooms. */
+  name?: string | null
   academic_year: string
   student_count: number
   students: Student[]
@@ -228,6 +232,12 @@ function SheetSkeleton() {
  */
 export function GradeOverviewPage() {
   const { grade = null } = useParams()
+  // `?class=<id>` narrows the page to ONE class row — how a coaching batch
+  // card opens, since a batch is a single named class and the grade number
+  // underneath it means nothing to the owner.
+  const [searchParams] = useSearchParams()
+  const classParam = searchParams.get("class")
+  const isCoaching = useAppSelector((s) => s.school.school?.kind === "coaching")
   const reduceMotion = useReducedMotion()
   const navigate = useNavigate()
 
@@ -294,7 +304,11 @@ export function GradeOverviewPage() {
         `/api/classes/grade/${grade}/overview`
       )
       setData(res)
-      setSectionId(res.sections[0]?.id ?? null)
+      setSectionId(
+        (classParam && res.sections.find((s) => s.id === classParam)?.id) ||
+          res.sections[0]?.id ||
+          null
+      )
       setTab("subjects")
       setQuery("")
       setPerson(null)
@@ -305,7 +319,7 @@ export function GradeOverviewPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [grade])
+  }, [grade, classParam])
 
   useEffect(() => {
     if (grade) fetchOverview()
@@ -315,6 +329,35 @@ export function GradeOverviewPage() {
     () => data?.sections.find((s) => s.id === sectionId) ?? null,
     [data, sectionId]
   )
+
+  // Batch mode: the page is about one named class, so the sections rail goes,
+  // the title is the batch name, and subjects are the batch's own (the grade
+  // view merges every section's — two "10th" batches would bleed together).
+  const batch = useMemo(
+    () => (classParam ? (data?.sections.find((s) => s.id === classParam) ?? null) : null),
+    [data, classParam]
+  )
+  const isBatch = batch != null
+  const batchClass = batch
+    ? { grade: Number(batch.grade), section: batch.section, name: batch.name }
+    : null
+  // While a `?class=` page loads there is no name yet — say "Batch", never
+  // the grade number underneath it.
+  const title = isBatch
+    ? classCode(batchClass)
+    : classParam
+      ? "Batch"
+      : grade
+        ? `Grade ${grade}`
+        : "Grade"
+  const placeWord = isBatch ? "batch" : "section"
+  const subjectsShown = useMemo(() => {
+    const all = data?.core_subjects ?? data?.subjects ?? []
+    if (!batch) return all
+    const ids = new Set(batch.subjects.map((s) => s.id))
+    const own = all.filter((s) => ids.has(s.id))
+    return own.length > 0 ? own : all
+  }, [data, batch])
 
   const people = useMemo(() => {
     if (!section) return []
@@ -358,20 +401,30 @@ export function GradeOverviewPage() {
 
   const palette = coverFor(grade ?? "0")
   const stats = data
-    ? [
-        { icon: BooksIcon, value: data.total_subjects, label: "subjects" },
-        {
-          icon: ArrowsSplitIcon,
-          value: data.total_sections,
-          label: "sections",
-        },
-        { icon: UsersIcon, value: data.total_students, label: "students" },
-        {
-          icon: ChalkboardTeacherIcon,
-          value: data.total_teachers,
-          label: "teachers",
-        },
-      ]
+    ? isBatch && batch
+      ? [
+          { icon: BooksIcon, value: subjectsShown.length, label: "subjects" },
+          { icon: UsersIcon, value: batch.student_count, label: "students" },
+          {
+            icon: ChalkboardTeacherIcon,
+            value: (batch.teachers ?? []).length,
+            label: "teachers",
+          },
+        ]
+      : [
+          { icon: BooksIcon, value: data.total_subjects, label: "subjects" },
+          {
+            icon: ArrowsSplitIcon,
+            value: data.total_sections,
+            label: "sections",
+          },
+          { icon: UsersIcon, value: data.total_students, label: "students" },
+          {
+            icon: ChalkboardTeacherIcon,
+            value: data.total_teachers,
+            label: "teachers",
+          },
+        ]
     : []
 
   return (
@@ -390,12 +443,10 @@ export function GradeOverviewPage() {
             className="inline-flex items-center gap-1 rounded px-1 py-0.5 hover:text-foreground"
           >
             <ArrowLeftIcon className="size-3.5" />
-            Classes
+            {isCoaching ? "Batches" : "Classes"}
           </Link>
           <CaretRightIcon className="size-3" aria-hidden />
-          <span className="truncate text-foreground">
-            {grade ? `Grade ${grade}` : "Grade"}
-          </span>
+          <span className="truncate text-foreground">{title}</span>
         </nav>
 
         <LoadingSwap
@@ -408,7 +459,7 @@ export function GradeOverviewPage() {
               <Sticker name="worried" size={80} />
               <div className="flex flex-col gap-1">
                 <p className="text-sm font-medium text-secondary-foreground">
-                  Couldn't load this grade
+                  Couldn't load this {isCoaching ? "batch" : "grade"}
                 </p>
                 <p className="text-xs text-muted-foreground">{error}</p>
               </div>
@@ -437,17 +488,24 @@ export function GradeOverviewPage() {
                     <div className="relative flex items-center gap-4">
                       <span
                         className={cn(
-                          "flex size-16 shrink-0 items-center justify-center rounded-2xl text-3xl font-semibold text-white shadow-xs",
+                          "flex size-16 shrink-0 items-center justify-center rounded-2xl font-semibold text-white shadow-xs",
+                          isBatch ? "text-2xl" : "text-3xl",
                           palette.cover
                         )}
                       >
-                        {data.grade}
+                        {isBatch ? classBadge(batchClass) : data.grade}
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
-                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                          Grade {data.grade}
+                        <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">
+                          {title}
                         </h1>
-                        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+                          {isBatch && Number(batch?.grade) > 0 && (
+                            <>
+                              Class {batch?.grade}
+                              <span className="text-border">·</span>
+                            </>
+                          )}
                           {data.academic_year}
                           <span className="text-border">·</span>
                           <span className="flex items-center gap-1.5">
@@ -467,7 +525,7 @@ export function GradeOverviewPage() {
                               <span className="font-medium text-secondary-foreground tabular-nums">
                                 {st.value}
                               </span>
-                              {st.label}
+                              {st.value === 1 ? st.label.replace(/s$/, "") : st.label}
                             </span>
                           ))}
                         </div>
@@ -486,6 +544,7 @@ export function GradeOverviewPage() {
                     "flex min-h-0 flex-1 flex-col gap-4 md:flex-row md:gap-6"
                   )}
                 >
+                  {!isBatch && (
                   <aside className="flex shrink-0 flex-col gap-1 md:w-56">
                     <BlockHeading
                       icon={ChalkboardIcon}
@@ -540,17 +599,18 @@ export function GradeOverviewPage() {
                       })}
                     </div>
                   </aside>
+                  )}
 
                   {/* What is taught, and who is in the picked section */}
                   <div className="flex min-w-0 flex-1 flex-col gap-5">
-                    <div className="flex items-center gap-1 border-b border-border">
+                    <div className="no-scrollbar -mx-1 flex items-center gap-1 overflow-x-auto border-b border-border px-1">
                       {(
                         [
                           {
                             key: "subjects",
                             label: "Subjects",
                             icon: BookOpenIcon,
-                            count: data.total_subjects,
+                            count: isBatch ? subjectsShown.length : data.total_subjects,
                           },
                           {
                             key: "students",
@@ -589,7 +649,7 @@ export function GradeOverviewPage() {
                               setQuery("")
                             }}
                             className={cn(
-                              "relative flex items-center gap-1.5 px-3 py-2.5 text-sm transition-colors outline-none focus-visible:text-foreground",
+                              "relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm whitespace-nowrap transition-colors outline-none focus-visible:text-foreground",
                               on
                                 ? "font-medium text-foreground"
                                 : "text-muted-foreground hover:text-foreground"
@@ -644,14 +704,12 @@ export function GradeOverviewPage() {
                                 Core
                               </p>
                               <div className="flex flex-wrap gap-2.5">
-                                {(data.core_subjects ?? data.subjects).map(
-                                  (s) => (
-                                    <SubjectChip key={s.id} subject={s} />
-                                  )
-                                )}
+                                {subjectsShown.map((s) => (
+                                  <SubjectChip key={s.id} subject={s} />
+                                ))}
                               </div>
                             </div>
-                            {electiveGroups.map((group) => (
+                            {!isBatch && electiveGroups.map((group) => (
                               <div
                                 key={group.elective_group_id}
                                 className="flex flex-col gap-3 rounded-xl bg-muted/40 p-4"
@@ -677,12 +735,14 @@ export function GradeOverviewPage() {
                           <div className="flex flex-col items-center gap-3 py-10 text-center">
                             <Sticker name="sleep" size={100} />
                             <p className="text-sm text-muted-foreground">
-                              No sections in this grade yet.
+                              {isBatch
+                                ? "This batch is empty so far."
+                                : "No sections in this grade yet."}
                             </p>
                           </div>
                         ) : tab === "timetable" ? (
                           <SectionTimetableView
-                            sectionLabel={section.section}
+                            sectionLabel={isBatch ? title : section.section}
                             data={ttBySection[section.id]}
                             periods={ttPeriods}
                             isAdmin={isAdmin}
@@ -697,7 +757,7 @@ export function GradeOverviewPage() {
                               <Input
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                placeholder={`Search ${tab} in Section ${section.section}…`}
+                                placeholder={`Search ${tab} in ${isBatch ? title : `Section ${section.section}`}…`}
                                 className="h-9 pl-9"
                                 aria-label={`Search ${tab}`}
                               />
@@ -712,7 +772,7 @@ export function GradeOverviewPage() {
                                 <p className="text-sm text-muted-foreground">
                                   {query
                                     ? `Nobody called "${query.trim()}" here.`
-                                    : `No ${tab} in this section yet.`}
+                                    : `No ${tab} in this ${placeWord} yet.`}
                                 </p>
                               </div>
                             ) : tab === "students" ? (
