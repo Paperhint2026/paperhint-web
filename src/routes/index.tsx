@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router-dom"
 import { PublicCircularPage } from "@/modules/notifications/pages/public-circular-page"
+import { TestAttemptPage } from "@/modules/tests/pages/test-attempt-page"
 
 import { AppLayout } from "@/components/layout/app-layout"
 import { ProtectedRoute } from "@/components/layout/protected-route"
@@ -35,6 +36,9 @@ import {
 import { LibraryPage } from "@/modules/knowledge/pages/library-page"
 import { BankPage } from "@/modules/knowledge/pages/bank-page"
 import { ExamsPage } from "@/modules/exams/pages/exams-page"
+import { OnlineTestsPage } from "@/modules/tests/pages/online-tests-page"
+import { TestBuilderPage } from "@/modules/tests/pages/test-builder-page"
+import { TestMonitorPage } from "@/modules/tests/pages/test-monitor-page"
 import { GenerateQuestionsPage } from "@/modules/exams/pages/generate-questions-page"
 import { QuestionsPage } from "@/modules/exams/pages/questions-page"
 import { PdfBuilderPage } from "@/modules/exams/pages/pdf-builder-page"
@@ -100,6 +104,12 @@ export const router = createBrowserRouter([
     // login, no app shell. The uuid token is the whole credential.
     path: "c/:token",
     element: <PublicCircularPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    // The no-login online-test page students open from a shared link.
+    path: "t/:token",
+    element: <TestAttemptPage />,
     errorElement: <RouteErrorPage />,
   },
   {
@@ -178,6 +188,15 @@ export const router = createBrowserRouter([
           },
           { path: "class/:classSubjectId/notes/*", element: <NotesPage /> },
           { path: "class/:classSubjectId/exams", element: <ExamsPage /> },
+          { path: "class/:classSubjectId/tests", element: <OnlineTestsPage /> },
+          {
+            path: "class/:classSubjectId/tests/:testId",
+            element: <TestBuilderPage />,
+          },
+          {
+            path: "class/:classSubjectId/tests/:testId/monitor",
+            element: <TestMonitorPage />,
+          },
           {
             path: "class/:classSubjectId/exams/:examId/generate",
             element: <GenerateQuestionsPage />,

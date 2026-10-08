@@ -6,6 +6,7 @@ import {
   ExamIcon,
   ListChecksIcon,
   NotePencilIcon,
+  TimerIcon,
   UsersIcon,
 } from "@phosphor-icons/react"
 import { isNavItemActive, navForWorkspace } from "@/data/nav"
@@ -44,6 +45,7 @@ const CLASS_SECTIONS = [
   { slug: "knowledge", label: "Knowledge", icon: BookOpenIcon },
   { slug: "notes", label: "Notes", icon: NotePencilIcon },
   { slug: "exams", label: "Exams", icon: ExamIcon },
+  { slug: "tests", label: "Online Tests", icon: TimerIcon },
   { slug: "grading", label: "Grading", icon: ListChecksIcon },
   { slug: "students", label: "Students", icon: UsersIcon },
 ] as const
