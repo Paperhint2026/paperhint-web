@@ -4,7 +4,11 @@ import type { IconProps } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
 
-export type SettingsSectionId = "profile" | "security" | "appearance"
+export type SettingsSectionId =
+  | "profile"
+  | "security"
+  | "appearance"
+  | "student-form"
 
 export type SettingsSection = {
   id: SettingsSectionId

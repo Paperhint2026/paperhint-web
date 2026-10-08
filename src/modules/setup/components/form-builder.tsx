@@ -371,14 +371,18 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+    // Container queries, not viewport ones: the builder lives in a narrow
+    // Settings column for owners and a full-width /setup tab for admins.
+    <div className="@container flex h-full min-h-0 w-full min-w-0 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 @3xl:flex-row">
         {/* Palette */}
-        <div className="flex shrink-0 flex-col gap-2 lg:w-40">
+        <div className="flex shrink-0 flex-col gap-2 @3xl:w-40">
           <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             New field
           </p>
-          <div className="grid grid-cols-3 gap-1.5 max-lg:grid-cols-6 max-sm:grid-cols-3 lg:grid-cols-2">
+          {/* As many type tiles as fit the row (never a fixed six, which
+              overflows a phone); two columns once the palette is a sidebar. */}
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(5.25rem,1fr))] gap-1.5 @3xl:grid-cols-2">
             {Object.entries(TYPE_META).map(([type, meta]) => (
               <button
                 key={type}
@@ -409,7 +413,7 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
         </div>
 
         {/* Live form preview */}
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background @3xl:max-h-[70vh]">
           <div className="flex flex-col gap-6 p-5">
             {sections.map((section) => {
               const sysHere = systemFields.filter(
@@ -524,7 +528,7 @@ export function FormBuilder({ entity }: { entity: "student" | "teacher" }) {
         </div>
 
         {/* Properties */}
-        <div className="shrink-0 lg:w-72">
+        <div className="shrink-0 @3xl:w-72">
           {selection === null ? (
             <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-10 text-center">
               <p className="text-sm font-medium text-secondary-foreground">

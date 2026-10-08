@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Link } from "react-router-dom"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { format } from "date-fns"
-import { CalendarIcon, CircleNotchIcon, XIcon } from "@phosphor-icons/react"
+import {
+  CalendarIcon,
+  CircleNotchIcon,
+  SlidersHorizontalIcon,
+  XIcon,
+} from "@phosphor-icons/react"
 import { apiClient } from "@/lib/api-client"
+import { useAppSelector } from "@/store"
+import { classCode } from "@/hooks/use-teacher-assignments"
 import {
   getCurrentAcademicYear,
   validateAcademicYear,
@@ -138,6 +146,10 @@ export function AddStudentDrawer({
   serverError = null,
 }: AddStudentDrawerProps) {
   const isMobile = useIsMobile()
+  // Coaching runs the slim form: name, batch, and whatever the owner added
+  // in Settings → Student form. Grade/section/roll/register are school
+  // furniture and never show here.
+  const isCoaching = useAppSelector((s) => s.school.school?.kind === "coaching")
   const [entry, setEntry] = useState<StudentEntry>({ ...emptyEntry })
   const [fieldError, setFieldError] = useState<StudentFieldError | null>(null)
   const errorFieldRef = useRef<HTMLDivElement | null>(null)
@@ -238,6 +250,20 @@ export function AddStudentDrawer({
     setEntry((prev) => ({ ...prev, elective_choices: [] }))
   }
 
+  // A batch is one class row; picking it sets the grade+section pair the
+  // save path resolves the class from.
+  const handleBatchChange = (classId: string) => {
+    const cls = classes.find((c) => c.id === classId)
+    if (!cls) return
+    setEntry((prev) => ({
+      ...prev,
+      grade: String(cls.grade),
+      section: cls.section,
+      elective_choices: [],
+    }))
+    setFieldError(null)
+  }
+
   const handleSectionChange = (val: string) => {
     update("section", val)
     setEntry((prev) => ({ ...prev, elective_choices: [] }))
@@ -287,12 +313,20 @@ export function AddStudentDrawer({
     )
   }
 
-  const isFormValid =
-    entry.full_name.trim() !== "" &&
-    entry.date_of_birth !== "" &&
-    entry.gender !== "" &&
-    validateAcademicYear(entry.academic_year) === null &&
-    electiveGroups.every((g) => getSelectedElective(g.elective_group_id) !== "")
+  const allCustomDefs = useMemo(
+    () => [...customDefs].sort((a, b) => a.sort_order - b.sort_order),
+    [customDefs]
+  )
+
+  const isFormValid = isCoaching
+    ? entry.full_name.trim() !== "" && selectedClassId !== null
+    : entry.full_name.trim() !== "" &&
+      entry.date_of_birth !== "" &&
+      entry.gender !== "" &&
+      validateAcademicYear(entry.academic_year) === null &&
+      electiveGroups.every(
+        (g) => getSelectedElective(g.elective_group_id) !== ""
+      )
 
   const handleSave = () => {
     if (!isFormValid) return
@@ -321,7 +355,9 @@ export function AddStudentDrawer({
         side={isMobile ? "bottom" : "right"}
         size={isMobile ? "full" : "xl"}
         showCloseButton={false}
-        className="flex h-full w-full flex-col p-0"
+        // The bottom sheet defaults to h-auto, which lets a long form grow
+        // past the screen instead of scrolling inside; pin it to the viewport.
+        className="flex h-full w-full flex-col p-0 data-[side=bottom]:h-dvh data-[side=bottom]:max-h-dvh"
       >
         {/* Header */}
         <SheetHeader className="border-b bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">
@@ -333,7 +369,9 @@ export function AddStudentDrawer({
               <SheetDescription>
                 {isEdit
                   ? "Update the student's details."
-                  : "Fill in the student's details to enroll them."}
+                  : isCoaching
+                    ? "A name and a batch is all it takes."
+                    : "Fill in the student's details to enroll them."}
               </SheetDescription>
             </div>
             <SheetClose asChild>
@@ -348,7 +386,78 @@ export function AddStudentDrawer({
         </SheetHeader>
 
         {/* Body */}
-        <div className="no-scrollbar flex-1 overflow-y-auto">
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+          {isCoaching ? (
+            <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm">
+                  Full Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  placeholder="e.g. Aarav Sharma"
+                  value={entry.full_name}
+                  onChange={(e) => update("full_name", e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-sm">
+                  Batch <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={selectedClassId ?? ""}
+                  onValueChange={handleBatchChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pick a batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {classCode(c)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {classes.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Create a batch first — students live inside one.
+                  </p>
+                )}
+              </div>
+
+              {allCustomDefs.length > 0 ? (
+                <>
+                  <Separator />
+                  <p className="text-xs font-medium text-muted-foreground">
+                    More details
+                  </p>
+                  <CustomFieldsInputs
+                    defs={allCustomDefs}
+                    values={entry.custom_fields ?? {}}
+                    onChange={(next) =>
+                      setEntry((prev) => ({ ...prev, custom_fields: next }))
+                    }
+                  />
+                </>
+              ) : (
+                <Link
+                  to="/settings#student-form"
+                  className="flex items-start gap-2.5 rounded-xl border border-dashed border-border px-4 py-3 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                >
+                  <SlidersHorizontalIcon className="mt-0.5 size-4 shrink-0" />
+                  <span>
+                    Need a phone number, school name or fee plan on this form?
+                    Add your own fields in{" "}
+                    <span className="font-medium text-foreground">
+                      Settings → Student form
+                    </span>
+                    .
+                  </span>
+                </Link>
+              )}
+            </div>
+          ) : (
           <div className="flex flex-col gap-6 px-4 py-5 sm:px-6">
             {/* Personal Information */}
             <p className="text-xs font-medium text-muted-foreground">
@@ -730,16 +839,13 @@ export function AddStudentDrawer({
                 }
               />
             </div>
-          </div>
-        </div>
 
-        {/* Emergency-section + Additional custom fields (/setup builder) */}
-        {(defsForSection(customDefs, "emergency").length > 0 ||
-          defsForSection(customDefs, "additional").length > 0) && (
-          <div className="flex flex-col gap-4 px-4 pb-4 sm:px-6">
+            {/* Emergency-section + Additional custom fields (/setup builder) —
+                inside the scroller, so a long form never hides them. */}
             {customSection("emergency")}
             {defsForSection(customDefs, "additional").length > 0 && (
               <>
+                <Separator />
                 <p className="text-xs font-medium text-muted-foreground">
                   Additional Details
                 </p>
@@ -747,7 +853,8 @@ export function AddStudentDrawer({
               </>
             )}
           </div>
-        )}
+          )}
+        </div>
 
         {/* Footer */}
         <SheetFooter className="flex-col border-t bg-muted/50 px-4 py-3 sm:px-6 sm:py-4">

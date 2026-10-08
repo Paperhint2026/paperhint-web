@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { AnimatePresence } from "motion/react"
 import {
+  ListChecksIcon,
   PaletteIcon,
   ShieldCheckIcon,
   UserCircleIcon,
@@ -21,6 +22,7 @@ import {
 import { ProfileSection } from "@/modules/settings/components/profile-section"
 import { SecuritySection } from "@/modules/settings/components/security-section"
 import { AppearanceSection } from "@/modules/settings/components/appearance-section"
+import { StudentFormSection } from "@/modules/settings/components/student-form-section"
 
 const SECTIONS: SettingsSection[] = [
   {
@@ -43,7 +45,20 @@ const SECTIONS: SettingsSection[] = [
   },
 ]
 
-const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id))
+// Solo/coaching owners have no /setup console; the student form builder
+// lives here for them instead.
+const OWNER_SECTIONS: SettingsSection[] = [
+  {
+    id: "student-form",
+    label: "Student form",
+    hint: "Fields on Add Student",
+    icon: ListChecksIcon,
+  },
+]
+
+const SECTION_IDS = new Set<string>(
+  [...SECTIONS, ...OWNER_SECTIONS].map((s) => s.id)
+)
 
 function isSectionId(v: string): v is SettingsSectionId {
   return SECTION_IDS.has(v)
@@ -67,6 +82,8 @@ function getInitials(name: string) {
 export function SettingsPage() {
   const { user } = useAuth()
   const school = useAppSelector((s) => s.school.school)
+  const isOwnWorkspace = school?.kind === "solo" || school?.kind === "coaching"
+  const sections = isOwnWorkspace ? [...SECTIONS, ...OWNER_SECTIONS] : SECTIONS
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -164,14 +181,24 @@ export function SettingsPage() {
       {/* ── Rail + section ── */}
       {/* Header and rail stay put; only the section column scrolls, so the
           rail is always in reach and the save bar pins to this column's edge. */}
-      <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-10">
-        <aside className="lg:self-start">
-          <SettingsNav sections={SECTIONS} active={active} onChange={select} />
+      {/* minmax(0,1fr) on the phone column too: an implicit auto column
+          would size itself to the rail's four tabs and push the whole page
+          past the viewport instead of letting the rail scroll. */}
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] lg:gap-10">
+        <aside className="min-w-0 lg:self-start">
+          <SettingsNav sections={sections} active={active} onChange={select} />
         </aside>
 
         {/* The scroller. Fades at both ends say "there is more" without a
             hard cut, and the gutter keeps the cards clear of the scrollbar. */}
-        <div className="relative min-h-0 min-w-0 lg:max-w-3xl">
+        {/* The form designer is three panes wide; the reading-width cap
+            that suits the other sections would crush it. */}
+        <div
+          className={cn(
+            "relative min-h-0 min-w-0",
+            active !== "student-form" && "lg:max-w-3xl"
+          )}
+        >
           <div
             aria-hidden
             className={cn(
@@ -196,6 +223,8 @@ export function SettingsPage() {
                 <ProfileSection key="profile" user={user} />
               ) : active === "security" ? (
                 <SecuritySection key="security" />
+              ) : active === "student-form" && isOwnWorkspace ? (
+                <StudentFormSection key="student-form" />
               ) : (
                 <AppearanceSection key="appearance" />
               )}
