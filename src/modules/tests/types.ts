@@ -53,6 +53,8 @@ export interface TestSettings {
 export interface OnlineTest {
   id: string
   class_subject_id: string
+  /** The teacher who created the test — only they see the "Show answers" toggle. */
+  teacher_id: string
   exam_name: string
   total_marks: number | null
   delivery: "online"

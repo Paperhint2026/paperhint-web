@@ -262,7 +262,10 @@ export function TestMonitorPage() {
 
       {/* Flag report */}
       <Dialog open={!!report || reportLoading} onOpenChange={(o) => !o && setReport(null)}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+        {/* overflow-x-hidden + min-w-0 so a long UA string (or any other
+            overflowing child) wraps inside the dialog instead of pushing it
+            wider than the viewport. */}
+        <DialogContent className="max-h-[calc(100dvh-2rem)] min-w-0 overflow-x-hidden overflow-y-auto sm:max-w-lg">
           {report ? (
             <>
               <DialogHeader>
@@ -276,7 +279,7 @@ export function TestMonitorPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="flex flex-col gap-4 text-sm">
+              <div className="flex min-w-0 flex-col gap-4 text-sm">
                 {report.written.length > 0 && (
                   <WrittenReview
                     testId={testId!}
@@ -339,9 +342,21 @@ export function TestMonitorPage() {
                 </div>
 
                 {report.attempt.device_info && (
-                  <p className="truncate text-[11px] text-muted-foreground" title={report.attempt.device_info}>
-                    Device: {report.attempt.device_info}
-                  </p>
+                  // The user-agent string is long and nothing-to-read; keep
+                  // it tucked away in a <details> so the dialog stays tidy
+                  // and teachers who need the fingerprint can open it.
+                  <details className="group min-w-0 text-[11px] text-muted-foreground">
+                    <summary className="cursor-pointer list-none select-none hover:text-foreground">
+                      Device info
+                      <span className="ml-1 text-muted-foreground/70 group-open:hidden">
+                        · show
+                      </span>
+                      <span className="ml-1 text-muted-foreground/70 group-open:inline hidden">
+                        · hide
+                      </span>
+                    </summary>
+                    <p className="mt-1 break-all">{report.attempt.device_info}</p>
+                  </details>
                 )}
               </div>
 

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
+import { format } from "date-fns"
 import {
   ArrowDownIcon,
   ArrowLeftIcon,
   ArrowUpIcon,
+  CalendarIcon,
   CheckIcon,
   CircleNotchIcon,
   CopyIcon,
+  EyeIcon,
+  EyeSlashIcon,
   GearSixIcon,
   GlobeIcon,
   MonitorPlayIcon,
@@ -20,14 +24,21 @@ import {
 import { toast } from "sonner"
 
 import { apiClient } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth"
 import { showError } from "@/lib/show-error"
 import { cn } from "@/lib/utils"
 import { PAGE_GUTTER, PAGE_TOP } from "@/components/layout/page-container"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LoadingSwap } from "@/components/shared/loading-swap"
 import { Sticker } from "@/components/shared/sticker"
@@ -59,7 +70,8 @@ import {
   type TestSettings,
 } from "@/modules/tests/types"
 
-/** A one-line human answer summary for the question card. */
+/** A one-line human answer summary for the question card. Match questions
+ *  skip this and render the aligned pairs block below (keyPairs). */
 function keySummary(q: TestQuestion): string {
   const c = q.online_config
   switch (q.type) {
@@ -70,10 +82,21 @@ function keySummary(q: TestQuestion): string {
     case "fill_blank":
       return (c.blanks ?? []).map((b) => b[0]).join(" · ")
     case "match":
-      return `${(c.left ?? []).length} pairs`
+      return ""
     case "short_answer":
       return "AI-graded, you review"
   }
+}
+
+/** For match questions, the real "answer" is each left item alongside its
+ *  correct right item — [{ left, right }] in authoring order (ignoring the
+ *  per-student shuffle so the teacher sees her own authored order). */
+function matchPairs(q: TestQuestion): { left: string; right: string }[] {
+  if (q.type !== "match") return []
+  const left = q.online_config.left ?? []
+  const right = q.online_config.right ?? []
+  const key = q.online_config.key ?? []
+  return left.map((l, i) => ({ left: l, right: right[key[i]] ?? "" }))
 }
 
 export function TestBuilderPage() {
@@ -96,6 +119,11 @@ export function TestBuilderPage() {
   const [shareOpen, setShareOpen] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [copied, setCopied] = useState(false)
+  // The answer summary sits inside the card today; peers can read the test
+  // too (same-workspace), so the author decides when to flip it on.
+  const [showAnswers, setShowAnswers] = useState(false)
+  const { user } = useAuth()
+  const isOwner = Boolean(user && test && user.id === test.teacher_id)
 
   const fetchTest = useCallback(async () => {
     if (!testId) return
@@ -278,6 +306,23 @@ export function TestBuilderPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {isOwner && questions.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAnswers((s) => !s)}
+                    aria-pressed={showAnswers}
+                  >
+                    {showAnswers ? (
+                      <EyeSlashIcon className="size-4" />
+                    ) : (
+                      <EyeIcon className="size-4" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {showAnswers ? "Hide answers" : "Show answers"}
+                    </span>
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
                   <GearSixIcon className="size-4" />
                   <span className="hidden sm:inline">Settings</span>
@@ -346,8 +391,36 @@ export function TestBuilderPage() {
                           {QUESTION_TYPE_LABEL[q.type]}
                         </span>
                         <span className="tabular-nums">{q.marks} mark{q.marks === 1 ? "" : "s"}</span>
-                        <span className="truncate">· {keySummary(q)}</span>
+                        {isOwner && showAnswers && q.type !== "match" && keySummary(q) && (
+                          <span className="truncate text-primary">
+                            · {keySummary(q)}
+                          </span>
+                        )}
                       </p>
+                      {/* Match the following gets its own two-column answer
+                          block — "4 pairs" tells the teacher nothing on its
+                          own. Each left item sits beside the right item it
+                          maps to, in the order they were authored. */}
+                      {isOwner && showAnswers && q.type === "match" && (
+                        <ul className="mt-1 flex flex-col gap-1 rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+                          {matchPairs(q).map((p, idx) => (
+                            <li
+                              key={idx}
+                              className="flex min-w-0 items-start gap-2"
+                            >
+                              <span className="min-w-0 flex-1 truncate text-secondary-foreground">
+                                {p.left}
+                              </span>
+                              <span className="shrink-0 text-muted-foreground">
+                                →
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-primary">
+                                {p.right}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                     <span className="flex shrink-0 items-center gap-0.5">
                       <Button
@@ -499,11 +572,129 @@ const FRACTIONS = [
   { value: "1", label: "Full marks of the question" },
 ]
 
-function toLocalInput(iso: string | null) {
-  if (!iso) return ""
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+/** Compact date+time field in the design system (calendar + 12-hour time
+ *  dropdowns in a popover) — replaces the browser's native datetime-local
+ *  picker, which shoves a 1000px modal over everything on desktop. Value
+ *  is an ISO string or "" for empty. */
+function DatetimeField({
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string
+  onChange: (next: string) => void
+  placeholder: string
+  ariaLabel: string
+}) {
+  const date = value ? new Date(value) : null
+
+  const h24 = date?.getHours() ?? 9
+  const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24
+  const meridiem: "AM" | "PM" = h24 < 12 ? "AM" : "PM"
+  const mins = date ? Math.floor(date.getMinutes() / 5) * 5 : 0
+
+  const commit = (
+    base: Date | null,
+    nextH12: number,
+    nextMins: number,
+    nextMer: "AM" | "PM"
+  ) => {
+    const anchor = base ?? new Date()
+    const nextH24 =
+      nextMer === "AM"
+        ? nextH12 === 12
+          ? 0
+          : nextH12
+        : nextH12 === 12
+          ? 12
+          : nextH12 + 12
+    const next = new Date(anchor)
+    next.setHours(nextH24, nextMins, 0, 0)
+    onChange(next.toISOString())
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          aria-label={ariaLabel}
+          data-empty={!date}
+          className="h-9 w-full justify-start truncate text-left font-normal data-[empty=true]:text-muted-foreground"
+        >
+          <CalendarIcon className="size-4" />
+          {date ? format(date, "d MMM yyyy, h:mm a") : placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={date ?? undefined}
+          onSelect={(d) => d && commit(d, h12, mins, meridiem)}
+          captionLayout="dropdown"
+        />
+        <div className="flex items-center gap-1.5 border-t border-border px-3 py-2">
+          <Select
+            value={String(h12)}
+            onValueChange={(v) => commit(date, Number(v), mins, meridiem)}
+            disabled={!date}
+          >
+            <SelectTrigger className="h-8 w-16 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                <SelectItem key={h} value={String(h)}>
+                  {String(h).padStart(2, "0")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-muted-foreground">:</span>
+          <Select
+            value={String(mins)}
+            onValueChange={(v) => commit(date, h12, Number(v), meridiem)}
+            disabled={!date}
+          >
+            <SelectTrigger className="h-8 w-16 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
+                <SelectItem key={m} value={String(m)}>
+                  {String(m).padStart(2, "0")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={meridiem}
+            onValueChange={(v) => commit(date, h12, mins, v as "AM" | "PM")}
+            disabled={!date}
+          >
+            <SelectTrigger className="h-8 w-16 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="AM">AM</SelectItem>
+              <SelectItem value="PM">PM</SelectItem>
+            </SelectContent>
+          </Select>
+          {date && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-8 px-2 text-xs text-destructive"
+              onClick={() => onChange("")}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 function TestSettingsDialog({
@@ -522,8 +713,9 @@ function TestSettingsDialog({
   onSaved: (t: OnlineTest) => void
 }) {
   const [duration, setDuration] = useState(test.duration_minutes ?? 30)
-  const [opensAt, setOpensAt] = useState(toLocalInput(test.opens_at))
-  const [closesAt, setClosesAt] = useState(toLocalInput(test.closes_at))
+  // ISO strings or "" for empty; the DatetimeField reads/writes ISO directly.
+  const [opensAt, setOpensAt] = useState(test.opens_at ?? "")
+  const [closesAt, setClosesAt] = useState(test.closes_at ?? "")
   const [s, setS] = useState<TestSettings>(test.test_settings)
   const [saving, setSaving] = useState(false)
 
@@ -533,8 +725,8 @@ function TestSettingsDialog({
     setWasOpen(open)
     if (open) {
       setDuration(test.duration_minutes ?? 30)
-      setOpensAt(toLocalInput(test.opens_at))
-      setClosesAt(toLocalInput(test.closes_at))
+      setOpensAt(test.opens_at ?? "")
+      setClosesAt(test.closes_at ?? "")
       setS(test.test_settings)
     }
   }
@@ -546,8 +738,10 @@ function TestSettingsDialog({
         `/api/online-tests/${test.id}`,
         {
           duration_minutes: duration,
-          opens_at: opensAt ? new Date(opensAt).toISOString() : null,
-          closes_at: closesAt ? new Date(closesAt).toISOString() : null,
+          // State already holds ISO strings — the DatetimeField writes them
+          // directly, so no local-to-UTC conversion needed here.
+          opens_at: opensAt || null,
+          closes_at: closesAt || null,
           settings: s,
         }
       )
@@ -589,17 +783,17 @@ function TestSettingsDialog({
           <div className="flex flex-col gap-1.5">
             <Label>Open window (optional)</Label>
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="datetime-local"
+              <DatetimeField
                 value={opensAt}
-                onChange={(e) => setOpensAt(e.target.value)}
-                aria-label="Opens at"
+                onChange={setOpensAt}
+                placeholder="Opens at"
+                ariaLabel="Opens at"
               />
-              <Input
-                type="datetime-local"
+              <DatetimeField
                 value={closesAt}
-                onChange={(e) => setClosesAt(e.target.value)}
-                aria-label="Closes at"
+                onChange={setClosesAt}
+                placeholder="Closes at"
+                ariaLabel="Closes at"
               />
             </div>
             <p className="text-xs text-muted-foreground">
