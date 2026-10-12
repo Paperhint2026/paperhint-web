@@ -243,13 +243,15 @@ export const ADMIN_NAV: NavGroup[] = [
         path: "/attendance",
         status: "live",
       },
-      soon(
-        "substitution",
-        "Leave & substitution",
-        UserSwitchIcon,
-        "A10",
-        "Approve leave, watch every alteration, and cover the gaps: for any period no colleague filled, free teachers are suggested and a cover assigned."
-      ),
+      // A10 shipped 2026-09-21; its admin surface got its own page so the
+      // Attendance row stays just the rolls.
+      {
+        key: "substitution",
+        title: "Leave & substitution",
+        icon: UserSwitchIcon,
+        path: "/leave",
+        status: "live",
+      },
       // Circulars (authored school-wide messages) are still to come — the
       // page today is the rail's full history and the digest's landing spot.
       {
@@ -259,13 +261,15 @@ export const ADMIN_NAV: NavGroup[] = [
         path: "/notifications",
         status: "live",
       },
-      soon(
-        "reports",
-        "Reports & KPI",
-        ChartBarIcon,
-        "A14",
-        "School performance in one place: class scores, attendance trends, teacher chapter-completion, pending work — exportable for management."
-      ),
+      // A14 — Reports & KPI shipped: admin dashboard with attendance,
+      // academic, syllabus, teacher-activity, and pending work.
+      {
+        key: "kpi",
+        title: "Reports & KPI",
+        icon: ChartBarIcon,
+        path: "/kpi",
+        status: "live",
+      },
     ],
   },
   {

@@ -162,26 +162,24 @@ export function AttendancePage() {
   )
 }
 
-const ADMIN_TABS = ["students", "teachers", "leave", "substitutions"] as const
+// Leave + substitutions moved to their own page (/leave) — attendance is just
+// the rolls now. The legacy /attendance/leave and /attendance/substitutions
+// URLs (old notification links, bookmarks) redirect there.
+const ADMIN_TABS = ["students", "teachers"] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 
 function AdminAttendance() {
   const navigate = useNavigate()
   const { tab: tabParam } = useParams<{ tab: string }>()
-  // The tab lives in the URL (/attendance/substitutions …) so notification
-  // links and shared URLs land on the right view.
   const tab: AdminTab = ADMIN_TABS.includes(tabParam as AdminTab)
     ? (tabParam as AdminTab)
     : "students"
   const setTab = (t: AdminTab) =>
     navigate(t === "students" ? "/attendance" : `/attendance/${t}`)
-  const [pending, setPending] = useState(0)
   useEffect(() => {
-    apiClient
-      .get<{ pending: number }>("/api/leaves")
-      .then((r) => setPending(r.pending ?? 0))
-      .catch(() => {})
-  }, [tab])
+    if (tabParam === "leave") navigate("/leave", { replace: true })
+    else if (tabParam === "substitutions") navigate("/leave/substitutions", { replace: true })
+  }, [tabParam, navigate])
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-1 self-start rounded-lg bg-muted p-1">
@@ -198,23 +196,10 @@ function AdminAttendance() {
             )}
           >
             {t}
-            {t === "leave" && pending > 0 && (
-              <span className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-                {pending}
-              </span>
-            )}
           </button>
         ))}
       </div>
-      {tab === "students" ? (
-        <AdminDayView />
-      ) : tab === "teachers" ? (
-        <AdminTeacherRoll />
-      ) : tab === "leave" ? (
-        <AdminLeaveList onPendingChange={setPending} />
-      ) : (
-        <AdminSubstitutions />
-      )}
+      {tab === "students" ? <AdminDayView /> : <AdminTeacherRoll />}
     </div>
   )
 }
@@ -1572,7 +1557,7 @@ function LeaveCard() {
   )
 }
 
-function AdminLeaveList({ onPendingChange }: { onPendingChange: (n: number) => void }) {
+export function AdminLeaveList({ onPendingChange }: { onPendingChange: (n: number) => void }) {
   const [leaves, setLeaves] = useState<Leave[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -2334,7 +2319,7 @@ function OpenClassesCard({ onChanged }: { onChanged: () => void }) {
 
 /* Admin: the substitution board */
 
-function AdminSubstitutions() {
+export function AdminSubstitutions() {
   const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA").format(new Date()))
   const [gaps, setGaps] = useState<Gap[] | null>(null)
   const [totals, setTotals] = useState({ total: 0, covered: 0 })
@@ -2558,20 +2543,15 @@ function GapRow({ gap, date, onChanged }: { gap: Gap; date: string; onChanged: (
                   </Tooltip>
                 </span>
               ))}
+              {/* A gap whose period has ended is history — assigning a cover
+                  then does nothing, so the picker only exists while the
+                  period can still be saved. */}
+              {!over && (
               <Popover open={openPicker} onOpenChange={(o) => { setOpenPicker(o); if (o) { setPicked(""); setQuery(""); loadCandidates() } }}>
                 <PopoverTrigger asChild>
-                  {over ? (
-                    <button
-                      type="button"
-                      className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                    >
-                      record a cover
-                    </button>
-                  ) : (
-                    <Button size="sm" variant="outline">
-                      {openOffers.length ? "Someone else…" : "Assign cover"}
-                    </Button>
-                  )}
+                  <Button size="sm" variant="outline">
+                    {openOffers.length ? "Someone else…" : "Assign cover"}
+                  </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-72 p-0">
                   <div className="border-b border-border p-2">
@@ -2634,6 +2614,7 @@ function GapRow({ gap, date, onChanged }: { gap: Gap; date: string; onChanged: (
                   </div>
                 </PopoverContent>
               </Popover>
+              )}
             </>
           )}
         </span>

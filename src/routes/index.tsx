@@ -41,6 +41,7 @@ import { TestBuilderPage } from "@/modules/tests/pages/test-builder-page"
 import { TestMonitorPage } from "@/modules/tests/pages/test-monitor-page"
 import { ReportsPage } from "@/modules/reports/pages/reports-page"
 import { ReportPrintPage } from "@/modules/reports/pages/report-print-page"
+import { KpiPage } from "@/modules/kpi/pages/kpi-page"
 import { GenerateQuestionsPage } from "@/modules/exams/pages/generate-questions-page"
 import { QuestionsPage } from "@/modules/exams/pages/questions-page"
 import { PdfBuilderPage } from "@/modules/exams/pages/pdf-builder-page"
@@ -58,6 +59,7 @@ import { FeatureRoute } from "@/components/shared/feature-route"
 import { ComingSoonPage } from "@/modules/coming-soon/pages/coming-soon-page"
 import { AllotmentsPage } from "@/modules/allotments/pages/allotments-page"
 import { AttendancePage } from "@/modules/attendance/pages/attendance-page"
+import { LeaveSubstitutionPage } from "@/modules/attendance/pages/leave-substitution-page"
 import { RolloverPage } from "@/modules/rollover/pages/rollover-page"
 import { DepartmentsPage } from "@/modules/departments/pages/departments-page"
 import { DepartmentDetailPage } from "@/modules/departments/pages/department-detail-page"
@@ -127,6 +129,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: "reports", element: <ReportsPage /> },
+          { path: "kpi", element: <KpiPage /> },
           // One route for the grid and the grade sheet, so opening or closing
           // the sheet only changes params — the page never remounts.
           { path: "classes", element: <ClassesPage /> },
@@ -171,6 +174,8 @@ export const router = createBrowserRouter([
           },
           { path: "attendance", element: <AttendancePage /> },
           { path: "attendance/:tab", element: <AttendancePage /> },
+          { path: "leave", element: <LeaveSubstitutionPage /> },
+          { path: "leave/:tab", element: <LeaveSubstitutionPage /> },
           { path: "rollover", element: <RolloverPage /> },
           { path: "departments", element: <DepartmentsPage /> },
           { path: "departments/:id", element: <DepartmentDetailPage /> },
