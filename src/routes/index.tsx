@@ -39,6 +39,8 @@ import { ExamsPage } from "@/modules/exams/pages/exams-page"
 import { OnlineTestsPage } from "@/modules/tests/pages/online-tests-page"
 import { TestBuilderPage } from "@/modules/tests/pages/test-builder-page"
 import { TestMonitorPage } from "@/modules/tests/pages/test-monitor-page"
+import { ReportsPage } from "@/modules/reports/pages/reports-page"
+import { ReportPrintPage } from "@/modules/reports/pages/report-print-page"
 import { GenerateQuestionsPage } from "@/modules/exams/pages/generate-questions-page"
 import { QuestionsPage } from "@/modules/exams/pages/questions-page"
 import { PdfBuilderPage } from "@/modules/exams/pages/pdf-builder-page"
@@ -117,10 +119,14 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     children: [
       { path: "onboarding", element: <OnboardingPage /> },
+      // The print document renders OUTSIDE the app shell — it goes to paper,
+      // so no sidebar, no dark theme, just the report.
+      { path: "reports/print", element: <ReportPrintPage /> },
       {
         element: <AppLayout />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: "reports", element: <ReportsPage /> },
           // One route for the grid and the grade sheet, so opening or closing
           // the sheet only changes params — the page never remounts.
           { path: "classes", element: <ClassesPage /> },

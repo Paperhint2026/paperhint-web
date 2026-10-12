@@ -222,13 +222,15 @@ export const ADMIN_NAV: NavGroup[] = [
         "T14",
         "Answer sheets photographed and scored against the same rubric for every student; the school-level view over what teachers review."
       ),
-      soon(
-        "results",
-        "Results & report cards",
-        CertificateIcon,
-        "A13",
-        "Marks per student per exam, and a printable term report card compiled from the records that already exist. Also shown inside each student's profile."
-      ),
+      // A13 gone live: printable attendance registers, report cards and
+      // marks sheets, compiled from records that already exist.
+      {
+        key: "results",
+        title: "Reports & printouts",
+        icon: CertificateIcon,
+        path: "/reports",
+        status: "live",
+      },
     ],
   },
   {
@@ -321,6 +323,13 @@ export const TEACHER_NAV: NavGroup[] = [
         title: "Attendance",
         icon: ClipboardTextIcon,
         path: "/attendance",
+        status: "live",
+      },
+      {
+        key: "reports",
+        title: "Reports",
+        icon: CertificateIcon,
+        path: "/reports",
         status: "live",
       },
       {

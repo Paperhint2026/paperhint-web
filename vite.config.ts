@@ -13,6 +13,11 @@ import { defineConfig, type Plugin } from "vite"
 // frame-src 'none' means NO <iframe>/<object> PDF previews — they render blank
 // in prod. PDFs are drawn to canvases by components/shared/pdf-pages.tsx
 // (pdf.js, bundled locally so its worker passes script-src 'self').
+//
+// 'wasm-unsafe-eval' is NOT 'unsafe-eval': JS eval()/new Function stay
+// blocked; it only permits WebAssembly compilation. @react-pdf/renderer's
+// Yoga layout engine is wasm — without it the question-paper PDF builder
+// dies in prod with a CSP CompileError.
 function cspMeta(): Plugin {
   return {
     name: "csp-meta",
@@ -20,7 +25,7 @@ function cspMeta(): Plugin {
     transformIndexHtml(html) {
       return html.replace(
         "<head>",
-        `<head>\n    <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'self'; frame-src 'none'; form-action 'self'" />`
+        `<head>\n    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'self'; frame-src 'none'; form-action 'self'" />`
       )
     },
   }

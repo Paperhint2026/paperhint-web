@@ -67,6 +67,12 @@ export function AcademicYearCard() {
   const [label, setLabel] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  // Editing the OPEN year's dates after the fact — onboarding opens the year
+  // automatically without dates, and the reports period presets (year /
+  // halves / quarters) follow whatever is set here.
+  const [editingDates, setEditingDates] = useState(false)
+  const [editStart, setEditStart] = useState("")
+  const [editEnd, setEditEnd] = useState("")
 
   const load = useCallback(() => {
     apiClient
@@ -94,6 +100,31 @@ export function AcademicYearCard() {
     setStartDate("")
     setEndDate("")
     setStarting(true)
+  }
+
+  const beginEditDates = () => {
+    if (!open) return
+    setEditStart(open.start_date ?? "")
+    setEditEnd(open.end_date ?? "")
+    setEditingDates(true)
+  }
+
+  const saveDates = async () => {
+    if (!open) return
+    setSaving(true)
+    try {
+      await apiClient.patch(`/api/academic-years/${open.id}`, {
+        start_date: editStart || null,
+        end_date: editEnd || null,
+      })
+      toast.success(`${open.label} dates saved`)
+      setEditingDates(false)
+      load()
+    } catch (e) {
+      showError(e)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const submit = async () => {
@@ -151,10 +182,15 @@ export function AcademicYearCard() {
                   {open.class_count === 1 ? "class" : "classes"}
                 </span>
               </div>
-              {!starting && (
-                <Button variant="outline" onClick={beginStart}>
-                  Start new academic year
-                </Button>
+              {!starting && !editingDates && (
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={beginEditDates}>
+                    {open.start_date || open.end_date ? "Edit dates" : "Set dates"}
+                  </Button>
+                  <Button variant="outline" onClick={beginStart}>
+                    Start new academic year
+                  </Button>
+                </div>
               )}
             </div>
           ) : (
@@ -166,6 +202,51 @@ export function AcademicYearCard() {
               {!starting && (
                 <Button onClick={beginStart}>Open the first year</Button>
               )}
+            </div>
+          )}
+
+          {/* Edit the open year's dates */}
+          {editingDates && open && (
+            <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">Starts</Label>
+                  <DatePickerField
+                    value={editStart}
+                    onChange={setEditStart}
+                    className="w-48"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs">Ends</Label>
+                  <DatePickerField
+                    value={editEnd}
+                    onChange={setEditEnd}
+                    className="w-48"
+                  />
+                </div>
+                <div className="ml-auto flex gap-2">
+                  <Button variant="ghost" onClick={() => setEditingDates(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={saveDates}
+                    disabled={
+                      saving || Boolean(editStart && editEnd && editEnd <= editStart)
+                    }
+                  >
+                    {saving ? (
+                      <CircleNotchIcon className="size-4 animate-spin" />
+                    ) : (
+                      "Save dates"
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Report periods — the academic year, halves and quarters — follow
+                these dates. Without them, 1 April – 31 March is assumed.
+              </p>
             </div>
           )}
 

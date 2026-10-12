@@ -90,7 +90,13 @@ type Overview = {
   totals: { expected: number; taken: number; missing: number }
 }
 
-const STATUS_ORDER: Status[] = ["present", "absent", "late", "leave"]
+// The roll is binary — schools keep Present/Absent, nothing else. The
+// Status type keeps the legacy values so registers saved before this
+// simplification still load; normalizeStatus folds them onto P/A.
+const STATUS_ORDER: Status[] = ["present", "absent"]
+
+const normalizeStatus = (s: Status): Status =>
+  s === "late" ? "present" : s === "leave" ? "absent" : s
 const STATUS_NAME: Record<Status, string> = {
   present: "Present",
   absent: "Absent",
@@ -894,9 +900,10 @@ function RosterMarking({
       .then((r) => {
         setStudents(r.students)
         // Everyone starts present; an existing register overlays its truth.
+        // Legacy late/leave rows snap onto the two buttons.
         const initial: Record<string, Status> = {}
         for (const s of r.students) initial[s.id] = "present"
-        for (const e of r.entries) initial[e.student_id] = e.status
+        for (const e of r.entries) initial[e.student_id] = normalizeStatus(e.status)
         setMarks(initial)
         setMeta(r.register)
       })
@@ -955,8 +962,6 @@ function RosterMarking({
         <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
           <span>{counts.present} present</span>
           {counts.absent > 0 && <span className="text-destructive">{counts.absent} absent</span>}
-          {counts.late > 0 && <span>{counts.late} late</span>}
-          {counts.leave > 0 && <span>{counts.leave} leave</span>}
         </div>
       </div>
 
